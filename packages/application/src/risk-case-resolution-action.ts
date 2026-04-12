@@ -1,0 +1,5 @@
+export enum RiskCaseResolutionAction {
+  MarkRiskCaseUnderReviewAfterSubcaseCompletion = "MarkRiskCaseUnderReviewAfterSubcaseCompletion",
+  MarkRiskCaseResolvedAfterSubcaseCompletion = "MarkRiskCaseResolvedAfterSubcaseCompletion",
+  MarkRiskCaseManualInterventionRequiredAfterSubcaseFailure = "MarkRiskCaseManualInterventionRequiredAfterSubcaseFailure"
+}

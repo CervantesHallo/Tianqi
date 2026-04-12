@@ -1,0 +1,16 @@
+{
+  "name": "@tianqi/ports",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@tianqi/contracts": "workspace:*",
+    "@tianqi/domain": "workspace:*",
+    "@tianqi/shared": "workspace:*"
+  }
+}

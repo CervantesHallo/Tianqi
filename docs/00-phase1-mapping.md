@@ -1,5 +1,11 @@
 # Tianqi Phase 1 Mapping
 
+## 跨 Phase 通用文档
+
+与某一特定 Phase 无关、贯穿整个仓库生命周期的工程约定统一登记于本节。
+
+- [`docs/commit-convention.md`](./commit-convention.md) —— 仓库 commit 消息风格约定（Conventional Commits + Trailer，基于 `git log` 实际样本固化）。
+
 ## Phase 2 启动状态（当前焦点）
 
 - Phase 1 骨架与治理收口资产已冻结为基线，不再作为当前主增量方向。

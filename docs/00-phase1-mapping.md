@@ -173,7 +173,7 @@
 - `ports` -> `packages/ports`：外部系统端口接口定义（仅抽象，不含实现，含 repository/idempotency/publisher/result-store/compensation-query/compensation-mutation/audit-sink/metrics-sink/sink-failure-recovery-store）
 - `application` -> `packages/application`：最小命令入口（create/transition）+ 结果回读 + 补偿查询/变更入口 + 审计事件表达 + metrics 映射 + sink 调用编排占位
 - `policy` -> `packages/policy`：策略接口占位（无业务细节）
-- `infrastructure` -> `packages/infrastructure`：Phase 1 占位目录（无外部接入实现），Phase 8 起新建 Adapter 走 `packages/adapters/*` 路线
+- `infrastructure` -> `packages/infrastructure`：**DEPRECATED（Phase 8 起）** —— Adapter 统一落点为 `packages/adapters/*`。本目录仅保留 Phase 1 / Step 1 占位，禁止新增任何源文件、脚本、测试或子目录，统一清理时点不在 Phase 8 范围内。详见 `packages/infrastructure/README.md` 顶部 DEPRECATED 段。
 - `adapters` -> `packages/adapters/*`：Phase 8 起承载所有 Port 在真实基础设施上的具体 Adapter；Step 1 已落地 `@tianqi/adapter-testkit` 共享契约测试工具包骨架
 
 ## 当前已落地

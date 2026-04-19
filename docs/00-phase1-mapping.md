@@ -173,7 +173,8 @@
 - `ports` -> `packages/ports`：外部系统端口接口定义（仅抽象，不含实现，含 repository/idempotency/publisher/result-store/compensation-query/compensation-mutation/audit-sink/metrics-sink/sink-failure-recovery-store）
 - `application` -> `packages/application`：最小命令入口（create/transition）+ 结果回读 + 补偿查询/变更入口 + 审计事件表达 + metrics 映射 + sink 调用编排占位
 - `policy` -> `packages/policy`：策略接口占位（无业务细节）
-- `infrastructure` -> `packages/infrastructure`：预留目录（无外部接入实现）
+- `infrastructure` -> `packages/infrastructure`：Phase 1 占位目录（无外部接入实现），Phase 8 起新建 Adapter 走 `packages/adapters/*` 路线
+- `adapters` -> `packages/adapters/*`：Phase 8 起承载所有 Port 在真实基础设施上的具体 Adapter；Step 1 已落地 `@tianqi/adapter-testkit` 共享契约测试工具包骨架
 
 ## 当前已落地
 
@@ -416,3 +417,7 @@ Phase 7 原始目标：配置发布守卫 / 契约冻结 / 回滚方案 / Runboo
 **Phase 7 已封板。Decision: phase7_closed。Ready for Next Phase: YES。Phase 7 不再接受新能力。**
 
 **Tianqi（天启）Phase 1-7 全部封板完成。**
+
+Phase 8 原始目标：把 Phase 1 在 `packages/ports` 中定义的所有端口在生产级别上落地（EventStore / Notification / Config / External Engine 四类 Adapter），共计 20 个 Step。
+
+- Step 1 完成基础设施适配器层骨架启动：`pnpm-workspace.yaml` 新增 `packages/adapters/*` 通配 + 新增 `packages/adapters/adapter-testkit` 共享契约测试工具包骨架（package.json / tsconfig.json / src/index.ts / README.md，依赖严格限定为 `@tianqi/contracts` 与 `@tianqi/ports`）+ 新增 `packages/adapters/README.md` 顶层说明（位置/三条强约束/已入驻 Adapter 表）+ 根 `tsconfig.json` 接入新工作区包的 Project Reference + 执行记录文档 `docs/phase8/01-adapter-layer-scaffolding.md`。本步不实现任何契约测试、不创建任何具体 Adapter、不迁移任何 in-memory 实现、不改动 ports/contracts/domain/application/policy/shared 任何文件、不引入任何第三方生产依赖。详见 `docs/phase8/01-adapter-layer-scaffolding.md`。

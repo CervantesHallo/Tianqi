@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tianqi/contracts": "workspace:*",
-    "@tianqi/ports": "workspace:*"
+    "@tianqi/ports": "workspace:*",
+    "@tianqi/shared": "workspace:*"
   }
 }

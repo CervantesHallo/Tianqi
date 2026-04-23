@@ -1,3 +1,10 @@
 export type { AdapterFoundationFactory } from "./adapter-foundation-factory.js";
 export { defineHealthCheckContractTests } from "./health-check-contract.js";
 export { defineLifecycleContractTests } from "./lifecycle-contract.js";
+export type { EventStoreContractProbe } from "./event-store-contract-probe.js";
+export { defineEventStoreContractTests } from "./event-store-contract.js";
+export type {
+  EventStoreAdapterFactory,
+  EventStoreAdapterUnderTest,
+  EventStoreContractOptions
+} from "./event-store-contract.js";

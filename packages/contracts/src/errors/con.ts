@@ -42,3 +42,18 @@ export const adapterContractTestViolationError = (
     },
     cause
   );
+
+export const eventSchemaViolationError = (
+  fieldName: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.EVENT_SCHEMA_VIOLATION,
+    "Event schema violation",
+    {
+      fieldName,
+      reason
+    },
+    cause
+  );

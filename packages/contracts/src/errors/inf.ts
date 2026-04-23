@@ -40,3 +40,29 @@ export const adapterInitializationFailedError = (
     },
     cause
   );
+
+export const eventStoreNotInitializedError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EVENT_STORE_NOT_INITIALIZED,
+    "Event store adapter is not initialized",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );
+
+export const eventStoreAlreadyShutDownError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EVENT_STORE_ALREADY_SHUT_DOWN,
+    "Event store adapter has already been shut down",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );

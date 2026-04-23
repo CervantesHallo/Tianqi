@@ -16,9 +16,18 @@ export type {
 } from "./error-code.js";
 export { ERROR_LAYERS } from "./errors/index.js";
 export type { ErrorLayer, TianqiErrorContext } from "./errors/index.js";
-export { adapterInitializationFailedError, InfrastructureError } from "./errors/index.js";
+export {
+  adapterInitializationFailedError,
+  eventStoreAlreadyShutDownError,
+  eventStoreNotInitializedError,
+  InfrastructureError
+} from "./errors/index.js";
 export { sagaStepTimeoutError, SagaError } from "./errors/index.js";
-export { adapterContractTestViolationError, Phase8ContractError } from "./errors/index.js";
+export {
+  adapterContractTestViolationError,
+  eventSchemaViolationError,
+  Phase8ContractError
+} from "./errors/index.js";
 export type { DomainEventEnvelope } from "./domain-event-envelope.js";
 export { DOMAIN_EVENT_TYPES } from "./domain-event-type.js";
 export type { DomainEventType } from "./domain-event-type.js";

@@ -48,6 +48,22 @@ importers:
         specifier: workspace:*
         version: link:../../shared
 
+  packages/adapters/event-store-memory:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+
   packages/application:
     dependencies:
       '@tianqi/contracts':

@@ -3,9 +3,7 @@ export {
   contractRequiredFieldMissingError,
   ContractError
 } from "./contract-error.js";
-export {
-  createDomainEventEnvelope
-} from "./domain-event-envelope.js";
+export { createDomainEventEnvelope } from "./domain-event-envelope.js";
 export { ERROR_CODES } from "./error-code.js";
 export type {
   ApplicationErrorCode,
@@ -13,8 +11,14 @@ export type {
   DomainErrorCode,
   ErrorCode,
   InfrastructureErrorCode,
-  PolicyErrorCode
+  PolicyErrorCode,
+  SagaErrorCode
 } from "./error-code.js";
+export { ERROR_LAYERS } from "./errors/index.js";
+export type { ErrorLayer, TianqiErrorContext } from "./errors/index.js";
+export { adapterInitializationFailedError, InfrastructureError } from "./errors/index.js";
+export { sagaStepTimeoutError, SagaError } from "./errors/index.js";
+export { adapterContractTestViolationError, Phase8ContractError } from "./errors/index.js";
 export type { DomainEventEnvelope } from "./domain-event-envelope.js";
 export { DOMAIN_EVENT_TYPES } from "./domain-event-type.js";
 export type { DomainEventType } from "./domain-event-type.js";

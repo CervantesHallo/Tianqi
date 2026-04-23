@@ -41,9 +41,12 @@ export const ERROR_CODES = {
   CONTRACT_COMPATIBILITY_BLOCKED: "TQ-APP-024",
   RELEASE_GUARD_BLOCKED: "TQ-APP-025",
   INFRASTRUCTURE_UNAVAILABLE: "TQ-INF-001",
+  ADAPTER_INITIALIZATION_FAILED: "TQ-INF-002",
   CONTRACT_VERSION_INCOMPATIBLE: "TQ-CON-001",
   CONTRACT_REQUIRED_FIELD_MISSING: "TQ-CON-002",
-  CONTRACT_INVALID_FIELD_FORMAT: "TQ-CON-003"
+  CONTRACT_INVALID_FIELD_FORMAT: "TQ-CON-003",
+  ADAPTER_CONTRACT_TEST_VIOLATION: "TQ-CON-004",
+  SAGA_STEP_TIMEOUT: "TQ-SAG-001"
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -53,3 +56,4 @@ export type ApplicationErrorCode = Extract<ErrorCode, `TQ-APP-${string}`>;
 export type PolicyErrorCode = Extract<ErrorCode, `TQ-POL-${string}`>;
 export type InfrastructureErrorCode = Extract<ErrorCode, `TQ-INF-${string}`>;
 export type ContractErrorCode = Extract<ErrorCode, `TQ-CON-${string}`>;
+export type SagaErrorCode = Extract<ErrorCode, `TQ-SAG-${string}`>;

@@ -1,7 +1,13 @@
 export type {
-  ADLCaseRepositoryError,
-  ADLCaseRepositoryPort
-} from "./adl-case-repository-port.js";
+  AdapterFoundation,
+  AdapterHealthCheck,
+  AdapterHealthDetails,
+  AdapterHealthDetailValue,
+  AdapterHealthStatus,
+  AdapterIdentity,
+  AdapterLifecycle
+} from "./adapter-foundation.js";
+export type { ADLCaseRepositoryError, ADLCaseRepositoryPort } from "./adl-case-repository-port.js";
 export type {
   AuditEventRecord,
   AuditEventSinkError,
@@ -100,7 +106,11 @@ export type {
   SinkFailureRecoveryStoreError,
   SinkFailureRecoveryStorePort
 } from "./sink-failure-recovery-store-port.js";
-export type { NotificationMessage, NotificationPort, NotificationPortError } from "./notification-port.js";
+export type {
+  NotificationMessage,
+  NotificationPort,
+  NotificationPortError
+} from "./notification-port.js";
 export type {
   RiskCaseRepositoryError,
   RiskCaseRepositoryPort

@@ -6,6 +6,11 @@ import {
   adapterInitializationFailedError,
   configFileUnreadableError,
   configHistoryDirectoryUnreadableError,
+  externalEngineCircuitOpenError,
+  externalEngineNonRetryableError,
+  externalEngineRateLimitedError,
+  externalEngineRetriesExhaustedError,
+  externalEngineTimeoutError,
   InfrastructureError
 } from "./inf.js";
 
@@ -94,5 +99,94 @@ describe("TQ-INF error namespace", () => {
     expect(ERROR_CODES.CONFIG_FILE_UNREADABLE).not.toBe(
       ERROR_CODES.CONFIG_HISTORY_DIRECTORY_UNREADABLE
     );
+  });
+
+  it("constructs TQ-INF-013 external engine timeout with domain-level phase moniker", () => {
+    const error = externalEngineTimeoutError("margin-engine-http", "request", 2_000, 2_004);
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe("TQ-INF-013");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "margin-engine-http",
+      timeoutPhase: "request",
+      timeoutMs: 2_000,
+      elapsedMs: 2_004
+    });
+  });
+
+  it("constructs TQ-INF-014 retries exhausted with domain-level final failure category", () => {
+    const error = externalEngineRetriesExhaustedError(
+      "match-engine-http",
+      4,
+      3,
+      "downstream_unavailable"
+    );
+    expect(error.code).toBe("TQ-INF-014");
+    expect(error.context).toEqual({
+      adapterName: "match-engine-http",
+      attempts: 4,
+      maxRetries: 3,
+      finalFailureCategory: "downstream_unavailable"
+    });
+    // §6.5 discipline: the category is a domain moniker, NOT an HTTP status or a raw
+    // socket error. This assertion is a soft guard against regressions that would be
+    // tempting to write (e.g. passing `String(err.code)`).
+    expect(String(error.context["finalFailureCategory"])).not.toMatch(/^[45]\d\d$/);
+  });
+
+  it("constructs TQ-INF-015 circuit-open with open timestamp and trip counter", () => {
+    const openedAt = "2026-04-24T10:00:00.000Z";
+    const error = externalEngineCircuitOpenError("position-engine-http", openedAt, 3);
+    expect(error.code).toBe("TQ-INF-015");
+    expect(error.context).toEqual({
+      adapterName: "position-engine-http",
+      openedAt,
+      consecutiveFailures: 3
+    });
+  });
+
+  it("constructs TQ-INF-016 rate-limited with quantified concurrency signal", () => {
+    const error = externalEngineRateLimitedError("mark-price-engine-http", 5, 5);
+    expect(error.code).toBe("TQ-INF-016");
+    expect(error.context).toEqual({
+      adapterName: "mark-price-engine-http",
+      currentConcurrency: 5,
+      cap: 5
+    });
+  });
+
+  it("constructs TQ-INF-017 non-retryable with domain-level downstream category", () => {
+    const error = externalEngineNonRetryableError(
+      "fund-engine-http",
+      "permission_denied",
+      "caller lacks write capability on fund account"
+    );
+    expect(error.code).toBe("TQ-INF-017");
+    expect(error.context).toEqual({
+      adapterName: "fund-engine-http",
+      downstreamCategory: "permission_denied",
+      reason: "caller lacks write capability on fund account"
+    });
+    // §6.5: downstream category must not be a 4xx / 5xx raw status.
+    expect(String(error.context["downstreamCategory"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("keeps all five External Engine codes distinct and under the TQ-INF namespace", () => {
+    // Convention K: five remediation tool-chains, five codes. Each failure mode has a
+    // different runbook (timeout: check budgets / retry: investigate downstream /
+    // circuit: engage the breaker dashboard / rate: raise cap or queue / non-retryable:
+    // inspect request contract), so the namespace stays granular rather than collapsed.
+    const codes = [
+      ERROR_CODES.EXTERNAL_ENGINE_TIMEOUT,
+      ERROR_CODES.EXTERNAL_ENGINE_RETRIES_EXHAUSTED,
+      ERROR_CODES.EXTERNAL_ENGINE_CIRCUIT_OPEN,
+      ERROR_CODES.EXTERNAL_ENGINE_RATE_LIMITED,
+      ERROR_CODES.EXTERNAL_ENGINE_NON_RETRYABLE
+    ];
+    const unique = new Set(codes);
+    expect(unique.size).toBe(5);
+    for (const code of codes) {
+      expect(code.startsWith("TQ-INF-")).toBe(true);
+    }
   });
 });

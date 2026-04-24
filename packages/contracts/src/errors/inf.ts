@@ -177,3 +177,105 @@ export const configHistoryDirectoryUnreadableError = (
     },
     cause
   );
+
+// External Engine five-pack (Step 13): each of the five factories below enforces the
+// §6.5 "领域摘要转译" discipline — the `reason` / category parameters are deliberately
+// typed as domain-level strings (e.g. "invalid_request" / "downstream_unavailable"),
+// NOT raw HTTP status codes, socket error class names, or downstream stack traces.
+// Adapter implementations MUST translate whatever lower-level signal they saw into a
+// domain-recognisable moniker before calling these factories; doing otherwise leaks
+// downstream details into the TQ-INF error context, which is exactly what §6.5 forbids.
+
+// Timeout phase is one of three: the time to open the socket (connect), the time from
+// request-sent to response-received (request), or the overall budget including retries
+// and backoff (total). Callers pass the elapsed time in ms so the error message alone
+// tells an operator "we waited X against a budget of Y and gave up".
+export const externalEngineTimeoutError = (
+  adapterName: string,
+  timeoutPhase: "connect" | "request" | "total",
+  timeoutMs: number,
+  elapsedMs: number
+): InfrastructureError =>
+  new InfrastructureError(ERROR_CODES.EXTERNAL_ENGINE_TIMEOUT, "External engine call timed out", {
+    adapterName,
+    timeoutPhase,
+    timeoutMs,
+    elapsedMs
+  });
+
+// Retries exhausted after all retryable attempts failed. `attempts` is the total number
+// of attempts made (including the first one), `maxRetries` is the configured budget, and
+// `finalFailureCategory` is a domain moniker ("downstream_unavailable" /
+// "transient_conflict" / etc) — NEVER a raw HTTP status or socket error string.
+export const externalEngineRetriesExhaustedError = (
+  adapterName: string,
+  attempts: number,
+  maxRetries: number,
+  finalFailureCategory: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EXTERNAL_ENGINE_RETRIES_EXHAUSTED,
+    "External engine retries exhausted",
+    {
+      adapterName,
+      attempts,
+      maxRetries,
+      finalFailureCategory
+    }
+  );
+
+// Raised when the circuit breaker is in "open" state and the call is refused without
+// reaching the downstream. openedAt is ISO-8601; consecutiveFailures is the count that
+// tripped the breaker, so a runbook can decide whether to lower the threshold or
+// investigate downstream health.
+export const externalEngineCircuitOpenError = (
+  adapterName: string,
+  openedAt: string,
+  consecutiveFailures: number
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EXTERNAL_ENGINE_CIRCUIT_OPEN,
+    "External engine circuit breaker is open",
+    {
+      adapterName,
+      openedAt,
+      consecutiveFailures
+    }
+  );
+
+// Raised when the client-side rate limiter refuses a call because concurrency would
+// exceed the configured cap. currentConcurrency and cap quantify the signal; together
+// they tell an operator whether to raise the cap or add a queue ahead of the adapter.
+export const externalEngineRateLimitedError = (
+  adapterName: string,
+  currentConcurrency: number,
+  cap: number
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EXTERNAL_ENGINE_RATE_LIMITED,
+    "External engine call rate limited",
+    {
+      adapterName,
+      currentConcurrency,
+      cap
+    }
+  );
+
+// Raised when the downstream returned an error that the adapter classified as
+// non-retryable. downstreamCategory is a domain moniker (e.g. "invalid_request" /
+// "permission_denied" / "not_found") — NEVER the raw HTTP status (400/403/404) or a
+// provider-specific error code. The translation lives in the adapter; §6.5 discipline.
+export const externalEngineNonRetryableError = (
+  adapterName: string,
+  downstreamCategory: string,
+  reason: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EXTERNAL_ENGINE_NON_RETRYABLE,
+    "External engine returned a non-retryable error",
+    {
+      adapterName,
+      downstreamCategory,
+      reason
+    }
+  );

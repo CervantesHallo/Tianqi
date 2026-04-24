@@ -15,6 +15,7 @@
     { "path": "./packages/adapters/notification-kafka" },
     { "path": "./packages/adapters/config-memory" },
     { "path": "./packages/adapters/config-file" },
-    { "path": "./packages/adapters/external-engine-http-base" }
+    { "path": "./packages/adapters/external-engine-http-base" },
+    { "path": "./packages/adapters/margin-engine-http" }
   ]
 }

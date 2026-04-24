@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { AdapterFoundation } from "@tianqi/ports";
 
 import {
+  defineConfigContractTests,
+  defineEventStoreContractTests,
   defineHealthCheckContractTests,
   defineLifecycleContractTests,
+  defineNotificationContractTests,
   type AdapterFoundationFactory
 } from "./index.js";
 
@@ -45,5 +48,13 @@ describe("@tianqi/adapter-testkit exports", () => {
     const factory: AdapterFoundationFactory = async () => buildStubFoundation();
     expect(() => defineHealthCheckContractTests(factory)).not.toThrow();
     expect(() => defineLifecycleContractTests(factory)).not.toThrow();
+  });
+
+  it("exports the full set of Phase 8 adapter contract suites as callable functions", () => {
+    // Smoke test: every contract suite ships as a named export so Adapters can mount it
+    // with a single import. Without this guard, renaming one would silently break fan-out.
+    expect(typeof defineEventStoreContractTests).toBe("function");
+    expect(typeof defineNotificationContractTests).toBe("function");
+    expect(typeof defineConfigContractTests).toBe("function");
   });
 });

@@ -25,3 +25,15 @@ export type {
   NotificationAdapterUnderTest,
   NotificationContractOptions
 } from "./notification-contract.js";
+export type {
+  ConfigAuditCause,
+  ConfigAuditEntry,
+  ConfigContractProbe,
+  ConfigContractProbeError
+} from "./config-contract-probe.js";
+export { defineConfigContractTests } from "./config-contract.js";
+export type {
+  ConfigAdapterFactory,
+  ConfigAdapterUnderTest,
+  ConfigContractOptions
+} from "./config-contract.js";

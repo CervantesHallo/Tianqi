@@ -21,6 +21,7 @@ export {
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
   InfrastructureError,
+  kafkaBrokerUnreachableError,
   postgresUnreachableError,
   sqliteDatabaseUnreachableError,
   sqliteSchemaVersionMismatchError

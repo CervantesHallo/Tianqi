@@ -117,3 +117,20 @@ export const postgresUnreachableError = (
     },
     cause
   );
+
+export const kafkaBrokerUnreachableError = (
+  adapterName: string,
+  brokers: readonly string[],
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.KAFKA_BROKER_UNREACHABLE,
+    "Kafka broker is unreachable",
+    {
+      adapterName,
+      brokers: brokers.join(","),
+      reason
+    },
+    cause
+  );

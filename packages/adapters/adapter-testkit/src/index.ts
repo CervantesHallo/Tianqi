@@ -37,3 +37,10 @@ export type {
   ConfigAdapterUnderTest,
   ConfigContractOptions
 } from "./config-contract.js";
+export { definePersistentConfigContractTests } from "./persistent-config-contract.js";
+export type {
+  PersistentConfigAdapterFactory,
+  PersistentConfigAdapterUnderTest,
+  PersistentConfigContractOptions,
+  PersistentConfigTestSession
+} from "./persistent-config-contract.js";

@@ -8,6 +8,8 @@ import {
   defineHealthCheckContractTests,
   defineLifecycleContractTests,
   defineNotificationContractTests,
+  definePersistentConfigContractTests,
+  definePersistentEventStoreContractTests,
   type AdapterFoundationFactory
 } from "./index.js";
 
@@ -56,5 +58,14 @@ describe("@tianqi/adapter-testkit exports", () => {
     expect(typeof defineEventStoreContractTests).toBe("function");
     expect(typeof defineNotificationContractTests).toBe("function");
     expect(typeof defineConfigContractTests).toBe("function");
+  });
+
+  it("exports the full set of Phase 8 persistent contract suites as callable functions", () => {
+    // Persistent contracts are a separate fan-out vector — Step 5 for EventStore,
+    // Step 12 for Config. Adapters that advertise persistence mount these additionally
+    // to the basic contracts. Guard the barrel so neither persistent suite silently
+    // disappears during a refactor.
+    expect(typeof definePersistentEventStoreContractTests).toBe("function");
+    expect(typeof definePersistentConfigContractTests).toBe("function");
   });
 });

@@ -108,6 +108,25 @@ importers:
         specifier: 7.6.11
         version: 7.6.11
 
+  packages/adapters/notification-kafka:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+
   packages/adapters/notification-memory:
     dependencies:
       '@tianqi/contracts':
@@ -939,6 +958,10 @@ packages:
 
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
+
+  kafkajs@2.2.4:
+    resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
+    engines: {node: '>=14.0.0'}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -2050,6 +2073,8 @@ snapshots:
   json-schema-traverse@0.4.1: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
+
+  kafkajs@2.2.4: {}
 
   keyv@4.5.4:
     dependencies:

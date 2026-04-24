@@ -134,3 +134,24 @@ export const kafkaBrokerUnreachableError = (
     },
     cause
   );
+
+// Config-file adapter specific: raised when init() cannot open / read the YAML file.
+// Tool chain ("which path, whose mount, what permission") diverges from DB-connection
+// failures and Kafka-broker failures, so Convention K says mint a distinct code rather
+// than reuse TQ-INF-001/009/010.
+export const configFileUnreadableError = (
+  adapterName: string,
+  filePath: string,
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.CONFIG_FILE_UNREADABLE,
+    "Config file is unreadable",
+    {
+      adapterName,
+      filePath,
+      reason
+    },
+    cause
+  );

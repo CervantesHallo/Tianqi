@@ -101,3 +101,26 @@ export const adapterConfigActivationAuditFailedError = (
     },
     cause
   );
+
+// Config-file adapter specific: YAML parsed successfully but structurally did not match
+// the Adapter's expected shape (root `version` missing/non-integer, `values` missing/
+// non-object, etc). This is distinct from TQ-CON-005 EVENT_SCHEMA_VIOLATION because the
+// remediation corpus is completely different — Config schemas are operator-facing YAML
+// documented for humans to hand-edit, while event schemas are program-generated JSON
+// whose docs live in the domain-event package.
+export const configFileSchemaInvalidError = (
+  adapterName: string,
+  filePath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID,
+    "Config file schema is invalid",
+    {
+      adapterName,
+      filePath,
+      reason
+    },
+    cause
+  );

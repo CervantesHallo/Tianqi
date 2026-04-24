@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { ERROR_CODES } from "../error-code.js";
 import { ERROR_LAYERS } from "./error-layer.js";
-import { adapterInitializationFailedError, InfrastructureError } from "./inf.js";
+import {
+  adapterInitializationFailedError,
+  configFileUnreadableError,
+  InfrastructureError
+} from "./inf.js";
 
 describe("TQ-INF error namespace", () => {
   it("constructs the TQ-INF-002 sample via factory", () => {
@@ -38,5 +42,25 @@ describe("TQ-INF error namespace", () => {
     // @ts-expect-error — TQ-SAG-001 cannot be assigned to an InfrastructureErrorCode slot
     const invalid = new InfrastructureError(ERROR_CODES.SAGA_STEP_TIMEOUT, "wrong", {});
     expect(invalid).toBeInstanceOf(InfrastructureError);
+  });
+
+  it("constructs the TQ-INF-011 config-file unreadable via factory", () => {
+    const cause = new Error("ENOENT: no such file or directory");
+    const error = configFileUnreadableError(
+      "config-file",
+      "/etc/tianqi/config.yaml",
+      "file not found",
+      cause
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.CONFIG_FILE_UNREADABLE);
+    expect(error.code).toBe("TQ-INF-011");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "config-file",
+      filePath: "/etc/tianqi/config.yaml",
+      reason: "file not found"
+    });
+    expect(error.cause).toBe(cause);
   });
 });

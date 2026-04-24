@@ -5,6 +5,7 @@ import {
   adapterConfigActivationAuditFailedError,
   adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
+  configFileSchemaInvalidError,
   Phase8ContractError
 } from "./con.js";
 import { ERROR_LAYERS } from "./error-layer.js";
@@ -88,5 +89,31 @@ describe("TQ-CON error namespace (Phase 8 structured class)", () => {
     const cause = new Error("audit writer offline");
     const error = adapterConfigActivationAuditFailedError("reference-config", 7, 6, cause);
     expect(error.cause).toBe(cause);
+  });
+
+  it("constructs the TQ-CON-008 config-file schema-invalid via factory", () => {
+    const error = configFileSchemaInvalidError(
+      "config-file",
+      "/etc/tianqi/config.yaml",
+      "root `version` must be a positive integer"
+    );
+    expect(error).toBeInstanceOf(Phase8ContractError);
+    expect(error.code).toBe(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID);
+    expect(error.code).toBe("TQ-CON-008");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "config-file",
+      filePath: "/etc/tianqi/config.yaml",
+      reason: "root `version` must be a positive integer"
+    });
+  });
+
+  it("distinguishes TQ-CON-008 from TQ-CON-005 event schema violation", () => {
+    // Convention K applied: event schemas and config schemas live in different corpora
+    // (program-generated JSON with domain-event docs vs operator-edited YAML with runbook
+    // docs), so the two diagnostics stay split even though both surface as "schema wrong".
+    expect(ERROR_CODES.EVENT_SCHEMA_VIOLATION).toBe("TQ-CON-005");
+    expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).toBe("TQ-CON-008");
+    expect(ERROR_CODES.EVENT_SCHEMA_VIOLATION).not.toBe(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID);
   });
 });

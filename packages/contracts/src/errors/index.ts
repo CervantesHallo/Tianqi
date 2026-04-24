@@ -2,6 +2,7 @@ export { ERROR_LAYERS } from "./error-layer.js";
 export type { ErrorLayer, TianqiErrorContext } from "./error-layer.js";
 export {
   adapterInitializationFailedError,
+  configFileUnreadableError,
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
   InfrastructureError,
@@ -15,6 +16,7 @@ export {
   adapterConfigActivationAuditFailedError,
   adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
+  configFileSchemaInvalidError,
   eventSchemaViolationError,
   Phase8ContractError
 } from "./con.js";

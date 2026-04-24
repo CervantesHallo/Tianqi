@@ -100,3 +100,20 @@ export const sqliteSchemaVersionMismatchError = (
       actualVersion
     }
   );
+
+export const postgresUnreachableError = (
+  adapterName: string,
+  connectionTarget: string,
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.POSTGRES_UNREACHABLE,
+    "Postgres server is unreachable",
+    {
+      adapterName,
+      connectionTarget,
+      reason
+    },
+    cause
+  );

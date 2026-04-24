@@ -5,6 +5,7 @@ export {
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
   InfrastructureError,
+  postgresUnreachableError,
   sqliteDatabaseUnreachableError,
   sqliteSchemaVersionMismatchError
 } from "./inf.js";

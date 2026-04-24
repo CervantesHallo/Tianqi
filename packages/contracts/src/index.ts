@@ -21,6 +21,7 @@ export {
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
   InfrastructureError,
+  postgresUnreachableError,
   sqliteDatabaseUnreachableError,
   sqliteSchemaVersionMismatchError
 } from "./errors/index.js";

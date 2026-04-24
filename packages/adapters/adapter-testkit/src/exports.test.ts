@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AdapterFoundation } from "@tianqi/ports";
 
 import {
+  createMockDownstreamServer,
   defineConfigContractTests,
   defineEventStoreContractTests,
   defineExternalEngineContractTests,
@@ -75,5 +76,14 @@ describe("@tianqi/adapter-testkit exports", () => {
     // adapters (timeout / retry / circuit / rate limit / trace propagation). Guard
     // the barrel so renames or accidental removals during Step 14-18 land loudly.
     expect(typeof defineExternalEngineContractTests).toBe("function");
+  });
+
+  it("exports createMockDownstreamServer as a callable function for Sprint E reuse", () => {
+    // Step 15 extracts the mock HTTP downstream server from the Step 14 adapter's
+    // test/helpers/ into the testkit so Sprint E business engines can share it
+    // rather than each copy ~150 lines independently. Binding is Step 15's
+    // foundational contribution to Step 16-17 — guard it against accidental
+    // rename or removal.
+    expect(typeof createMockDownstreamServer).toBe("function");
   });
 });

@@ -49,6 +49,11 @@ export type {
   ExternalEngineContractProbe,
   ExternalEngineRetryStats
 } from "./external-engine-contract-probe.js";
+export { createMockDownstreamServer } from "./helpers/mock-downstream-server.js";
+export type {
+  MockDownstreamFault,
+  MockDownstreamServer
+} from "./helpers/mock-downstream-server.js";
 export { defineExternalEngineContractTests } from "./external-engine-contract.js";
 export type {
   ExternalEngineAdapterFactory,

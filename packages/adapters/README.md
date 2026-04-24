@@ -22,5 +22,6 @@
 | [`@tianqi/event-store-memory`](./event-store-memory)     | `EventStorePort` 内存实现（非持久化）                     | Phase 8 / Step 4 落地 |
 | [`@tianqi/event-store-sqlite`](./event-store-sqlite)     | `EventStorePort` SQLite 持久化实现（基于 better-sqlite3） | Phase 8 / Step 5 落地 |
 | [`@tianqi/event-store-postgres`](./event-store-postgres) | `EventStorePort` PostgreSQL 持久化实现（基于 pg + Pool）  | Phase 8 / Step 6 落地 |
+| [`@tianqi/notification-memory`](./notification-memory)   | `NotificationPort` 内存实现（非持久化；at-least-once）    | Phase 8 / Step 8 落地 |
 
 本表只反映当前仓库实际状态，新增 Adapter 须在合入时同步更新此表，禁止预先列出尚未落地的 Adapter。

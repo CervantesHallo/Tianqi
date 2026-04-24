@@ -10,6 +10,7 @@
     { "path": "./packages/adapters/adapter-testkit" },
     { "path": "./packages/adapters/event-store-memory" },
     { "path": "./packages/adapters/event-store-sqlite" },
-    { "path": "./packages/adapters/event-store-postgres" }
+    { "path": "./packages/adapters/event-store-postgres" },
+    { "path": "./packages/adapters/notification-memory" }
   ]
 }

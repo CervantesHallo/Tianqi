@@ -108,6 +108,22 @@ importers:
         specifier: 7.6.11
         version: 7.6.11
 
+  packages/adapters/notification-memory:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+
   packages/application:
     dependencies:
       '@tianqi/contracts':

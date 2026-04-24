@@ -5,6 +5,7 @@ import type { AdapterFoundation } from "@tianqi/ports";
 import {
   defineConfigContractTests,
   defineEventStoreContractTests,
+  defineExternalEngineContractTests,
   defineHealthCheckContractTests,
   defineLifecycleContractTests,
   defineNotificationContractTests,
@@ -67,5 +68,12 @@ describe("@tianqi/adapter-testkit exports", () => {
     // disappears during a refactor.
     expect(typeof definePersistentEventStoreContractTests).toBe("function");
     expect(typeof definePersistentConfigContractTests).toBe("function");
+  });
+
+  it("exports the External Engine contract suite as a callable function", () => {
+    // Step 13 adds Sprint E's stability-focused contract suite for external service
+    // adapters (timeout / retry / circuit / rate limit / trace propagation). Guard
+    // the barrel so renames or accidental removals during Step 14-18 land loudly.
+    expect(typeof defineExternalEngineContractTests).toBe("function");
   });
 });

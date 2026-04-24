@@ -44,3 +44,19 @@ export type {
   PersistentConfigContractOptions,
   PersistentConfigTestSession
 } from "./persistent-config-contract.js";
+export type {
+  CircuitBreakerState,
+  ExternalEngineContractProbe,
+  ExternalEngineRetryStats
+} from "./external-engine-contract-probe.js";
+export { defineExternalEngineContractTests } from "./external-engine-contract.js";
+export type {
+  ExternalEngineAdapterFactory,
+  ExternalEngineAdapterUnderTest,
+  ExternalEngineContractOptions,
+  ExternalEngineError,
+  ExternalEngineErrorCode,
+  ExternalEngineRequest,
+  ExternalEngineSuccess,
+  TestkitExternalEngineFoundation
+} from "./external-engine-contract.js";

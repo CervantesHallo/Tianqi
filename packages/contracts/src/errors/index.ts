@@ -12,6 +12,8 @@ export {
 } from "./inf.js";
 export { sagaStepTimeoutError, SagaError } from "./sag.js";
 export {
+  adapterConfigActivationAuditFailedError,
+  adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
   eventSchemaViolationError,
   Phase8ContractError

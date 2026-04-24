@@ -57,3 +57,47 @@ export const eventSchemaViolationError = (
     },
     cause
   );
+
+// Adapter-layer "config version not found" — distinct from TQ-POL-007 which covers the
+// Policy-layer diagnostic. The Adapter returns this when asked for a version it never
+// persisted (e.g. rollback target not loaded, getByVersion for an unknown version). Keeping
+// the adapter-layer semantics in TQ-CON-* respects layer hygiene: Adapters never mint
+// Policy-layer codes, and the two diagnostic paths (check storage vs. check caller)
+// diverge enough to warrant distinct codes even though their surface message is similar.
+export const adapterConfigVersionNotFoundError = (
+  adapterName: string,
+  requestedVersion: number,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.ADAPTER_CONFIG_VERSION_NOT_FOUND,
+    "Config version not found in adapter storage",
+    {
+      adapterName,
+      requestedVersion
+    },
+    cause
+  );
+
+// Triggered when the Adapter atomically couples "activate new version" with "append an
+// audit event" and the audit append fails. The Adapter MUST rollback the activation so
+// the active pointer never outruns the audit trail; this error flags that rollback.
+// Note: this lives in TQ-CON-* rather than TQ-SAG-* because the Adapter is not a Saga
+// coordinator — it just preserves a single-Adapter invariant. TQ-SAG-* is reserved for
+// cross-step, cross-Adapter workflow failures.
+export const adapterConfigActivationAuditFailedError = (
+  adapterName: string,
+  attemptedVersion: number,
+  rolledBackTo: number,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.ADAPTER_CONFIG_ACTIVATION_AUDIT_FAILED,
+    "Config activation rolled back because audit append failed",
+    {
+      adapterName,
+      attemptedVersion,
+      rolledBackTo
+    },
+    cause
+  );

@@ -28,6 +28,8 @@ export {
 } from "./errors/index.js";
 export { sagaStepTimeoutError, SagaError } from "./errors/index.js";
 export {
+  adapterConfigActivationAuditFailedError,
+  adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
   eventSchemaViolationError,
   Phase8ContractError

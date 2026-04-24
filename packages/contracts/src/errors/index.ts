@@ -6,6 +6,7 @@ export {
   configHistoryDirectoryUnreadableError,
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
+  externalEngineBaseUrlUnreachableError,
   externalEngineCircuitOpenError,
   externalEngineNonRetryableError,
   externalEngineRateLimitedError,

@@ -279,3 +279,28 @@ export const externalEngineNonRetryableError = (
       reason
     }
   );
+
+// External Engine HTTP base (Step 14): raised when init() verifies that baseUrl cannot
+// be reached at all (DNS resolve failure, connection refused, TLS handshake failure).
+// Distinct from TQ-INF-013 (runtime call timeout) because the diagnostic tool-chain
+// diverges — "is the hostname correct; are we in the right network; is TLS trust
+// store seeded" vs "is the budget too tight for normal latency". Also distinct from
+// TQ-INF-009 POSTGRES_UNREACHABLE / TQ-INF-010 KAFKA_BROKER_UNREACHABLE because HTTP
+// endpoints have their own curl-based runbooks. §6.5 discipline applies: reason must
+// be a domain moniker, not a raw socket error name.
+export const externalEngineBaseUrlUnreachableError = (
+  adapterName: string,
+  baseUrl: string,
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.EXTERNAL_ENGINE_BASE_URL_UNREACHABLE,
+    "External engine base URL is unreachable",
+    {
+      adapterName,
+      baseUrl,
+      reason
+    },
+    cause
+  );

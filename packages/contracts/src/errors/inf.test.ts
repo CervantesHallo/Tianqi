@@ -6,6 +6,7 @@ import {
   adapterInitializationFailedError,
   configFileUnreadableError,
   configHistoryDirectoryUnreadableError,
+  externalEngineBaseUrlUnreachableError,
   externalEngineCircuitOpenError,
   externalEngineNonRetryableError,
   externalEngineRateLimitedError,
@@ -188,5 +189,38 @@ describe("TQ-INF error namespace", () => {
     for (const code of codes) {
       expect(code.startsWith("TQ-INF-")).toBe(true);
     }
+  });
+
+  it("constructs TQ-INF-018 base URL unreachable with domain-level reason", () => {
+    const cause = new Error("ECONNREFUSED: localhost:65535");
+    const error = externalEngineBaseUrlUnreachableError(
+      "external-engine-http-base",
+      "http://engine.internal:8080",
+      "downstream_unavailable",
+      cause
+    );
+    expect(error.code).toBe("TQ-INF-018");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "external-engine-http-base",
+      baseUrl: "http://engine.internal:8080",
+      reason: "downstream_unavailable"
+    });
+    expect(error.cause).toBe(cause);
+    // §6.5: reason is a domain moniker, not a raw socket error string. The cause
+    // chain can carry the raw error but the context itself must stay clean.
+    expect(String(error.context["reason"])).not.toMatch(/ECONNREFUSED|ENOTFOUND|EAI_/);
+  });
+
+  it("distinguishes TQ-INF-018 from TQ-INF-013 despite both being HTTP engine failures", () => {
+    // Convention K: TQ-INF-018 is init-time unreachable (runbook: check URL, DNS,
+    // TLS trust); TQ-INF-013 is runtime timeout (runbook: check budget configuration
+    // against downstream latency histogram). The two runbooks overlap in the
+    // "investigate downstream health" root step but diverge everywhere else.
+    expect(ERROR_CODES.EXTERNAL_ENGINE_TIMEOUT).toBe("TQ-INF-013");
+    expect(ERROR_CODES.EXTERNAL_ENGINE_BASE_URL_UNREACHABLE).toBe("TQ-INF-018");
+    expect(ERROR_CODES.EXTERNAL_ENGINE_TIMEOUT).not.toBe(
+      ERROR_CODES.EXTERNAL_ENGINE_BASE_URL_UNREACHABLE
+    );
   });
 });

@@ -19,6 +19,7 @@ export type { ErrorLayer, TianqiErrorContext } from "./errors/index.js";
 export {
   adapterInitializationFailedError,
   configFileUnreadableError,
+  configHistoryDirectoryUnreadableError,
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
   InfrastructureError,
@@ -33,6 +34,7 @@ export {
   adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
   configFileSchemaInvalidError,
+  configHistoryStateInconsistentError,
   eventSchemaViolationError,
   Phase8ContractError
 } from "./errors/index.js";

@@ -5,6 +5,7 @@ import { ERROR_LAYERS } from "./error-layer.js";
 import {
   adapterInitializationFailedError,
   configFileUnreadableError,
+  configHistoryDirectoryUnreadableError,
   InfrastructureError
 } from "./inf.js";
 
@@ -62,5 +63,36 @@ describe("TQ-INF error namespace", () => {
       reason: "file not found"
     });
     expect(error.cause).toBe(cause);
+  });
+
+  it("constructs the TQ-INF-012 config-history-directory unreadable via factory", () => {
+    const cause = new Error("EACCES: permission denied, mkdir");
+    const error = configHistoryDirectoryUnreadableError(
+      "config-file",
+      "/etc/tianqi/config.yaml.tianqi-history",
+      "mkdir denied",
+      cause
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.CONFIG_HISTORY_DIRECTORY_UNREADABLE);
+    expect(error.code).toBe("TQ-INF-012");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "config-file",
+      historyDirectory: "/etc/tianqi/config.yaml.tianqi-history",
+      reason: "mkdir denied"
+    });
+    expect(error.cause).toBe(cause);
+  });
+
+  it("distinguishes TQ-INF-012 from TQ-INF-011 despite both being config-file I/O", () => {
+    // Convention K: the file is a single YAML; the history directory is a tree of
+    // YAML/JSONL/JSON files. Their remediation runbooks diverge — mkdir/chmod -R vs
+    // chmod on one file — so the two codes stay split.
+    expect(ERROR_CODES.CONFIG_FILE_UNREADABLE).toBe("TQ-INF-011");
+    expect(ERROR_CODES.CONFIG_HISTORY_DIRECTORY_UNREADABLE).toBe("TQ-INF-012");
+    expect(ERROR_CODES.CONFIG_FILE_UNREADABLE).not.toBe(
+      ERROR_CODES.CONFIG_HISTORY_DIRECTORY_UNREADABLE
+    );
   });
 });

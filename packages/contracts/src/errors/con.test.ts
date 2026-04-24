@@ -6,6 +6,7 @@ import {
   adapterConfigVersionNotFoundError,
   adapterContractTestViolationError,
   configFileSchemaInvalidError,
+  configHistoryStateInconsistentError,
   Phase8ContractError
 } from "./con.js";
 import { ERROR_LAYERS } from "./error-layer.js";
@@ -115,5 +116,33 @@ describe("TQ-CON error namespace (Phase 8 structured class)", () => {
     expect(ERROR_CODES.EVENT_SCHEMA_VIOLATION).toBe("TQ-CON-005");
     expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).toBe("TQ-CON-008");
     expect(ERROR_CODES.EVENT_SCHEMA_VIOLATION).not.toBe(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID);
+  });
+
+  it("constructs the TQ-CON-009 config-history-state inconsistent via factory", () => {
+    const error = configHistoryStateInconsistentError(
+      "config-file",
+      "/etc/tianqi/config.yaml.tianqi-history",
+      "state.json activeVersion=5 but versions/v000005.yaml missing"
+    );
+    expect(error).toBeInstanceOf(Phase8ContractError);
+    expect(error.code).toBe(ERROR_CODES.CONFIG_HISTORY_STATE_INCONSISTENT);
+    expect(error.code).toBe("TQ-CON-009");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "config-file",
+      historyDirectory: "/etc/tianqi/config.yaml.tianqi-history",
+      reason: "state.json activeVersion=5 but versions/v000005.yaml missing"
+    });
+  });
+
+  it("keeps TQ-CON-008 and TQ-CON-009 split across file-schema vs history-state corpora", () => {
+    // Convention K: schema-invalid is about the operator-edited YAML shape;
+    // history-state-inconsistent is about the Adapter-managed history tree falling out
+    // of sync with itself. Different runbooks, different audiences, different codes.
+    expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).toBe("TQ-CON-008");
+    expect(ERROR_CODES.CONFIG_HISTORY_STATE_INCONSISTENT).toBe("TQ-CON-009");
+    expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).not.toBe(
+      ERROR_CODES.CONFIG_HISTORY_STATE_INCONSISTENT
+    );
   });
 });

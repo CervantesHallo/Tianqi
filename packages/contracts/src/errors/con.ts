@@ -124,3 +124,26 @@ export const configFileSchemaInvalidError = (
     },
     cause
   );
+
+// Config-file adapter specific (Step 12): state.json inside historyDirectory reports a
+// configuration that cannot be reconciled with the on-disk version files or audit.jsonl
+// (e.g. state.json says activeVersion=5 but versions/v000005.yaml is missing, or the
+// audit.jsonl tail entry does not match state.json's pointer). Operator remediation is
+// "inspect historyDirectory files by hand" — a distinct runbook from TQ-CON-005/008,
+// hence a dedicated contract-layer code.
+export const configHistoryStateInconsistentError = (
+  adapterName: string,
+  historyDirectory: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.CONFIG_HISTORY_STATE_INCONSISTENT,
+    "Config history state is inconsistent",
+    {
+      adapterName,
+      historyDirectory,
+      reason
+    },
+    cause
+  );

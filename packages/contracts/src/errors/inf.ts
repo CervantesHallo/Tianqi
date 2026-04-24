@@ -155,3 +155,25 @@ export const configFileUnreadableError = (
     },
     cause
   );
+
+// Config-file adapter specific (Step 12): raised when historyDirectory cannot be created,
+// listed, or written to during init() or reload(). Diagnostic tool-chain ("chmod the
+// directory, df for space, check for cross-device bind mounts") differs from the config
+// file itself — historyDirectory is a directory requiring lsattr/xattr checks too —
+// so Convention K says mint a distinct code rather than fold into TQ-INF-011.
+export const configHistoryDirectoryUnreadableError = (
+  adapterName: string,
+  historyDirectory: string,
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.CONFIG_HISTORY_DIRECTORY_UNREADABLE,
+    "Config history directory is unreadable or unwritable",
+    {
+      adapterName,
+      historyDirectory,
+      reason
+    },
+    cause
+  );

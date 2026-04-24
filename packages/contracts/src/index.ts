@@ -20,7 +20,9 @@ export {
   adapterInitializationFailedError,
   eventStoreAlreadyShutDownError,
   eventStoreNotInitializedError,
-  InfrastructureError
+  InfrastructureError,
+  sqliteDatabaseUnreachableError,
+  sqliteSchemaVersionMismatchError
 } from "./errors/index.js";
 export { sagaStepTimeoutError, SagaError } from "./errors/index.js";
 export {

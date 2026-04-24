@@ -66,3 +66,37 @@ export const eventStoreAlreadyShutDownError = (
       attemptedAction
     }
   );
+
+export const sqliteDatabaseUnreachableError = (
+  adapterName: string,
+  databasePath: string,
+  reason: string,
+  cause?: Error
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.SQLITE_DATABASE_UNREACHABLE,
+    "SQLite database is unreachable",
+    {
+      adapterName,
+      databasePath,
+      reason
+    },
+    cause
+  );
+
+export const sqliteSchemaVersionMismatchError = (
+  adapterName: string,
+  databasePath: string,
+  expectedVersion: string,
+  actualVersion: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.SQLITE_SCHEMA_VERSION_MISMATCH,
+    "SQLite schema_version does not match the value expected by the adapter",
+    {
+      adapterName,
+      databasePath,
+      expectedVersion,
+      actualVersion
+    }
+  );

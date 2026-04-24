@@ -12,6 +12,8 @@
     { "path": "./packages/adapters/event-store-sqlite" },
     { "path": "./packages/adapters/event-store-postgres" },
     { "path": "./packages/adapters/notification-memory" },
-    { "path": "./packages/adapters/notification-kafka" }
+    { "path": "./packages/adapters/notification-kafka" },
+    { "path": "./packages/adapters/config-memory" },
+    { "path": "./packages/adapters/config-file" }
   ]
 }

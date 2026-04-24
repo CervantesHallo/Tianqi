@@ -16,13 +16,15 @@
 
 ## 当前已入驻 Adapter
 
-| 包名                                                     | 角色                                                         | 状态                  |
-| -------------------------------------------------------- | ------------------------------------------------------------ | --------------------- |
-| [`@tianqi/adapter-testkit`](./adapter-testkit)           | 适配器层共享契约测试工具包                                   | Phase 8 / Step 1 落地 |
-| [`@tianqi/event-store-memory`](./event-store-memory)     | `EventStorePort` 内存实现（非持久化）                        | Phase 8 / Step 4 落地 |
-| [`@tianqi/event-store-sqlite`](./event-store-sqlite)     | `EventStorePort` SQLite 持久化实现（基于 better-sqlite3）    | Phase 8 / Step 5 落地 |
-| [`@tianqi/event-store-postgres`](./event-store-postgres) | `EventStorePort` PostgreSQL 持久化实现（基于 pg + Pool）     | Phase 8 / Step 6 落地 |
-| [`@tianqi/notification-memory`](./notification-memory)   | `NotificationPort` 内存实现（非持久化；at-least-once）       | Phase 8 / Step 8 落地 |
-| [`@tianqi/notification-kafka`](./notification-kafka)     | `NotificationPort` Kafka 实现（基于 kafkajs；at-least-once） | Phase 8 / Step 9 落地 |
+| 包名                                                     | 角色                                                         | 状态                   |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ---------------------- |
+| [`@tianqi/adapter-testkit`](./adapter-testkit)           | 适配器层共享契约测试工具包                                   | Phase 8 / Step 1 落地  |
+| [`@tianqi/event-store-memory`](./event-store-memory)     | `EventStorePort` 内存实现（非持久化）                        | Phase 8 / Step 4 落地  |
+| [`@tianqi/event-store-sqlite`](./event-store-sqlite)     | `EventStorePort` SQLite 持久化实现（基于 better-sqlite3）    | Phase 8 / Step 5 落地  |
+| [`@tianqi/event-store-postgres`](./event-store-postgres) | `EventStorePort` PostgreSQL 持久化实现（基于 pg + Pool）     | Phase 8 / Step 6 落地  |
+| [`@tianqi/notification-memory`](./notification-memory)   | `NotificationPort` 内存实现（非持久化；at-least-once）       | Phase 8 / Step 8 落地  |
+| [`@tianqi/notification-kafka`](./notification-kafka)     | `NotificationPort` Kafka 实现（基于 kafkajs；at-least-once） | Phase 8 / Step 9 落地  |
+| [`@tianqi/config-memory`](./config-memory)               | `ConfigPort` 内存实现（非持久化；1PC + compensation）        | Phase 8 / Step 11 落地 |
+| [`@tianqi/config-file`](./config-file)                   | `ConfigPort` YAML 文件实现（冷启动；基础三动作；基于 yaml）  | Phase 8 / Step 11 落地 |
 
 本表只反映当前仓库实际状态，新增 Adapter 须在合入时同步更新此表，禁止预先列出尚未落地的 Adapter。

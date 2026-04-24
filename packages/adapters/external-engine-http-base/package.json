@@ -1,0 +1,20 @@
+{
+  "name": "@tianqi/external-engine-http-base",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@tianqi/contracts": "workspace:*",
+    "@tianqi/ports": "workspace:*",
+    "@tianqi/shared": "workspace:*",
+    "undici": "8.1.0"
+  },
+  "devDependencies": {
+    "@tianqi/adapter-testkit": "workspace:*"
+  }
+}

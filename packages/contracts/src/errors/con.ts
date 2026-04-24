@@ -147,3 +147,34 @@ export const configHistoryStateInconsistentError = (
     },
     cause
   );
+
+// Margin Engine HTTP adapter specific (Step 15): the downstream Margin service
+// returned a 2xx response body that did not match the MarginEnginePort response
+// schema (missing required fields / wrong types / invalid ISO-8601 timestamp).
+// Convention K splits this from TQ-CON-005 (event schema) and TQ-CON-008 (config
+// file schema) because the diagnostic audience is different — a Margin downstream
+// schema violation coordinates with the Margin service owner, who reads a
+// different API doc corpus from the event-source owner and from the operator
+// editing YAML. Sprint E Step 16-17 will mint TQ-CON-011 / 012 / 013 / 014 for
+// Position / Match / MarkPrice / Fund using the same rationale; the convention
+// is that each business engine owns its own downstream-schema code slot.
+// §6.5 discipline applies: `reason` is a domain moniker ("missing_field" /
+// "wrong_type" / "invalid_timestamp"), NEVER a raw provider error message.
+export const marginResponseSchemaInvalidError = (
+  adapterName: string,
+  operation: string,
+  fieldPath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID,
+    "Margin engine response schema is invalid",
+    {
+      adapterName,
+      operation,
+      fieldPath,
+      reason
+    },
+    cause
+  );

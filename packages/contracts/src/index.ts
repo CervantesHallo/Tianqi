@@ -42,6 +42,7 @@ export {
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
   eventSchemaViolationError,
+  marginResponseSchemaInvalidError,
   Phase8ContractError
 } from "./errors/index.js";
 export type { DomainEventEnvelope } from "./domain-event-envelope.js";

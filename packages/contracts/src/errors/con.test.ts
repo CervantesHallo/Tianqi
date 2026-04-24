@@ -7,6 +7,7 @@ import {
   adapterContractTestViolationError,
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
+  marginResponseSchemaInvalidError,
   Phase8ContractError
 } from "./con.js";
 import { ERROR_LAYERS } from "./error-layer.js";
@@ -144,5 +145,42 @@ describe("TQ-CON error namespace (Phase 8 structured class)", () => {
     expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).not.toBe(
       ERROR_CODES.CONFIG_HISTORY_STATE_INCONSISTENT
     );
+  });
+
+  it("constructs TQ-CON-010 Margin response schema invalid with domain-level reason", () => {
+    const error = marginResponseSchemaInvalidError(
+      "margin-engine-http",
+      "calculate-margin",
+      "requiredMargin",
+      "missing_field"
+    );
+    expect(error.code).toBe("TQ-CON-010");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "margin-engine-http",
+      operation: "calculate-margin",
+      fieldPath: "requiredMargin",
+      reason: "missing_field"
+    });
+    // §6.5 discipline: reason is a domain moniker, not a raw HTTP status or a
+    // provider-specific error message.
+    expect(String(error.context["reason"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("distinguishes TQ-CON-010 from TQ-CON-005 and TQ-CON-008 — each engine owns its schema slot", () => {
+    // Convention K per the Sprint E namespace plan: each business engine in Sprint E
+    // mints its own *_RESPONSE_SCHEMA_INVALID code because the diagnostic audience
+    // is the downstream service owner (Margin team / Position team / etc), whose API
+    // docs and recent deploys are the root remediation path. Step 16-17 will add
+    // TQ-CON-011 / 012 / 013 / 014 for the remaining four engines.
+    expect(ERROR_CODES.EVENT_SCHEMA_VIOLATION).toBe("TQ-CON-005");
+    expect(ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID).toBe("TQ-CON-008");
+    expect(ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID).toBe("TQ-CON-010");
+    const codes = new Set([
+      ERROR_CODES.EVENT_SCHEMA_VIOLATION,
+      ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID,
+      ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID
+    ]);
+    expect(codes.size).toBe(3);
   });
 });

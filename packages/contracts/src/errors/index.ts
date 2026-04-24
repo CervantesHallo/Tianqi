@@ -26,5 +26,6 @@ export {
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
   eventSchemaViolationError,
+  marginResponseSchemaInvalidError,
   Phase8ContractError
 } from "./con.js";

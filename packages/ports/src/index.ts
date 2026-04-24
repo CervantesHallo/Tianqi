@@ -94,6 +94,29 @@ export type {
   LiquidationCaseRepositoryPort
 } from "./liquidation-case-repository-port.js";
 export type {
+  CalculateMarginRequest,
+  CalculateMarginResponse,
+  LockMarginRequest,
+  LockMarginResponse,
+  MarginAccountId,
+  MarginAmount,
+  MarginCurrency,
+  MarginEnginePort,
+  MarginEnginePortError,
+  MarginEnginePortErrorCode,
+  MarginLockId,
+  QueryMarginBalanceRequest,
+  QueryMarginBalanceResponse,
+  ReleaseMarginRequest,
+  ReleaseMarginResponse
+} from "./margin-engine-port.js";
+export {
+  createMarginAccountId,
+  createMarginAmount,
+  createMarginCurrency,
+  createMarginLockId
+} from "./margin-engine-port.js";
+export type {
   MetricsProjectionRecord,
   MetricsSinkError,
   MetricsSinkPort

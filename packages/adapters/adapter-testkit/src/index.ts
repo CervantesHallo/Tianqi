@@ -14,3 +14,14 @@ export type {
   PersistentEventStoreContractOptions,
   PersistentTestSession
 } from "./persistent-event-store-contract.js";
+export type {
+  NotificationContractProbe,
+  NotificationHandler,
+  NotificationSubscription
+} from "./notification-contract-probe.js";
+export { defineNotificationContractTests } from "./notification-contract.js";
+export type {
+  NotificationAdapterFactory,
+  NotificationAdapterUnderTest,
+  NotificationContractOptions
+} from "./notification-contract.js";

@@ -78,10 +78,14 @@ describe("createFileConfig — adapter-specific invariants", () => {
     }
   });
 
-  it("test_object_keys_exposes_only_union_of_three_contracts_no_extras", async () => {
+  it("test_object_keys_exposes_only_union_of_three_contracts_plus_reload_no_extras", async () => {
     const filePath = nextPath();
     await writeFile(filePath, VALID_YAML, "utf8");
     const adapter = createFileConfig({ filePath });
+    // Step 12 extends the Adapter with reload() — outside ConfigPort / AdapterFoundation
+    // / ConfigContractProbe but inside the FileConfig type. This test asserts the exact
+    // key union so a silent extra method (e.g. an accidental debug getter) cannot slip
+    // into the public surface unnoticed.
     const expected = new Set([
       "adapterName",
       "__configProbe",
@@ -94,7 +98,8 @@ describe("createFileConfig — adapter-specific invariants", () => {
       "setAuditFailureMode",
       "init",
       "shutdown",
-      "healthCheck"
+      "healthCheck",
+      "reload"
     ]);
     const actual = new Set(Object.keys(adapter));
     expect(actual).toEqual(expected);

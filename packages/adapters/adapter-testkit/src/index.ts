@@ -8,3 +8,9 @@ export type {
   EventStoreAdapterUnderTest,
   EventStoreContractOptions
 } from "./event-store-contract.js";
+export { definePersistentEventStoreContractTests } from "./persistent-event-store-contract.js";
+export type {
+  PersistentEventStoreAdapterFactory,
+  PersistentEventStoreContractOptions,
+  PersistentTestSession
+} from "./persistent-event-store-contract.js";

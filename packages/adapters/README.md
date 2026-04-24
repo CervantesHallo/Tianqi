@@ -27,5 +27,6 @@
 | [`@tianqi/config-memory`](./config-memory)                         | `ConfigPort` 内存实现（非持久化；1PC + compensation）                  | Phase 8 / Step 11 落地                |
 | [`@tianqi/config-file`](./config-file)                             | `ConfigPort` YAML 文件实现（冷启动 + 热加载 + 跨重启历史；基于 yaml）  | Phase 8 / Step 11 落地 · Step 12 扩展 |
 | [`@tianqi/external-engine-http-base`](./external-engine-http-base) | **基座 Adapter**：External Engine HTTP 客户端封装五件套（基于 undici） | Phase 8 / Step 14 落地                |
+| [`@tianqi/margin-engine-http`](./margin-engine-http)               | **业务 Engine**：MarginEnginePort HTTP 实现（消费基座）                | Phase 8 / Step 15 落地                |
 
 本表只反映当前仓库实际状态，新增 Adapter 须在合入时同步更新此表，禁止预先列出尚未落地的 Adapter。

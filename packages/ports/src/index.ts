@@ -117,6 +117,55 @@ export {
   createMarginLockId
 } from "./margin-engine-port.js";
 export type {
+  ActiveOrderSummary,
+  CancelOrderRequest,
+  CancelOrderResponse,
+  ListActiveOrdersRequest,
+  ListActiveOrdersResponse,
+  MatchAccountId,
+  MatchEnginePort,
+  MatchEnginePortError,
+  MatchEnginePortErrorCode,
+  OrderId,
+  OrderSide,
+  OrderStatus,
+  OrderType,
+  PlaceOrderRequest,
+  PlaceOrderResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  QueryTradesRequest,
+  QueryTradesResponse,
+  TradeId,
+  TradeRecord
+} from "./match-engine-port.js";
+export { createMatchAccountId, createOrderId, createTradeId } from "./match-engine-port.js";
+export type {
+  AdjustPositionRequest,
+  AdjustPositionResponse,
+  ClosePositionRequest,
+  ClosePositionResponse,
+  ListOpenPositionsRequest,
+  ListOpenPositionsResponse,
+  OpenPositionRequest,
+  OpenPositionResponse,
+  OpenPositionSummary,
+  PositionAccountId,
+  PositionEnginePort,
+  PositionEnginePortError,
+  PositionEnginePortErrorCode,
+  PositionId,
+  PositionSide,
+  PositionSize,
+  QueryPositionRequest,
+  QueryPositionResponse
+} from "./position-engine-port.js";
+export {
+  createPositionAccountId,
+  createPositionId,
+  createPositionSize
+} from "./position-engine-port.js";
+export type {
   MetricsProjectionRecord,
   MetricsSinkError,
   MetricsSinkPort

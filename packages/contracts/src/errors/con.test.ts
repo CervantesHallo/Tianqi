@@ -8,7 +8,9 @@ import {
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
   marginResponseSchemaInvalidError,
-  Phase8ContractError
+  matchResponseSchemaInvalidError,
+  Phase8ContractError,
+  positionResponseSchemaInvalidError
 } from "./con.js";
 import { ERROR_LAYERS } from "./error-layer.js";
 
@@ -182,5 +184,64 @@ describe("TQ-CON error namespace (Phase 8 structured class)", () => {
       ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID
     ]);
     expect(codes.size).toBe(3);
+  });
+
+  it("constructs TQ-CON-011 Position response schema invalid via factory", () => {
+    const error = positionResponseSchemaInvalidError(
+      "position-engine-http",
+      "open-position",
+      "size",
+      "missing_or_negative_number"
+    );
+    expect(error.code).toBe("TQ-CON-011");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "position-engine-http",
+      operation: "open-position",
+      fieldPath: "size",
+      reason: "missing_or_negative_number"
+    });
+    // §6.5: domain moniker, not a raw HTTP status.
+    expect(String(error.context["reason"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("constructs TQ-CON-012 Match response schema invalid via factory", () => {
+    const error = matchResponseSchemaInvalidError(
+      "match-engine-http",
+      "place-order",
+      "orderId",
+      "missing_or_non_string"
+    );
+    expect(error.code).toBe("TQ-CON-012");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "match-engine-http",
+      operation: "place-order",
+      fieldPath: "orderId",
+      reason: "missing_or_non_string"
+    });
+    expect(String(error.context["reason"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("keeps all five Sprint E + history schema codes split as five distinct slots", () => {
+    // Convention K codified across Sprint E: the five known *_SCHEMA codes
+    // (TQ-CON-005 / 008 / 010 / 011 / 012) all live under TQ-CON-* but each
+    // points at a distinct diagnostic audience (event package maintainers /
+    // operators editing YAML / Margin service team / Position service team /
+    // Match service team). Step 17 will add TQ-CON-013 / 014 for MarkPrice /
+    // Fund using the same convention. This permanent assertion guards the
+    // namespace from accidental collapse during a future "let's deduplicate"
+    // refactor.
+    const codes = [
+      ERROR_CODES.EVENT_SCHEMA_VIOLATION,
+      ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID,
+      ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.POSITION_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.MATCH_RESPONSE_SCHEMA_INVALID
+    ];
+    expect(new Set(codes).size).toBe(5);
+    for (const code of codes) {
+      expect(code.startsWith("TQ-CON-")).toBe(true);
+    }
   });
 });

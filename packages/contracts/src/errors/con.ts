@@ -148,6 +148,49 @@ export const configHistoryStateInconsistentError = (
     cause
   );
 
+// Position / Match Engine HTTP adapter specific (Step 16): same shape as the
+// Margin variant below, but distinct codes per Convention K — the diagnostic
+// audience differs (Position service team vs. Match service team vs. Margin
+// service team) and so does the API doc corpus they consult to remediate a
+// schema mismatch. Sprint E reserves TQ-CON-013 / 014 for MarkPrice / Fund.
+export const positionResponseSchemaInvalidError = (
+  adapterName: string,
+  operation: string,
+  fieldPath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.POSITION_RESPONSE_SCHEMA_INVALID,
+    "Position engine response schema is invalid",
+    {
+      adapterName,
+      operation,
+      fieldPath,
+      reason
+    },
+    cause
+  );
+
+export const matchResponseSchemaInvalidError = (
+  adapterName: string,
+  operation: string,
+  fieldPath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.MATCH_RESPONSE_SCHEMA_INVALID,
+    "Match engine response schema is invalid",
+    {
+      adapterName,
+      operation,
+      fieldPath,
+      reason
+    },
+    cause
+  );
+
 // Margin Engine HTTP adapter specific (Step 15): the downstream Margin service
 // returned a 2xx response body that did not match the MarginEnginePort response
 // schema (missing required fields / wrong types / invalid ISO-8601 timestamp).

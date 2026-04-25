@@ -19,6 +19,7 @@
     { "path": "./packages/adapters/margin-engine-http" },
     { "path": "./packages/adapters/position-engine-http" },
     { "path": "./packages/adapters/match-engine-http" },
-    { "path": "./packages/adapters/mark-price-engine-http" }
+    { "path": "./packages/adapters/mark-price-engine-http" },
+    { "path": "./packages/adapters/fund-engine-http" }
   ]
 }

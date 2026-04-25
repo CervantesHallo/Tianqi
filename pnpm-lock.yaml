@@ -216,6 +216,25 @@ importers:
         specifier: workspace:*
         version: link:../adapter-testkit
 
+  packages/adapters/position-engine-http:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/external-engine-http-base':
+        specifier: workspace:*
+        version: link:../external-engine-http-base
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+
   packages/application:
     dependencies:
       '@tianqi/contracts':

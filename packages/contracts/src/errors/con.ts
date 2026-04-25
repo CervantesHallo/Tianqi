@@ -191,6 +191,54 @@ export const matchResponseSchemaInvalidError = (
     cause
   );
 
+// MarkPrice / Fund Engine HTTP adapter specific (Step 17 — Sprint E final round):
+// same shape as the Margin / Position / Match variants, distinct codes per
+// Convention K. The MarkPrice diagnostic audience is the downstream MarkPrice
+// service team (whose runbook is "did pricing oracle drift / did the funding
+// schedule shift"), the Fund diagnostic audience is the downstream Fund service
+// team (whose runbook is "did the ledger schema change / is a transfer state
+// machine update mid-deploy"). With Step 17 the namespace TQ-CON-005 / 008 /
+// 010 / 011 / 012 / 013 / 014 reaches its Sprint E full surface — the seven
+// schema codes guard seven separate diagnostic audiences and the seven-code
+// pairwise-distinct assertion in con.test.ts permanently records that fact.
+export const markPriceResponseSchemaInvalidError = (
+  adapterName: string,
+  operation: string,
+  fieldPath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.MARK_PRICE_RESPONSE_SCHEMA_INVALID,
+    "MarkPrice engine response schema is invalid",
+    {
+      adapterName,
+      operation,
+      fieldPath,
+      reason
+    },
+    cause
+  );
+
+export const fundResponseSchemaInvalidError = (
+  adapterName: string,
+  operation: string,
+  fieldPath: string,
+  reason: string,
+  cause?: Error
+): Phase8ContractError =>
+  new Phase8ContractError(
+    ERROR_CODES.FUND_RESPONSE_SCHEMA_INVALID,
+    "Fund engine response schema is invalid",
+    {
+      adapterName,
+      operation,
+      fieldPath,
+      reason
+    },
+    cause
+  );
+
 // Margin Engine HTTP adapter specific (Step 15): the downstream Margin service
 // returned a 2xx response body that did not match the MarginEnginePort response
 // schema (missing required fields / wrong types / invalid ISO-8601 timestamp).

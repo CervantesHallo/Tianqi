@@ -117,6 +117,47 @@ export {
   createMarginLockId
 } from "./margin-engine-port.js";
 export type {
+  FundAccountId,
+  FundAmount,
+  FundCurrency,
+  FundEnginePort,
+  FundEnginePortError,
+  FundEnginePortErrorCode,
+  LedgerEntry,
+  LedgerEntryType,
+  QueryFundBalanceRequest,
+  QueryFundBalanceResponse,
+  QueryFundLedgerRequest,
+  QueryFundLedgerResponse,
+  QueryTransferStatusRequest,
+  QueryTransferStatusResponse,
+  TransferFundRequest,
+  TransferFundResponse,
+  TransferId,
+  TransferStatus
+} from "./fund-engine-port.js";
+export {
+  createFundAccountId,
+  createFundAmount,
+  createFundCurrency,
+  createTransferId
+} from "./fund-engine-port.js";
+export type {
+  FundingRateValue,
+  MarkPriceEnginePort,
+  MarkPriceEnginePortError,
+  MarkPriceEnginePortErrorCode,
+  MarkPriceQuote,
+  MarkPriceValue,
+  QueryFundingRateRequest,
+  QueryFundingRateResponse,
+  QueryMarkPriceBatchRequest,
+  QueryMarkPriceBatchResponse,
+  QueryMarkPriceRequest,
+  QueryMarkPriceResponse
+} from "./mark-price-engine-port.js";
+export { createFundingRateValue, createMarkPriceValue } from "./mark-price-engine-port.js";
+export type {
   ActiveOrderSummary,
   CancelOrderRequest,
   CancelOrderResponse,

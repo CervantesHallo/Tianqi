@@ -7,7 +7,9 @@ import {
   adapterContractTestViolationError,
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
+  fundResponseSchemaInvalidError,
   marginResponseSchemaInvalidError,
+  markPriceResponseSchemaInvalidError,
   matchResponseSchemaInvalidError,
   Phase8ContractError,
   positionResponseSchemaInvalidError
@@ -240,6 +242,70 @@ describe("TQ-CON error namespace (Phase 8 structured class)", () => {
       ERROR_CODES.MATCH_RESPONSE_SCHEMA_INVALID
     ];
     expect(new Set(codes).size).toBe(5);
+    for (const code of codes) {
+      expect(code.startsWith("TQ-CON-")).toBe(true);
+    }
+  });
+
+  it("constructs TQ-CON-013 MarkPrice response schema invalid via factory", () => {
+    const error = markPriceResponseSchemaInvalidError(
+      "mark-price-engine-http",
+      "query-mark-price",
+      "markPrice",
+      "missing_or_non_positive_number"
+    );
+    expect(error.code).toBe("TQ-CON-013");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "mark-price-engine-http",
+      operation: "query-mark-price",
+      fieldPath: "markPrice",
+      reason: "missing_or_non_positive_number"
+    });
+    // §6.5: domain moniker, never raw HTTP status.
+    expect(String(error.context["reason"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("constructs TQ-CON-014 Fund response schema invalid via factory", () => {
+    const error = fundResponseSchemaInvalidError(
+      "fund-engine-http",
+      "transfer-fund",
+      "status",
+      "transfer_status_unknown"
+    );
+    expect(error.code).toBe("TQ-CON-014");
+    expect(error.layer).toBe(ERROR_LAYERS.CONTRACT);
+    expect(error.context).toEqual({
+      adapterName: "fund-engine-http",
+      operation: "transfer-fund",
+      fieldPath: "status",
+      reason: "transfer_status_unknown"
+    });
+    expect(String(error.context["reason"])).not.toMatch(/^\d\d\d$/);
+  });
+
+  it("keeps all seven Sprint E + history schema codes split as seven distinct slots", () => {
+    // Convention K's fifth and final extension across Sprint E (Step 10 → 11
+    // → 15 → 16 → 17). With Step 17 the schema-violation namespace reaches
+    // its closed surface for Phase 8: TQ-CON-005 / 008 / 010 / 011 / 012 /
+    // 013 / 014. Each code maps to one diagnostic audience whose runbook is
+    // structurally distinct from the others (event-package maintainers /
+    // YAML-editing operators / Tianqi on-call deep-ops / five separate
+    // downstream service teams). This pairwise-distinct assertion is the
+    // permanent guard against future "rationalisation" refactors that try
+    // to collapse the namespace — when somebody proposes "these are all
+    // schema errors, let's merge them," this test fails and points at the
+    // audience-distinction rationale.
+    const codes = [
+      ERROR_CODES.EVENT_SCHEMA_VIOLATION,
+      ERROR_CODES.CONFIG_FILE_SCHEMA_INVALID,
+      ERROR_CODES.MARGIN_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.POSITION_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.MATCH_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.MARK_PRICE_RESPONSE_SCHEMA_INVALID,
+      ERROR_CODES.FUND_RESPONSE_SCHEMA_INVALID
+    ];
+    expect(new Set(codes).size).toBe(7);
     for (const code of codes) {
       expect(code.startsWith("TQ-CON-")).toBe(true);
     }

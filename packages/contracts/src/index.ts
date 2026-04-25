@@ -42,7 +42,9 @@ export {
   configFileSchemaInvalidError,
   configHistoryStateInconsistentError,
   eventSchemaViolationError,
+  fundResponseSchemaInvalidError,
   marginResponseSchemaInvalidError,
+  markPriceResponseSchemaInvalidError,
   matchResponseSchemaInvalidError,
   Phase8ContractError,
   positionResponseSchemaInvalidError

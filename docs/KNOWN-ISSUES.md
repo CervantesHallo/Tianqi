@@ -10,16 +10,22 @@
 
 ---
 
-## Phase 8 状态总览
+## Phase 8 状态总览 — **CLOSED**（Step 19, 2026-04-26）
 
 **Phase 8 CLOSED 二元判据 (§2.2)**：
 
-- ✅ lint / typecheck / test 通过 — Step 17 落地，Step 18 维持（1668 tests，1607 passed + 61 skipped）
-- ✅ 契约测试通过 — Step 17 落地，Step 18 跨 Adapter 集成验证维持
-- ✅ 覆盖率达标（§9.3 80% lines/functions/statements + 75% branches gate） — Step 18 实测：lines 85.97% / functions 94.86% / statements 85.97% / branches 79.79%
-- ⏳ ADR 归档 — Step 19 职责
+- ✅ lint / typecheck / test 通过（1668 tests，1607 passed + 61 skipped）
+- ✅ 契约测试通过（21 contract it × 5 业务 Engine + 1 基座 + 3 EventStore + 2 Notification + 2 Config 全部维持绿）
+- ✅ 覆盖率达标（§9.3 80% lines/functions/statements + 75% branches gate）— lines 85.97% / functions 94.86% / statements 85.97% / branches 79.78%
+- ✅ ADR 归档（`docs/decisions/0001-phase-8-adapter-layer.md`）
 
-**Phase 8 整体覆盖率**：85.97% lines / 79.79% branches / 94.86% functions / 85.97% statements（运行 `pnpm test:coverage` 重现）。**整体超过 80%/75% 门槛**。
+**Phase 8 整体覆盖率**：85.97% lines / 79.78% branches / 94.86% functions / 85.97% statements（运行 `pnpm test:coverage` 重现）。**整体超过 80%/75% 门槛**。
+
+**Phase 8 三件产出（§12.2）齐备**：
+
+- ✅ ADR 归档：`docs/decisions/0001-phase-8-adapter-layer.md`
+- ✅ 新组件完整清单：`docs/phase8/19-phase-8-closure.md` §C
+- ✅ 未解决问题清单：本文件（KI-P8-001/002/003/005 仍 open；KI-P8-004 已修复）
 
 ---
 
@@ -64,14 +70,18 @@
 - **修复责任 Step**：未确定
 - **备注**：本 flake 在 Step 18 之前已存在（基线 Step 17 也偶发），不是 Step 18 集成测试引入。Step 18 添加的 5 个并发 mock HTTP server 提高了暴露概率，但根因是契约测试本身对 100ms 级别时序的敏感度。Phase 9+ 当 application 层使用 fake-timers 接入这些 Adapter 时可一并加固。
 
-### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）
+### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）— ✅ 已修复（Step 19）
 
-- **当前**：5 业务 Engine Adapter（margin / position / match / mark-price / fund）+ 基座 external-engine-http-base 的 tsconfig.json 都用 `rootDir: "."` + `include: ["src/**/*.ts", "test/**/*.ts"]`，导致编译产物落到 `dist/src/`，需要 `package.json` 的 `main`/`types` 用 `dist/src/index.js` 这个绕路写法
-- **当前缓解**：Step 15 已修补 external-engine-http-base 的 main/types；Step 18 顺手修补 margin-engine-http（之前漏了），其它 4 个业务 Engine 创建时即已用正确路径
-- **理想形态**：把 test/ 目录迁到 src/**tests**/ 或类似，使 rootDir 回归 src/，main 写 `dist/index.js`
-- **修复责任 Phase**：Phase 8
-- **修复责任 Step**：Step 19（Phase Gate 一并整理，《Step 18 指令》§九 已预告）
-- **备注**：纯结构性整理，不影响行为契约。Step 19 收官时统一处理。
+- **状态**：**RESOLVED** — Step 19 完成根本性整理
+- **历史背景**：5 业务 Engine Adapter（margin / position / match / mark-price / fund）+ 基座 external-engine-http-base 的 tsconfig.json 都用 `rootDir: "."` + `include: ["src/**/*.ts", "test/**/*.ts"]`，导致编译产物落到 `dist/src/`，需要 `package.json` 的 `main`/`types` 用 `dist/src/index.js` 这个绕路写法
+- **Step 19 处置**：
+  - 6 个 Adapter 包统一把 `test/*.ts` 迁到 `src/`（`*.test.ts` / `*.contract.test.ts` 直接平铺；helpers 子目录改为 `src/helpers/`）
+  - tsconfig.json 改回 `rootDir: "src"` + `include: ["src/**/*.ts"]`，与 Sprint B-D 既有 Adapter 风格一致
+  - package.json `main` / `types` 改回标准 `dist/index.js` / `dist/index.d.ts`
+  - 测试文件内 `../src/<engine>.js` 改为 `./<engine>.js` 相对路径
+  - vitest.config.ts coverage exclude 增加 `**/helpers/**` 让 src/helpers/ 的 mock 工具不计入覆盖率
+- **修复后实测**：1668 tests 全绿（数量不变）；覆盖率 85.97% lines / 79.78% branches（与 Step 18 基线持平）
+- **修复责任 Phase / Step**：Phase 8 / Step 19（按计划闭合）
 
 ### KI-P8-005：ports/src 行覆盖率 0%（结构性原因）
 

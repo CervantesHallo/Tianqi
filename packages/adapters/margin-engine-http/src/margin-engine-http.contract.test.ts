@@ -8,7 +8,7 @@ import {
   type MockDownstreamServer
 } from "@tianqi/adapter-testkit";
 
-import { createMarginEngineHttp } from "../src/margin-engine-http.js";
+import { createMarginEngineHttp } from "./margin-engine-http.js";
 
 // Step 15 — META-RULE P lower-tier mount: the Margin business engine runs the
 // full 21-it Step-13 external-engine contract suite against a real undici pool

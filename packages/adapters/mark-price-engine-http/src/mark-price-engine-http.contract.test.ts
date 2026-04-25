@@ -8,15 +8,12 @@ import {
   type MockDownstreamServer
 } from "@tianqi/adapter-testkit";
 
-import { createFundEngineHttp } from "../src/fund-engine-http.js";
+import { createMarkPriceEngineHttp } from "./mark-price-engine-http.js";
 
-// META-RULE P lower-tier mount for the Fund business engine. Independent of the
-// MarkPrice contract mount in @tianqi/mark-price-engine-http — the two engine
-// adapters never share runtime objects, mock servers, or test fixtures
-// (META-RULE F). Each engine spins up its own mock during beforeAll. This is
-// the fifth time the same 21 stability contracts run on a business engine
-// (margin / position / match / mark-price / fund) — Sprint E business engine
-// closure.
+// META-RULE P lower-tier mount for the MarkPrice business engine. Step 13's 21
+// stability contracts run unchanged on a real undici pool aimed at the testkit's
+// shared mock downstream. Step 17 inherits the 400-599 timeout-avoidance window
+// established in Step 14 §G and continued in Step 15 / 16 unchanged.
 
 let mock: MockDownstreamServer;
 
@@ -29,7 +26,7 @@ afterAll(async () => {
 });
 
 const factory = (): ExternalEngineAdapterUnderTest =>
-  createFundEngineHttp({
+  createMarkPriceEngineHttp({
     baseUrl: mock.url,
     timeouts: { connectMs: 300, requestMs: 200, totalMs: 1000 },
     retry: { maxAttempts: 4, baseDelayMs: 10, maxDelayMs: 100 },
@@ -56,4 +53,4 @@ const options: ExternalEngineContractOptions = {
   }
 };
 
-defineExternalEngineContractTests("fund-engine-http", factory, options);
+defineExternalEngineContractTests("mark-price-engine-http", factory, options);

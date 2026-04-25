@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createTraceId } from "@tianqi/shared";
 
-import { createHttpBaseEngine } from "../src/http-base-engine.js";
+import { createHttpBaseEngine } from "./http-base-engine.js";
 
 import {
   startMockDownstreamServer,

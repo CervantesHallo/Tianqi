@@ -8,12 +8,15 @@ import {
   type MockDownstreamServer
 } from "@tianqi/adapter-testkit";
 
-import { createMatchEngineHttp } from "../src/match-engine-http.js";
+import { createFundEngineHttp } from "./fund-engine-http.js";
 
-// META-RULE P lower-tier mount for the Match business engine. Independent of the
-// Position contract mount in @tianqi/position-engine-http — the two engine
+// META-RULE P lower-tier mount for the Fund business engine. Independent of the
+// MarkPrice contract mount in @tianqi/mark-price-engine-http — the two engine
 // adapters never share runtime objects, mock servers, or test fixtures
-// (META-RULE F). Each engine spins up its own mock during beforeAll.
+// (META-RULE F). Each engine spins up its own mock during beforeAll. This is
+// the fifth time the same 21 stability contracts run on a business engine
+// (margin / position / match / mark-price / fund) — Sprint E business engine
+// closure.
 
 let mock: MockDownstreamServer;
 
@@ -26,7 +29,7 @@ afterAll(async () => {
 });
 
 const factory = (): ExternalEngineAdapterUnderTest =>
-  createMatchEngineHttp({
+  createFundEngineHttp({
     baseUrl: mock.url,
     timeouts: { connectMs: 300, requestMs: 200, totalMs: 1000 },
     retry: { maxAttempts: 4, baseDelayMs: 10, maxDelayMs: 100 },
@@ -53,4 +56,4 @@ const options: ExternalEngineContractOptions = {
   }
 };
 
-defineExternalEngineContractTests("match-engine-http", factory, options);
+defineExternalEngineContractTests("fund-engine-http", factory, options);

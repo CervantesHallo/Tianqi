@@ -9,7 +9,7 @@ import {
 } from "@tianqi/ports";
 import { createTraceId } from "@tianqi/shared";
 
-import { createMarginEngineHttp } from "../src/margin-engine-http.js";
+import { createMarginEngineHttp } from "./margin-engine-http.js";
 
 // Own tests for @tianqi/margin-engine-http — 9 it-blocks organised into three
 // segments per Step 15's Convention L revision for business engines:

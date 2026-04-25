@@ -33,6 +33,10 @@ export default defineConfig({
         "**/*.integration.test.ts",
         "**/test/**",
         "**/fixtures/**",
+        // Step 19 KI-P8-004 cleanup: with test files moved to src/, test-only
+        // helpers (e.g. mock-downstream-server) live in src/helpers/. Excluding
+        // that subdir keeps the coverage denominator on production code only.
+        "**/helpers/**",
         "**/dist/**",
         "**/node_modules/**",
         // Re-export-only barrels carry no logic to cover.

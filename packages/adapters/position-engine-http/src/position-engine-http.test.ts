@@ -4,7 +4,7 @@ import { createMockDownstreamServer, type MockDownstreamServer } from "@tianqi/a
 import { createPositionAccountId, createPositionId, createPositionSize } from "@tianqi/ports";
 import { createTraceId } from "@tianqi/shared";
 
-import { createPositionEngineHttp } from "../src/position-engine-http.js";
+import { createPositionEngineHttp } from "./position-engine-http.js";
 
 // Convention L revised: 10 it-blocks in 3 segments — 3 identity + 5 positive
 // (one per business method) + 2 error. Same shape as Step 15's margin-engine-http

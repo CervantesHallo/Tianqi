@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createMockDownstreamServer, type MockDownstreamServer } from "@tianqi/adapter-testkit";
 import { createTraceId } from "@tianqi/shared";
 
-import { createMarkPriceEngineHttp } from "../src/mark-price-engine-http.js";
+import { createMarkPriceEngineHttp } from "./mark-price-engine-http.js";
 
 // Convention L revised, **弹性应用**: 8 it-blocks in 3 segments — 3 identity + 3
 // positive (one per business method) + 2 error. With only 3 business methods the

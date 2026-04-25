@@ -9,7 +9,7 @@ import {
 } from "@tianqi/ports";
 import { createTraceId } from "@tianqi/shared";
 
-import { createFundEngineHttp } from "../src/fund-engine-http.js";
+import { createFundEngineHttp } from "./fund-engine-http.js";
 
 // Convention L revised: 9 it-blocks in 3 segments — 3 identity + 4 positive
 // (one per business method) + 2 error. Below the 10-it ceiling by 1 slot;

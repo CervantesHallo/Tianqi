@@ -8,7 +8,7 @@ import {
   type MockDownstreamServer
 } from "@tianqi/adapter-testkit";
 
-import { createPositionEngineHttp } from "../src/position-engine-http.js";
+import { createPositionEngineHttp } from "./position-engine-http.js";
 
 // META-RULE P lower-tier mount for the Position business engine. The 21 Step-13
 // stability contracts run unchanged on a real undici pool aimed at the testkit's

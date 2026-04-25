@@ -2,13 +2,14 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "rootDir": ".",
+    "rootDir": "src",
     "outDir": "dist"
   },
   "references": [
     { "path": "../../contracts" },
     { "path": "../../ports" },
-    { "path": "../../shared" }
+    { "path": "../../shared" },
+    { "path": "../adapter-testkit" }
   ],
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

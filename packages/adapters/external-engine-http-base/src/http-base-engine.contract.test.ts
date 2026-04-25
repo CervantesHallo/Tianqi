@@ -6,7 +6,7 @@ import {
   type ExternalEngineContractOptions
 } from "@tianqi/adapter-testkit";
 
-import { createHttpBaseEngine } from "../src/http-base-engine.js";
+import { createHttpBaseEngine } from "./http-base-engine.js";
 
 import {
   startMockDownstreamServer,

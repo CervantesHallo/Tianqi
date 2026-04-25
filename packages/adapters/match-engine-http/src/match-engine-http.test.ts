@@ -4,7 +4,7 @@ import { createMockDownstreamServer, type MockDownstreamServer } from "@tianqi/a
 import { createMatchAccountId, createOrderId } from "@tianqi/ports";
 import { createTraceId } from "@tianqi/shared";
 
-import { createMatchEngineHttp } from "../src/match-engine-http.js";
+import { createMatchEngineHttp } from "./match-engine-http.js";
 
 // Convention L revised: 10 it-blocks in 3 segments — 3 identity + 5 positive
 // (one per business method) + 2 error. Identical structure to the Margin /

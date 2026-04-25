@@ -8,12 +8,12 @@ import {
   type MockDownstreamServer
 } from "@tianqi/adapter-testkit";
 
-import { createMarkPriceEngineHttp } from "../src/mark-price-engine-http.js";
+import { createMatchEngineHttp } from "./match-engine-http.js";
 
-// META-RULE P lower-tier mount for the MarkPrice business engine. Step 13's 21
-// stability contracts run unchanged on a real undici pool aimed at the testkit's
-// shared mock downstream. Step 17 inherits the 400-599 timeout-avoidance window
-// established in Step 14 §G and continued in Step 15 / 16 unchanged.
+// META-RULE P lower-tier mount for the Match business engine. Independent of the
+// Position contract mount in @tianqi/position-engine-http — the two engine
+// adapters never share runtime objects, mock servers, or test fixtures
+// (META-RULE F). Each engine spins up its own mock during beforeAll.
 
 let mock: MockDownstreamServer;
 
@@ -26,7 +26,7 @@ afterAll(async () => {
 });
 
 const factory = (): ExternalEngineAdapterUnderTest =>
-  createMarkPriceEngineHttp({
+  createMatchEngineHttp({
     baseUrl: mock.url,
     timeouts: { connectMs: 300, requestMs: 200, totalMs: 1000 },
     retry: { maxAttempts: 4, baseDelayMs: 10, maxDelayMs: 100 },
@@ -53,4 +53,4 @@ const options: ExternalEngineContractOptions = {
   }
 };
 
-defineExternalEngineContractTests("mark-price-engine-http", factory, options);
+defineExternalEngineContractTests("match-engine-http", factory, options);

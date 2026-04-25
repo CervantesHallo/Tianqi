@@ -228,3 +228,20 @@ export type {
   RiskCaseRepositoryError,
   RiskCaseRepositoryPort
 } from "./risk-case-repository-port.js";
+// Phase 9 / Step 1 — SagaPort 类型契约（Saga 编排骨架的"输入端"）。
+// 本 Step 仅引入类型与 Brand 工厂；不引入运行能力（Step 6 起在 application 层落地）。
+export type {
+  CorrelationId,
+  SagaCompensationContext,
+  SagaContext,
+  SagaId,
+  SagaInvocation,
+  SagaPortError,
+  SagaResult,
+  SagaResultStatus,
+  SagaStep,
+  SagaStepExecution,
+  SagaStepStatus,
+  SagaStepStatusSnapshot
+} from "./saga-port.js";
+export { createCorrelationId, createSagaId } from "./saga-port.js";

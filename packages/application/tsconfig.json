@@ -9,7 +9,21 @@
     { "path": "../shared" },
     { "path": "../contracts" },
     { "path": "../domain" },
-    { "path": "../ports" }
+    { "path": "../ports" },
+    { "path": "../adapters/adapter-testkit" },
+    { "path": "../adapters/config-file" },
+    { "path": "../adapters/config-memory" },
+    { "path": "../adapters/event-store-memory" },
+    { "path": "../adapters/event-store-postgres" },
+    { "path": "../adapters/event-store-sqlite" },
+    { "path": "../adapters/external-engine-http-base" },
+    { "path": "../adapters/fund-engine-http" },
+    { "path": "../adapters/margin-engine-http" },
+    { "path": "../adapters/mark-price-engine-http" },
+    { "path": "../adapters/match-engine-http" },
+    { "path": "../adapters/notification-kafka" },
+    { "path": "../adapters/notification-memory" },
+    { "path": "../adapters/position-engine-http" }
   ],
   "include": ["src/**/*.ts"]
 }

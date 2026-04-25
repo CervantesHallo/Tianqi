@@ -13,5 +13,21 @@
     "@tianqi/domain": "workspace:*",
     "@tianqi/ports": "workspace:*",
     "@tianqi/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@tianqi/adapter-testkit": "workspace:*",
+    "@tianqi/config-file": "workspace:*",
+    "@tianqi/config-memory": "workspace:*",
+    "@tianqi/event-store-memory": "workspace:*",
+    "@tianqi/event-store-postgres": "workspace:*",
+    "@tianqi/event-store-sqlite": "workspace:*",
+    "@tianqi/external-engine-http-base": "workspace:*",
+    "@tianqi/fund-engine-http": "workspace:*",
+    "@tianqi/margin-engine-http": "workspace:*",
+    "@tianqi/mark-price-engine-http": "workspace:*",
+    "@tianqi/match-engine-http": "workspace:*",
+    "@tianqi/notification-kafka": "workspace:*",
+    "@tianqi/notification-memory": "workspace:*",
+    "@tianqi/position-engine-http": "workspace:*"
   }
 }

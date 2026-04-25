@@ -16,19 +16,21 @@
 
 ## 当前已入驻 Adapter
 
-| 包名                                                               | 角色                                                                   | 状态                                  |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------- |
-| [`@tianqi/adapter-testkit`](./adapter-testkit)                     | 适配器层共享契约测试工具包                                             | Phase 8 / Step 1 落地                 |
-| [`@tianqi/event-store-memory`](./event-store-memory)               | `EventStorePort` 内存实现（非持久化）                                  | Phase 8 / Step 4 落地                 |
-| [`@tianqi/event-store-sqlite`](./event-store-sqlite)               | `EventStorePort` SQLite 持久化实现（基于 better-sqlite3）              | Phase 8 / Step 5 落地                 |
-| [`@tianqi/event-store-postgres`](./event-store-postgres)           | `EventStorePort` PostgreSQL 持久化实现（基于 pg + Pool）               | Phase 8 / Step 6 落地                 |
-| [`@tianqi/notification-memory`](./notification-memory)             | `NotificationPort` 内存实现（非持久化；at-least-once）                 | Phase 8 / Step 8 落地                 |
-| [`@tianqi/notification-kafka`](./notification-kafka)               | `NotificationPort` Kafka 实现（基于 kafkajs；at-least-once）           | Phase 8 / Step 9 落地                 |
-| [`@tianqi/config-memory`](./config-memory)                         | `ConfigPort` 内存实现（非持久化；1PC + compensation）                  | Phase 8 / Step 11 落地                |
-| [`@tianqi/config-file`](./config-file)                             | `ConfigPort` YAML 文件实现（冷启动 + 热加载 + 跨重启历史；基于 yaml）  | Phase 8 / Step 11 落地 · Step 12 扩展 |
-| [`@tianqi/external-engine-http-base`](./external-engine-http-base) | **基座 Adapter**：External Engine HTTP 客户端封装五件套（基于 undici） | Phase 8 / Step 14 落地                |
-| [`@tianqi/margin-engine-http`](./margin-engine-http)               | **业务 Engine**：MarginEnginePort HTTP 实现（消费基座）                | Phase 8 / Step 15 落地                |
-| [`@tianqi/position-engine-http`](./position-engine-http)           | **业务 Engine**：PositionEnginePort HTTP 实现（消费基座）              | Phase 8 / Step 16 落地                |
-| [`@tianqi/match-engine-http`](./match-engine-http)                 | **业务 Engine**：MatchEnginePort HTTP 实现（消费基座）                 | Phase 8 / Step 16 落地                |
+| 包名                                                               | 角色                                                                     | 状态                                  |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------- |
+| [`@tianqi/adapter-testkit`](./adapter-testkit)                     | 适配器层共享契约测试工具包                                               | Phase 8 / Step 1 落地                 |
+| [`@tianqi/event-store-memory`](./event-store-memory)               | `EventStorePort` 内存实现（非持久化）                                    | Phase 8 / Step 4 落地                 |
+| [`@tianqi/event-store-sqlite`](./event-store-sqlite)               | `EventStorePort` SQLite 持久化实现（基于 better-sqlite3）                | Phase 8 / Step 5 落地                 |
+| [`@tianqi/event-store-postgres`](./event-store-postgres)           | `EventStorePort` PostgreSQL 持久化实现（基于 pg + Pool）                 | Phase 8 / Step 6 落地                 |
+| [`@tianqi/notification-memory`](./notification-memory)             | `NotificationPort` 内存实现（非持久化；at-least-once）                   | Phase 8 / Step 8 落地                 |
+| [`@tianqi/notification-kafka`](./notification-kafka)               | `NotificationPort` Kafka 实现（基于 kafkajs；at-least-once）             | Phase 8 / Step 9 落地                 |
+| [`@tianqi/config-memory`](./config-memory)                         | `ConfigPort` 内存实现（非持久化；1PC + compensation）                    | Phase 8 / Step 11 落地                |
+| [`@tianqi/config-file`](./config-file)                             | `ConfigPort` YAML 文件实现（冷启动 + 热加载 + 跨重启历史；基于 yaml）    | Phase 8 / Step 11 落地 · Step 12 扩展 |
+| [`@tianqi/external-engine-http-base`](./external-engine-http-base) | **基座 Adapter**：External Engine HTTP 客户端封装五件套（基于 undici）   | Phase 8 / Step 14 落地                |
+| [`@tianqi/margin-engine-http`](./margin-engine-http)               | **业务 Engine**：MarginEnginePort HTTP 实现（消费基座）                  | Phase 8 / Step 15 落地                |
+| [`@tianqi/position-engine-http`](./position-engine-http)           | **业务 Engine**：PositionEnginePort HTTP 实现（消费基座）                | Phase 8 / Step 16 落地                |
+| [`@tianqi/match-engine-http`](./match-engine-http)                 | **业务 Engine**：MatchEnginePort HTTP 实现（消费基座）                   | Phase 8 / Step 16 落地                |
+| [`@tianqi/mark-price-engine-http`](./mark-price-engine-http)       | **业务 Engine**：MarkPriceEnginePort HTTP 实现（消费基座；纯读）         | Phase 8 / Step 17 落地                |
+| [`@tianqi/fund-engine-http`](./fund-engine-http)                   | **业务 Engine**：FundEnginePort HTTP 实现（消费基座；读为主 + 单一弱写） | Phase 8 / Step 17 落地                |
 
 本表只反映当前仓库实际状态，新增 Adapter 须在合入时同步更新此表，禁止预先列出尚未落地的 Adapter。

@@ -1,7 +1,15 @@
-// Phase 9 / Step 6 — saga-orchestrator 单元测试（裁决 7：≤10 业务 Engine
-// 风格）。10 it 覆盖：工厂签名 / 零步快路径 / persist 触发点 / 逆序补偿 /
-// 死信入队 / 状态致命 / 死信降级 / 审计降级 / 7 类审计事件 / compensationContext
-// 透传。
+// Phase 9 / Step 6 + Step 7 — saga-orchestrator 单元测试。
+//
+// Step 6 起 10 it：工厂签名 / 零步快路径 / persist 触发点 / 逆序补偿 /
+// 死信入队 / 状态致命 / 死信降级 / 审计降级 / 7 类审计事件 /
+// compensationContext 透传。
+//
+// Step 7 增量（裁决 5：上限放宽 ≤10 → ≤12）：新增 2 个不变量专项 it。
+//   - 不变量 2 专项 it（§4.2 双重幂等保护）：直接验证
+//     isStepEligibleForCompensation 8 状态枚举完备性
+//   - 不变量 5 专项 it（§4.6 链式继续）：3 step 中 2 个 compensate 失败 →
+//     全部入死信 + partially_compensated + 不变量 1/3/5 联动验证
+//   - 既有 it 4 升级（不变量 1 增强）：2 step 反向 → 4 step 严格逆序
 //
 // Mock 策略：本测试用 mock ports（可控制 save / append / enqueue 失败行
 // 为）；契约测试 saga-orchestrator.contract.test.ts 用真实 in-memory 适
@@ -24,13 +32,17 @@ import type {
   SagaStateStoreError,
   SagaStateStorePort,
   SagaStep,
-  SagaStepExecution
+  SagaStepExecution,
+  SagaStepStatus,
+  SagaStepStatusSnapshot
 } from "@tianqi/ports";
 import { createCorrelationId, createSagaId } from "@tianqi/ports";
 
 import {
   AUDIT_EVENT_TYPES,
+  aggregateCompensationOutcome,
   createSagaOrchestrator,
+  isStepEligibleForCompensation,
   type SagaDegradedFailureEvent
 } from "./saga-orchestrator.js";
 
@@ -286,6 +298,10 @@ describe("saga-orchestrator: unit tests", () => {
   });
 
   it("test_runSaga_with_failing_step_triggers_compensation_in_strict_reverse_order", async () => {
+    // Step 7 增强不变量 1（§4.3 严格逆序）：4 succeeded step 后第 5 step 失败，
+    // 验证补偿调用顺序严格按 stepIndex 降序 4→3→2→1（中间不跳过任何 step；
+    // 失败 step 自身不补偿）。Step 6 原 it 仅 2 step 反向，无法区分"严格逆序"
+    // 与"巧合反向"——4 step 是判定不变量 1 的最小可信场景。
     const recorder = { executes: [] as string[], compensates: [] as string[] };
     const orchestrator = createSagaOrchestrator({
       sagaStateStore: createMockSagaStateStore(),
@@ -295,7 +311,9 @@ describe("saga-orchestrator: unit tests", () => {
     const steps = [
       buildSucceedingStep("step-a", recorder),
       buildSucceedingStep("step-b", recorder),
-      buildFailingExecuteStep("step-c-fail", "synthetic execute failure", recorder)
+      buildSucceedingStep("step-c", recorder),
+      buildSucceedingStep("step-d", recorder),
+      buildFailingExecuteStep("step-e-fail", "synthetic execute failure", recorder)
     ];
     const result = await orchestrator.runSaga(buildInvocation("c4"), steps);
     expect(result.ok).toBe(true);
@@ -303,9 +321,15 @@ describe("saga-orchestrator: unit tests", () => {
       expect(result.value.status).toBe("compensated");
       expect(result.value.finalOutput).toBeNull();
     }
-    expect(recorder.executes).toEqual(["step-a", "step-b", "step-c-fail"]);
-    // 严格逆序补偿：b → a；失败 step 自身不补偿
-    expect(recorder.compensates).toEqual(["step-b", "step-a"]);
+    expect(recorder.executes).toEqual([
+      "step-a",
+      "step-b",
+      "step-c",
+      "step-d",
+      "step-e-fail"
+    ]);
+    // 不变量 1（§4.3）：严格逆序 d → c → b → a；失败 step 自身不补偿
+    expect(recorder.compensates).toEqual(["step-d", "step-c", "step-b", "step-a"]);
   });
 
   it("test_runSaga_with_compensation_failure_enqueues_dead_letter_and_marks_status", async () => {
@@ -489,5 +513,129 @@ describe("saga-orchestrator: unit tests", () => {
     expect(result.ok).toBe(true);
     // compensate 收到的 ctx 严格等于 execute 返回的 compensationContext（即 payload）
     expect(recorder.receivedCtx.get("step-echo")).toEqual(payload);
+  });
+
+  // ============================================================
+  // Step 7 不变量专项 it
+  // ============================================================
+
+  it("test_isStepEligibleForCompensation_returns_true_only_for_succeeded_status", () => {
+    // 不变量 2 专项（§4.2 双重幂等保护编排器侧）：直接对 isStepEligibleForCompensation
+    // 进行 8 状态枚举完备性测试。这是双重保护的"编排器侧守门"——单点失误不会让
+    // 已 compensate 的 step 被再次调用 compensate（避免对已撤销资源重复回滚导致
+    // 资金/持仓不一致）。
+    //
+    // 8 状态语义参考 saga-port.ts SagaStepStatus（§6 段 274-282）。
+    const allStatuses: SagaStepStatus[] = [
+      "pending",
+      "executing",
+      "succeeded",
+      "failed",
+      "compensating",
+      "compensated",
+      "compensation_failed",
+      "dead_lettered"
+    ];
+    for (const status of allStatuses) {
+      const eligible = isStepEligibleForCompensation(status);
+      if (status === "succeeded") {
+        expect(eligible).toBe(true);
+      } else {
+        // 任何非 succeeded 都拒绝补偿调用：避免重复 compensate（已 compensated /
+        // 已 dead_lettered）；避免错误时机调用（pending / executing）；避免对
+        // 失败 execute 的 step 调 compensate（failed——按 §4.3 失败 step 自身
+        // 不补偿）；避免重入 compensating 中态。
+        expect(eligible).toBe(false);
+      }
+    }
+
+    // aggregateCompensationOutcome 同样测 8 状态聚合（不变量 5 基础判定）：
+    // 仅 dead_lettered 触发 partially_compensated；其他全部聚合为 compensated。
+    const buildSnapshot = (status: SagaStepStatus): SagaStepStatusSnapshot => ({
+      name: `step-${status}`,
+      status,
+      failureReason: null
+    });
+    expect(aggregateCompensationOutcome([])).toBe("compensated");
+    expect(aggregateCompensationOutcome([buildSnapshot("compensated")])).toBe(
+      "compensated"
+    );
+    expect(aggregateCompensationOutcome([buildSnapshot("dead_lettered")])).toBe(
+      "partially_compensated"
+    );
+    expect(
+      aggregateCompensationOutcome([
+        buildSnapshot("compensated"),
+        buildSnapshot("dead_lettered"),
+        buildSnapshot("compensated")
+      ])
+    ).toBe("partially_compensated");
+  });
+
+  it("test_runSaga_with_chained_compensation_failures_continues_to_completion_with_partially_compensated", async () => {
+    // 不变量 5 专项（链式继续 + §4.6）：3 succeeded step 中前 2 个 compensate
+    // 失败 + 第 3 个 compensate 成功。验证：
+    //   1. 链式继续——前 2 失败不阻断第 3 step 补偿尝试
+    //   2. 全部 2 个失败 step 入死信（不变量 3 联动）
+    //   3. 终态 partially_compensated（不变量 5 聚合）
+    //   4. 严格逆序 step-c → step-b → step-a（不变量 1 联动）
+    //   5. saga.step.compensate.outcome 触发 3 次（每个 compensate 1 次）
+    //   6. saga.dead_letter.enqueued 触发 2 次（每个失败 1 次）
+    //
+    // 这是"两次连续 compensate 失败 + 第三步成功"场景——风险点 §E 提及
+    // 的关键场景；本 it 验证 audit 事件序列正确性。
+    const recorder = { executes: [] as string[], compensates: [] as string[] };
+    const deadLetterStore = createMockDeadLetterStore();
+    const auditSink = createMockAuditSink();
+    const orchestrator = createSagaOrchestrator({
+      sagaStateStore: createMockSagaStateStore(),
+      deadLetterStore,
+      auditEventSink: auditSink
+    });
+    const steps = [
+      buildSucceedingStep("step-a", recorder), // compensate succeeds
+      buildFailingCompensateStep("step-b-bad-compensate", recorder),
+      buildFailingCompensateStep("step-c-bad-compensate", recorder),
+      buildFailingExecuteStep("step-d-fail", "trigger compensation", recorder)
+    ];
+    const result = await orchestrator.runSaga(buildInvocation("c12"), steps);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // 不变量 5：终态 partially_compensated（任一 dead_lettered 即降级）
+      expect(result.value.status).toBe("partially_compensated");
+      expect(result.value.finalOutput).toBeNull();
+      // step-a 应 compensated（compensate 成功）；step-b/c 应 dead_lettered
+      const statusByName = new Map(
+        result.value.stepStatuses.map(s => [s.name, s.status])
+      );
+      expect(statusByName.get("step-a")).toBe("compensated");
+      expect(statusByName.get("step-b-bad-compensate")).toBe("dead_lettered");
+      expect(statusByName.get("step-c-bad-compensate")).toBe("dead_lettered");
+      expect(statusByName.get("step-d-fail")).toBe("failed");
+    }
+
+    // 不变量 1（严格逆序）+ 不变量 5（链式继续）：
+    // compensate 触发顺序 c → b → a，链式继续不在 c 失败处中止
+    expect(recorder.compensates).toEqual([
+      "step-c-bad-compensate",
+      "step-b-bad-compensate",
+      "step-a"
+    ]);
+
+    // 不变量 3（§4.5 死信入队）：2 个失败 step 全部入死信
+    expect(deadLetterStore.enqueued.length).toBe(2);
+    const dlqStepNames = deadLetterStore.enqueued.map(e => e.stepName);
+    expect(dlqStepNames).toContain("step-b-bad-compensate");
+    expect(dlqStepNames).toContain("step-c-bad-compensate");
+
+    // 审计事件正确性（每个 compensate 1 个 outcome；每个失败 1 个 dead_letter）
+    const compensateOutcomes = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_STEP_COMPENSATE_OUTCOME
+    );
+    expect(compensateOutcomes.length).toBe(3);
+    const dlqEnqueued = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_DEAD_LETTER_ENQUEUED
+    );
+    expect(dlqEnqueued.length).toBe(2);
   });
 });

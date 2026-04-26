@@ -304,3 +304,56 @@ export const externalEngineBaseUrlUnreachableError = (
     },
     cause
   );
+
+// Phase 9 / Step 3 — SagaStateStore Adapter 错误工厂。
+// 与 EventStore 的 TQ-INF-003/004 同形态（INIT 前调用 / SHUTDOWN 后调用），
+// 但分配独立 code 让运维 runbook 与 EventStore 解耦——同样的"先 init 后操
+// 作"错误，Saga 状态存储与事件存储的处理路径完全不同（前者影响 Saga 推
+// 进，后者影响审计可回放）。
+
+export const sagaStateStoreNotInitializedError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.SAGA_STATE_STORE_NOT_INITIALIZED,
+    "Saga state store adapter is not initialized",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );
+
+export const sagaStateStoreAlreadyShutDownError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.SAGA_STATE_STORE_ALREADY_SHUT_DOWN,
+    "Saga state store adapter is already shut down",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );
+
+// schema_version 不匹配：postgres adapter 在 init 时发现持久化表的
+// schema_version 与代码内 SCHEMA_VERSION 常量不一致（譬如旧版部署后停服
+// 升级）。运维 runbook 与 TQ-INF-008 SQLITE_SCHEMA_VERSION_MISMATCH 不
+// 同：本码引导操作员检查 saga-state-store-postgres 包的 SCHEMA_VERSION
+// 历史与 ALTER 迁移脚本（Phase 11+ 责任），而 TQ-INF-008 引导检查 SQLite
+// 文件的本地状态。两条 runbook 分离更精确。
+export const sagaStateStoreSchemaVersionMismatchError = (
+  adapterName: string,
+  expected: string,
+  actual: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH,
+    "Saga state store schema_version does not match adapter expectation",
+    {
+      adapterName,
+      expected,
+      actual
+    }
+  );

@@ -245,3 +245,13 @@ export type {
   SagaStepStatusSnapshot
 } from "./saga-port.js";
 export { createCorrelationId, createSagaId } from "./saga-port.js";
+// Phase 9 / Step 3 — SagaStateStorePort 持久化契约（Saga 状态崩溃恢复用）。
+// 本 Step 仅引入类型；运行能力由 saga-state-store-memory + saga-state-store-postgres
+// Adapter 落地。
+export type {
+  PersistedCompensationEntry,
+  PersistedSagaState,
+  PersistedSagaStateOverallStatus,
+  SagaStateStoreError,
+  SagaStateStorePort
+} from "./saga-state-store-port.js";

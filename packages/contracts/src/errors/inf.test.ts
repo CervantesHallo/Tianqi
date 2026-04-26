@@ -12,7 +12,10 @@ import {
   externalEngineRateLimitedError,
   externalEngineRetriesExhaustedError,
   externalEngineTimeoutError,
-  InfrastructureError
+  InfrastructureError,
+  sagaStateStoreAlreadyShutDownError,
+  sagaStateStoreNotInitializedError,
+  sagaStateStoreSchemaVersionMismatchError
 } from "./inf.js";
 
 describe("TQ-INF error namespace", () => {
@@ -222,5 +225,65 @@ describe("TQ-INF error namespace", () => {
     expect(ERROR_CODES.EXTERNAL_ENGINE_TIMEOUT).not.toBe(
       ERROR_CODES.EXTERNAL_ENGINE_BASE_URL_UNREACHABLE
     );
+  });
+
+  // Phase 9 / Step 3 — TQ-INF-019/020/021 SagaStateStore 工厂的 round-trip
+  // 与三码独立性断言。每条新增码独占字符串槽位（不与既有 18 条 TQ-INF
+  // 重复），且工厂返回的 InfrastructureError layer=infrastructure。
+
+  it("constructs the TQ-INF-019 sample via factory", () => {
+    const error = sagaStateStoreNotInitializedError("saga-state-store-memory", "save");
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.SAGA_STATE_STORE_NOT_INITIALIZED);
+    expect(error.code).toBe("TQ-INF-019");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "saga-state-store-memory",
+      attemptedAction: "save"
+    });
+  });
+
+  it("constructs the TQ-INF-020 sample via factory", () => {
+    const error = sagaStateStoreAlreadyShutDownError("saga-state-store-postgres", "load");
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.SAGA_STATE_STORE_ALREADY_SHUT_DOWN);
+    expect(error.code).toBe("TQ-INF-020");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "saga-state-store-postgres",
+      attemptedAction: "load"
+    });
+  });
+
+  it("constructs the TQ-INF-021 sample via factory", () => {
+    const error = sagaStateStoreSchemaVersionMismatchError(
+      "saga-state-store-postgres",
+      "1.0.0",
+      "0.9.5"
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH);
+    expect(error.code).toBe("TQ-INF-021");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "saga-state-store-postgres",
+      expected: "1.0.0",
+      actual: "0.9.5"
+    });
+  });
+
+  it("keeps three new TQ-INF SagaStateStore codes pairwise distinct from EventStore counterparts", () => {
+    // 永久留痕：TQ-INF-019/020 与 EventStore 既有 TQ-INF-003/004 各自独立；
+    // TQ-INF-021 与 SQLite 既有 TQ-INF-008 schema 不匹配各自独立。同形态
+    // 错误分配独立 code 让运维 runbook 分离（裁决：见 docs/phase9/03 §C）。
+    const codes = new Set<string>([
+      ERROR_CODES.EVENT_STORE_NOT_INITIALIZED,
+      ERROR_CODES.EVENT_STORE_ALREADY_SHUT_DOWN,
+      ERROR_CODES.SQLITE_SCHEMA_VERSION_MISMATCH,
+      ERROR_CODES.SAGA_STATE_STORE_NOT_INITIALIZED,
+      ERROR_CODES.SAGA_STATE_STORE_ALREADY_SHUT_DOWN,
+      ERROR_CODES.SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH
+    ]);
+    expect(codes.size).toBe(6);
   });
 });

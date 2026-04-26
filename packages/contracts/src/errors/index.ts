@@ -15,6 +15,9 @@ export {
   InfrastructureError,
   kafkaBrokerUnreachableError,
   postgresUnreachableError,
+  sagaStateStoreAlreadyShutDownError,
+  sagaStateStoreNotInitializedError,
+  sagaStateStoreSchemaVersionMismatchError,
   sqliteDatabaseUnreachableError,
   sqliteSchemaVersionMismatchError
 } from "./inf.js";

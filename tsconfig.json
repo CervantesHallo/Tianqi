@@ -20,6 +20,8 @@
     { "path": "./packages/adapters/position-engine-http" },
     { "path": "./packages/adapters/match-engine-http" },
     { "path": "./packages/adapters/mark-price-engine-http" },
-    { "path": "./packages/adapters/fund-engine-http" }
+    { "path": "./packages/adapters/fund-engine-http" },
+    { "path": "./packages/adapters/saga-state-store-memory" },
+    { "path": "./packages/adapters/saga-state-store-postgres" }
   ]
 }

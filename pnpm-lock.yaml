@@ -295,6 +295,44 @@ importers:
         specifier: workspace:*
         version: link:../adapter-testkit
 
+  packages/adapters/saga-state-store-memory:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+
+  packages/adapters/saga-state-store-postgres:
+    dependencies:
+      '@tianqi/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@tianqi/ports':
+        specifier: workspace:*
+        version: link:../../ports
+      '@tianqi/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
+    devDependencies:
+      '@tianqi/adapter-testkit':
+        specifier: workspace:*
+        version: link:../adapter-testkit
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
+
   packages/application:
     dependencies:
       '@tianqi/contracts':

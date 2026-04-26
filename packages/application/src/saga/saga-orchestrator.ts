@@ -1,4 +1,4 @@
-// Phase 9 / Step 6 — SagaOrchestrator 核心实现。
+// Phase 9 / Step 6 — SagaOrchestrator 核心实现 + Step 7 补偿引擎增强。
 //
 // 把《§4》8 条 Saga 强约束（Sprint F 已落 §4.1-§4.7）从纸面规约变成
 // "运行时可执行编排器"。本文件是 Phase 9 至今最重的单文件；接口签名
@@ -16,6 +16,20 @@
 //   - 裁决 6 (Step 7-9 钩子)：runCompensationPhase / withStepTimeout +
 //     defaultStepTimeoutMs / Step 9 不在编排器接口暴露
 //   - 裁决 7：单元测试 ≤10 + 一行挂载 defineSagaContractTests
+//
+// Step 7 增强（详见 docs/decisions/0002 Step 7 段 + docs/phase9/07）：
+//   - 裁决 1 (β)：链式继续——单 step compensate 失败不阻断后续 step 补偿
+//   - 裁决 2 (C)：双重幂等保护——编排器侧 stepStatus 检查 + step 自身契约
+//   - 裁决 3 (X)：不扩展 PersistedSagaState（stepStatuses 已含 8 值终态语义）
+//   - 裁决 4：0 错误码新增（惯例 K 第 9 次实战）
+//   - 裁决 5：unit test 10→12（新增不变量 2 + 不变量 5 专项）
+//
+// 5 不变量（运行时层面的强约束，每条对应 §4 协议层条款）：
+//   - 不变量 1（§4.3）：补偿调用顺序严格逆序 stepIndex N-1, N-2, ..., 0
+//   - 不变量 2（§4.2）：仅 stepStatus === "succeeded" 的 step 被调用 compensate
+//   - 不变量 3（§4.5）：compensation_failed 的 step 必入死信
+//   - 不变量 4（§4.5）：每次 stepStatus 变化都 persist
+//   - 不变量 5（链式继续 + §4.6）：单点 compensate 失败不阻断后续 step 补偿尝试
 //
 // §6.5 转译纪律延续：state 持久化失败时返回 SagaPortError；message 是
 // 领域级摘要（"saga state persistence failed"）；cause 字段携带原始
@@ -169,6 +183,78 @@ let defaultDlqIdCounter = 0;
 const defaultGenerateDeadLetterId = (): DeadLetterId => {
   defaultDlqIdCounter += 1;
   return createDeadLetterId(`dlq-${Date.now()}-${defaultDlqIdCounter}`);
+};
+
+// ============================================================
+// Step 7 增强：补偿引擎私有 helper（文件级、纯函数、零状态）
+// ============================================================
+//
+// 这两个 helper 把 5 不变量中"哪个 step 该补"与"全部补完后整体什么状态"
+// 两个判定从 runCompensationPhase 主循环抽离，独立成型函数。读者翻开
+// runCompensationPhase 时一眼看出"哪条不变量在哪一行守护"。
+//
+// 不引入新接口签名（元规则 B 严守）；不暴露给外部消费者（不通过 src/
+// index.ts re-export；与 createSagaOrchestrator 同文件局部使用）。
+
+/**
+ * 不变量 2（§4.2 双重幂等保护编排器侧）：判定一个 step 是否仍处于
+ * 可补偿态。仅 "succeeded" 返回 true。
+ *
+ * 设计要义：
+ *   - 同一 step 不会被本编排器的 runCompensationPhase 内重复调用 compensate
+ *     （主循环遍历一次 succeeded 数组）
+ *   - 但崩溃恢复（Phase 10+ 责任）从 PersistedSagaState 重新装载
+ *     stepStatuses 后，可能遇到 status === "compensated" 已完成的 step；
+ *     此 helper 让恢复路径未来无需修改主循环逻辑——只需改 compensate
+ *     入口判定数据源（运行时 succeeded 数组 → 持久化 stepStatuses 字段）
+ *   - 与 §4.2 step 自身契约幂等组成"双重保护"：编排器侧守门 + step
+ *     自身能够安全应对意外重调（譬如部署 / 回滚误触发）
+ *
+ * 接受 SagaStepStatus 而不是 SagaStepStatusSnapshot，因为编排器侧本身
+ * 已经持有 status 字段；调用方提供哪种形式都不破坏判定纯度。
+ *
+ * **本 helper 通过 src/index.ts 导出**：
+ *   - Step 7 unit test 不变量 2 专项 it 直接调用验证 8 状态枚举完备性
+ *   - Phase 10+ 崩溃恢复 API 实现时复用相同判定语义（避免逻辑重复）
+ *   元规则 B 自此对本签名永久冻结。
+ */
+export const isStepEligibleForCompensation = (status: SagaStepStatus): boolean =>
+  status === "succeeded";
+
+/**
+ * 不变量 5（链式继续 + §4.6）：根据补偿循环结束后的 stepStatuses 计算
+ * Saga 整体的补偿终态。
+ *
+ * 判定规则（与 PersistedSagaStateOverallStatus 6 值集对齐）：
+ *   - 任一 step 状态为 "dead_lettered" → "partially_compensated"
+ *     （至少一次 compensate 失败被记入死信）
+ *   - 否则 → "compensated"
+ *     （含 vacuous 情形：无 succeeded step 触发补偿，循环未执行）
+ *
+ * 不返回 in_progress / completed / compensating / timed_out 这 4 类——本函
+ * 数仅在补偿阶段结束（runCompensationPhase 主循环结束）时被调用。这种
+ * 限定在类型层面无法表达，由调用上下文保证。
+ *
+ * 设计要义：
+ *   - 替代原 Step 6 实现里的局部 boolean `allCompensated` 计算——把判定
+ *     从"循环局部副作用"提升为"基于持久化 stepStatuses 的纯函数"
+ *   - 让聚合判定与补偿循环解耦：未来若 runCompensationPhase 多次调用
+ *     （崩溃恢复重入），聚合逻辑仍正确
+ *
+ * **本 helper 通过 src/index.ts 导出**：
+ *   - Step 7 unit test 不变量 5 专项 it 直接调用验证 8 状态枚举聚合行为
+ *   - Phase 10+ 崩溃恢复 API 实现时复用相同聚合语义
+ *   元规则 B 自此对本签名永久冻结。
+ */
+export const aggregateCompensationOutcome = (
+  stepStatuses: ReadonlyArray<SagaStepStatusSnapshot>
+): "compensated" | "partially_compensated" => {
+  for (const snapshot of stepStatuses) {
+    if (snapshot.status === "dead_lettered") {
+      return "partially_compensated";
+    }
+  }
+  return "compensated";
 };
 
 // ============================================================
@@ -362,16 +448,29 @@ export const createSagaOrchestrator = (
   };
 
   // ============================================================
-  // runCompensationPhase —— Step 7 钩子（私有）
-  // 严格逆序补偿已 succeeded 的 step；compensate 失败 → dead_lettered +
-  // DLQ enqueue + saga.step.compensate.outcome (failed) + saga.dead_letter.enqueued。
-  // Step 7 增强补偿幂等保证时仅扩展本方法。
+  // runCompensationPhase —— Step 7 增强：5 不变量在运行时层面被严格守住
+  //
+  // 不变量映射（与 docs/phase9/07 §D 一一对应）：
+  //   - 不变量 1（§4.3 严格逆序）→ for j = succeeded.length - 1; j >= 0; j -= 1
+  //   - 不变量 2（§4.2 双重幂等保护）→ isStepEligibleForCompensation 守门
+  //   - 不变量 3（§4.5 死信入队）→ compResult 失败必触发 tryEnqueueDeadLetter
+  //   - 不变量 4（§4.5 stepStatus 持久化）→ 每次 status 变化都 await persist
+  //   - 不变量 5（链式继续 + §4.6）→ compResult 失败时不 break，循环继续
+  //
+  // Step 7 增强 vs Step 6 原实现的关键差异：
+  //   - 引入 isStepEligibleForCompensation 守门（双重保护编排器侧）
+  //   - 终态聚合改用 aggregateCompensationOutcome 纯函数（基于持久化
+  //     stepStatuses 字段，而非循环局部 boolean），与崩溃恢复路径前向兼容
+  //   - 5 个不变量在代码注释里显式标注，新增维护者一目了然
+  //
+  // 接口签名零变化（元规则 B 严守）；与 Step 6 调用方完全兼容。
   // ============================================================
   const runCompensationPhase = async (
     state: InternalSagaState,
     steps: ReadonlyArray<SagaStep<unknown, unknown, unknown>>,
     succeeded: ReadonlyArray<{ idx: number; compensationContext: unknown }>
   ): Promise<Result<void, SagaPortError>> => {
+    // 不变量 4：进入补偿阶段必先 persist overallStatus → compensating
     state.overallStatus = "compensating";
     const persistEntry = await persist(state);
     if (!persistEntry.ok) return persistEntry;
@@ -382,12 +481,26 @@ export const createSagaOrchestrator = (
       succeededStepNames: succeeded.map(s => steps[s.idx]!.name)
     });
 
-    let allCompensated = true;
+    // 不变量 1（§4.3 严格逆序）：从 succeeded 数组末尾往头部遍历。succeeded
+    // 数组在 forward phase 按 stepIndex 升序 push，逆序遍历等价于按 stepIndex
+    // 严格降序（N-1, N-2, ..., 0）。中间不跳过任何 succeeded step。
     for (let j = succeeded.length - 1; j >= 0; j -= 1) {
       const entry = succeeded[j]!;
       const step = steps[entry.idx]!;
+      const currentStatus = state.stepStatuses[entry.idx]!.status;
 
-      // Persist: status → compensating
+      // 不变量 2（§4.2 双重幂等保护编排器侧）：仅 "succeeded" 状态的 step
+      // 才被调用 compensate。理论上 succeeded 数组只含 forward phase 中
+      // succeeded 的 step，此守门是冗余防御——但与 §4.2 step 自身契约幂等
+      // 形成双重保护，未来崩溃恢复（Phase 10+）从 PersistedSagaState 装载
+      // stepStatuses 直接复用本主循环时此守门是必要的。
+      if (!isStepEligibleForCompensation(currentStatus)) {
+        // 跳过：无 audit 触发（不是新事件，仅是恢复场景的状态确认）；
+        // 不入死信（既有终态保留）。不变量 5 隐含表达：跳过不阻断后续。
+        continue;
+      }
+
+      // 不变量 4：status → "compensating" 必先 persist
       state.stepStatuses[entry.idx] = {
         ...state.stepStatuses[entry.idx]!,
         status: "compensating"
@@ -403,6 +516,7 @@ export const createSagaOrchestrator = (
       );
 
       if (compResult.ok) {
+        // 不变量 4：status → "compensated" 必先 persist
         state.stepStatuses[entry.idx] = {
           ...state.stepStatuses[entry.idx]!,
           status: "compensated"
@@ -415,8 +529,9 @@ export const createSagaOrchestrator = (
           outcome: "succeeded"
         });
       } else {
-        allCompensated = false;
         const failureReason = compResult.error.message;
+        // 不变量 3（§4.5 死信入队）+ 不变量 4（持久化）：
+        // status → "dead_lettered" 必先 persist；后续必触发 enqueue
         state.stepStatuses[entry.idx] = {
           ...state.stepStatuses[entry.idx]!,
           status: "dead_lettered",
@@ -445,10 +560,14 @@ export const createSagaOrchestrator = (
             failureChain: [failureReason]
           });
         }
+        // 不变量 5（链式继续）：compensate 失败后**不 break**，循环继续到 j=0
       }
     }
 
-    state.overallStatus = allCompensated ? "compensated" : "partially_compensated";
+    // 不变量 5（链式继续聚合终态）：根据补偿循环结束后的持久化
+    // stepStatuses 计算 saga 整体状态。任一 dead_lettered →
+    // partially_compensated；否则 compensated。
+    state.overallStatus = aggregateCompensationOutcome(state.stepStatuses);
     return ok(undefined);
   };
 

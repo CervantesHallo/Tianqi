@@ -65,3 +65,16 @@ export type {
   ExternalEngineSuccess,
   TestkitExternalEngineFoundation
 } from "./external-engine-contract.js";
+// Phase 9 / Step 2 — Saga 契约套件公开 API。
+//   - 导出 defineSagaContractTests + SagaContractProbe + Subject/Factory/Options 类型
+//   - **不**导出 fixtures/reference-saga.ts 任何符号（元规则 F：参考实现严格
+//     testkit-only，不允许其他包消费）
+export type { SagaContractProbe } from "./saga-contract-probe.js";
+export { defineSagaContractTests } from "./saga-contract.js";
+export type {
+  SagaContractDriveOptions,
+  SagaContractDriveResult,
+  SagaContractFactory,
+  SagaContractOptions,
+  SagaContractSubject
+} from "./saga-contract.js";

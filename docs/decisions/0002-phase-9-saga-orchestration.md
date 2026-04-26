@@ -557,7 +557,123 @@ EventStore 003/004 + SQLite 008 + SagaStateStore 019/020/021 + DeadLetterStore
 
 **🎯 Phase 9 / Sprint F COMPLETE — 2026-04-26**
 
-### Step 6-19: [待后续 Step 增量填充]
+### Step 6: SagaOrchestrator 核心实现（**DRAFT — 等待用户审视**）
+
+> **状态**：DRAFT — 第一阶段产出，等待用户 APPROVE 后第二阶段升级为正式段
+> **草案文档**：`packages/application/src/saga/saga-orchestrator.draft.md`
+> **草案完成时间**：2026-04-26（Step 6 第一阶段）
+
+#### 性质：拆两阶段的 Phase 9 第一个 Step
+
+Step 6 是 Phase 9 至今最重的单 Step（预期 LOC 600-1200），且接口冻结后
+将束缚 Step 7-9 三个 Step。本 Step 拆为：
+- **第一阶段（PHASE_DESIGN）**：产出接口草案 + ADR DRAFT 段；本机
+  commit；**严禁 push**；等待用户 APPROVE
+- **第二阶段（PHASE_IMPLEMENT）**：仅在 APPROVE 后启动；实现 +
+  contract 挂载 + 文档 + 整批 push
+
+理由：给 Claude Code 的发明留一个回头修正窗口，让发明能在被冻结之前接
+受人类审视。（Sprint E 的双路径分发 / atomicWriteFile 三元组 / 1PC +
+compensation 6 失败点矩阵都是惊艳发明，但它们发生在已确定的接口背后；
+Step 6 不同——它是接口与实现一起新建。）
+
+#### 7 个核心裁决摘要（DRAFT 阶段）
+
+**裁决 1（SagaOrchestrator 形态）：γ 工厂闭包**
+
+```typescript
+createSagaOrchestrator(ports, options?): SagaOrchestrator
+```
+与 Tianqi 全仓 Adapter 工厂风格一致；闭包持有 ports/options + 内部 watchdog
+状态。拒绝 α（单函数失去长生命周期能力）+ β（class OOP 与函数式倾向不符）。
+
+**裁决 2（persist 时机）：选 A 每次 stepStatus 变化都 persist**
+
+6 类触发点：saga 启动 / step.execute 启动前 / step.execute 完成后 /
+compensate 启动前 / compensate 完成后 / saga 完成。崩溃恢复完整性优先；
+SagaStateStore.save upsert 语义不引入复杂度；拒绝 B 粗粒度（崩溃时丢
+失 in-flight execute 状态）。
+
+**裁决 3（审计事件）：7 类（修订版，execute/compensate 在事件类型层面分离 + Step 8 timed_out 预留）**
+
+修订理由（用户审视反馈）：审计事件类型是领域事件分类，自带语义优于
+payload 字段过滤；execute / compensate 阶段在事件类型层面应分离；为
+Step 8 整体超时预留 `saga.timed_out` 事件类型，避免 Step 8 时被迫扩展
+事件命名空间。
+
+| # | eventType | 本 Step 是否触发 |
+|---|---|---|
+| 1 | `saga.started` | ✅ |
+| 2 | `saga.step.execute.outcome` | ✅ |
+| 3 | `saga.compensation.started` | ✅ |
+| 4 | `saga.step.compensate.outcome` | ✅ |
+| 5 | `saga.dead_letter.enqueued` | ✅ |
+| 6 | `saga.completed` | ✅ |
+| 7 | `saga.timed_out` | ⚠️ 仅声明事件类型；**Step 8 整体超时实施时触发** |
+
+每事件 traceId 取自 SagaContext.traceId。append 失败 = 降级（log + 继续）。
+事件类型命名空间在本 Step 锁定（元规则 B 在审计层级）；后续 Step 7-9 / Phase 10+ 新增类型必须经 ADR-0002 修订流程。
+
+**裁决 4（与 Phase 4 OrchestrationSagaState 关系）：选 α 完全独立新建**
+
+不引用 Phase 4 任何代码。两套类型不冲突共存——Phase 4 服务 risk-case-orchestrator
+等既有；Phase 9 服务 Step 10-13 业务 Saga。未来若需迁移由 ADR-0002 修订流程。
+
+**裁决 5（错误恢复策略）：分级模式**
+
+| 数据流 | 级别 |
+|---|---|
+| sagaStateStore.save 失败 | **致命**（runSaga 立即 err 中止） |
+| step.execute 业务失败 | 业务层（触发补偿） |
+| step.compensate 失败 | 业务层（标记 dead_lettered + DeadLetterStore.enqueue） |
+| deadLetterStore.enqueue 失败 | **降级**（log + 继续） |
+| auditEventSink.append 失败 | **降级**（log + 继续） |
+
+**裁决 6（Step 7-9 接口预留）：内部私有方法 + Options 可选字段**
+
+- Step 7（逆序补偿）：内部 `runCompensationPhase(succeeded, ctx)` 私有方法
+- Step 8（超时）：内部 `withStepTimeout(task, stepName)` + Options.defaultStepTimeoutMs
+- Step 9（人工介入）：**不在编排器接口暴露**；Step 9 通过共享 DeadLetterStorePort 实现独立 manual intervention API；编排器对 Step 9 透明
+
+3 个钩子都是元规则 B 兼容形式（既有签名不改 / 仅扩展私有逻辑或新增可选字段）。
+
+**裁决 7（测试策略）：单元 ≤10 业务 Engine 风格 + 一行挂载 defineSagaContractTests**
+
+- 单元测试：编排器复杂度对应业务 Engine 而非基础设施 → ≤10 it
+- 契约挂载：本测试文件内部 wrapper（~200 LOC）把 SagaOrchestrator 包装
+  成 SagaContractSubject 形状（自带 step 工厂 + recorder + probe，本地
+  复制不 import fixtures，元规则 F）
+- 让 Sprint F 17 契约 it 在真实 SagaOrchestrator 上运行——证明 Step 2
+  契约可被真实编排器满足
+
+#### Sprint F 4 项历史核查的处理
+
+| 核查 | 本草案处理 |
+|---|---|
+| B.1 Phase 4 SagaStatus 骨架 | 完全独立新建（裁决 4 α）；不引用 Phase 4 任何代码 |
+| B.2 Phase 4 零持久化 | InternalSagaState 直接映射 PersistedSagaState；每次 stepStatus 变化都 save |
+| B.3 SQLite 不需要 | 编排器不直接接触存储介质，通过 Port 注入；Adapter 选 memory/postgres 由调用方决定 |
+| B.4 AuditEventSinkPort 已存在 | SagaOrchestratorPorts 含 auditEventSink；Step 9 透明（不在编排器接口） |
+
+#### 触发的元规则（DRAFT 阶段）
+
+- 元规则 B：严守（Sprint F Step 1-5 锁定签名一字未改）
+- 元规则 F：编排器不主动调 EventStorePort；仅经 AuditEventSinkPort
+- 元规则 Q：第六次实战（含强制开局动作 4 第 6 次实战 = Sprint F §B 直接消费）
+- 惯例 M：第六次实战（本段是 DRAFT；第二阶段升级为正式段）
+- 其他：A / C / D / E / G / H / I / J / K / L / M(probe) / N / O / P 全 N/A
+
+#### DRAFT → 正式段升级条件
+
+第二阶段触发于明确收到用户 APPROVE 字符串后：
+1. 删除本段"DRAFT — 等待用户审视"标记
+2. 删除 saga-orchestrator.draft.md（设计已沉淀进 ADR + 实际代码）
+3. 在本段补"实施细节"小节（与草案的差异 / 实现遇到的小裁决）
+4. 升级为正式段
+
+**第二阶段尚未启动**。
+
+### Step 7-19: [待后续 Step 增量填充]
 
 ## Consequences
 

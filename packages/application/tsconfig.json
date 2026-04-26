@@ -21,9 +21,11 @@
     { "path": "../adapters/margin-engine-http" },
     { "path": "../adapters/mark-price-engine-http" },
     { "path": "../adapters/match-engine-http" },
+    { "path": "../adapters/dead-letter-store-memory" },
     { "path": "../adapters/notification-kafka" },
     { "path": "../adapters/notification-memory" },
-    { "path": "../adapters/position-engine-http" }
+    { "path": "../adapters/position-engine-http" },
+    { "path": "../adapters/saga-state-store-memory" }
   ],
   "include": ["src/**/*.ts"]
 }

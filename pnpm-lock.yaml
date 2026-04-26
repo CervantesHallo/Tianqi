@@ -395,6 +395,9 @@ importers:
       '@tianqi/config-memory':
         specifier: workspace:*
         version: link:../adapters/config-memory
+      '@tianqi/dead-letter-store-memory':
+        specifier: workspace:*
+        version: link:../adapters/dead-letter-store-memory
       '@tianqi/event-store-memory':
         specifier: workspace:*
         version: link:../adapters/event-store-memory
@@ -428,6 +431,9 @@ importers:
       '@tianqi/position-engine-http':
         specifier: workspace:*
         version: link:../adapters/position-engine-http
+      '@tianqi/saga-state-store-memory':
+        specifier: workspace:*
+        version: link:../adapters/saga-state-store-memory
 
   packages/contracts:
     dependencies:

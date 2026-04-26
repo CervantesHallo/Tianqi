@@ -26,8 +26,10 @@
     "@tianqi/margin-engine-http": "workspace:*",
     "@tianqi/mark-price-engine-http": "workspace:*",
     "@tianqi/match-engine-http": "workspace:*",
+    "@tianqi/dead-letter-store-memory": "workspace:*",
     "@tianqi/notification-kafka": "workspace:*",
     "@tianqi/notification-memory": "workspace:*",
-    "@tianqi/position-engine-http": "workspace:*"
+    "@tianqi/position-engine-http": "workspace:*",
+    "@tianqi/saga-state-store-memory": "workspace:*"
   }
 }

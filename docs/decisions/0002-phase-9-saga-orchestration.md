@@ -779,7 +779,108 @@ export const AUDIT_EVENT_TYPES = {
 | Step 8（超时 watchdog） | `withStepTimeout(task, sagaId, stepName)` 私有方法 + `defaultStepTimeoutMs` Options 字段 + `SAGA_TIMED_OUT` 事件类型已声明 | ✅ Step 8 增强 watchdog 实现 + 新增可选 Options 字段（譬如 `watchdogPollIntervalMs`）；既有签名不改 |
 | Step 9（人工介入） | **不在编排器接口暴露**；通过共享 `DeadLetterStorePort` 独立实现 manual intervention API | ✅ 编排器对 Step 9 透明；Step 9 不需要修改本编排器任何签名 |
 
-### Step 7-19: [待后续 Step 增量填充]
+### Step 7: 逆序补偿引擎 + 补偿幂等保证（2026-04-26）
+
+**裁决摘要**：
+
+- **裁决 1（链式策略）**：β 链式继续——单 step compensate 失败入死信
+  后**不阻断**后续 step 的补偿尝试。理由：《§4.3》"严格逆序"语义不要
+  求"任一失败即中止"；多个独立 step 的补偿是独立资源回滚，第 N 步失败
+  不应阻塞第 N-1 步的回滚；α 链式中止会让"saga 失败"对资源占用造成永
+  久泄漏。Step 6 实施时已落地此策略（`runCompensationPhase` 主循环不在
+  失败处 break），Step 7 增强为显式注释 + 不变量 5 专项 it 覆盖。
+- **裁决 2（幂等保证实施层）**：C 双重保护——编排器侧通过
+  `isStepEligibleForCompensation` 守门（仅 stepStatus === "succeeded"
+  才调用 compensate）+ Step 自身契约幂等（《§4.2》要求 step 实现者保
+  证 compensate 幂等）。两层冗余对资金/持仓不一致这种高风险场景必要。
+  编排器侧守门当前是冗余防御（运行时主路径不可达，因 succeeded 数组
+  push 顺序决定 stepStatus 必为 "succeeded"），但是 Phase 10+ 崩溃恢复
+  实施时关键——恢复时主循环数据源切换为持久化 stepStatuses 字段，守门
+  逻辑必须存在。
+- **裁决 3（PersistedSagaState 字段足够性）**：X 不扩展——强制开局动作
+  5 实地核查确认 stepStatuses 字段含 8 值终态语义（succeeded /
+  compensated / dead_lettered 等），已能完全表达"已 compensate / 已 dead_lettered"
+  幂等判定所需信息。元规则 B 严守不动 Step 3 锁定 PersistedSagaState
+  签名。崩溃恢复（Phase 10+ 责任）时编排器从 PersistedSagaState 重新装
+  载 stepStatuses 复用本编排器主循环 + isStepEligibleForCompensation
+  守门即可，无需新字段。
+- **裁决 4（错误码新增数）**：0 新增——TQ-SAG-003 SAGA_STEP_COMPENSATION_FAILED
+  已能承载 compensate 失败语义；"部分失败"通过 SagaResult.status ===
+  "partially_compensated" 终态字段表达不需独立错误码；"顺序异常"理论
+  不可能（双重保护机制）不预设契约违反码（惯例 K"仅必需"原则）。
+  **惯例 K 第 9 次实战**仍按"仅必需"裁决 0 新增。
+- **裁决 5（测试上限处置）**：unit test 上限 ≤10 → ≤12——Step 7 性质特
+  殊（5 个不变量需要专项覆盖），Step 6 ≤10 业务 Engine 风格上限放宽至
+  ≤12。具体处置：（a）既有 it 4（"reverse compensation"）从 2 step 升
+  级到 4 step，验证不变量 1 严格逆序（in-place 修改不增加 it 数）；
+  （b）新增 it 11 不变量 2 专项（直接调用 isStepEligibleForCompensation
+  + aggregateCompensationOutcome 验证 8 状态枚举）；（c）新增 it 12
+  不变量 5 专项（3 succeeded step 中 2 个 compensate 失败 → 链式继续 +
+  partially_compensated + 全部入死信）。总数 10 → 12，符合放宽后上限。
+
+**5 不变量在代码层面落地**：
+
+| 不变量 | §4 协议层条款 | runCompensationPhase 内的代码守护点 | 测试覆盖 it |
+|---|---|---|---|
+| 1 严格逆序 | §4.3 | `for j = succeeded.length - 1; j >= 0; j -= 1` | it 4（升级 4 step）+ it 12 |
+| 2 双重幂等保护 | §4.2 | `if (!isStepEligibleForCompensation(currentStatus)) continue` | it 11（直接调用 helper）+ §4.2 step 契约（context-echo it 间接） |
+| 3 死信入队 | §4.5 | 失败分支必经 `tryEnqueueDeadLetter(...)` | it 5 + it 12 |
+| 4 stepStatus 持久化 | §4.5 | 每次 status 变化 await persist | it 3（6 触发点）+ it 12 |
+| 5 链式继续 + 终态聚合 | §4.6 | 失败分支不 break；终态由 aggregateCompensationOutcome 计算 | it 11（直接调用 helper）+ it 12 |
+
+**Step 6 runCompensationPhase 增强前后对比**：
+
+| 维度 | Step 6 原状 | Step 7 增强后 |
+|---|---|---|
+| 链式继续 | ✅ 已实现（循环不 break） | ✅ 显式注释 + 不变量 5 专项 it |
+| 终态聚合 | 局部 `boolean allCompensated` | `aggregateCompensationOutcome` 纯函数（基于持久化 stepStatuses） |
+| 双重幂等保护 | ❌ 无显式守门 | ✅ `isStepEligibleForCompensation` + `if (!...) continue` |
+| 5 不变量代码注释 | ❌ 隐式 | ✅ 每条不变量在对应代码行显式标注 |
+| 不变量专项 it | 仅不变量 1（2 step） | 不变量 1（4 step）+ 不变量 2 + 不变量 5 |
+| 接口签名 | runSaga 公开 + runCompensationPhase 私有 | 完全不变（元规则 B 严守） |
+| 新增 export | 无 | `isStepEligibleForCompensation` + `aggregateCompensationOutcome`（同文件 export，未通过 src/index.ts 暴露；元规则 B 自此对这两个 helper 签名永久冻结） |
+
+**关键实现细节**：
+
+- `isStepEligibleForCompensation(status)` 与 `aggregateCompensationOutcome(stepStatuses)`
+  作为文件级 export，与 createSagaOrchestrator 同文件局部使用 + Phase 10+
+  崩溃恢复 API 复用。export 但未通过 src/index.ts 暴露——延续 Step 6
+  既定的"saga-orchestrator 内部模块"位置（外部消费由 Step 10-13 业务接
+  入决定）。
+- 主循环 `if (!isStepEligibleForCompensation(currentStatus)) continue`
+  位于 status → "compensating" 之前，确保已 compensated / dead_lettered
+  step 不被重新设置为 "compensating" 状态（这会破坏 SagaStepStatus 状态
+  机的"不可回退"语义）。
+- 终态聚合 `state.overallStatus = aggregateCompensationOutcome(state.stepStatuses)`
+  替换原 `state.overallStatus = allCompensated ? "compensated" : "partially_compensated"`。
+  纯函数读 stepStatuses 字段，不依赖循环内局部状态，对崩溃恢复重入安全。
+- 5 不变量在代码注释里 1:1 标注到对应行，让维护者翻开 runCompensationPhase
+  一眼看出"哪条不变量在哪行守护"——这是项目宗旨"算法变成工程师愿意
+  读的代码"在补偿层面的具体落地。
+
+**测试结果**：
+
+- unit test 10 → 12（既有 it 4 升级 4 step + 新增 2 个不变量 it）
+- contract test 17 → 17（无修改，验证增强不破坏既有契约）
+- 总数 1814 → 1816（+2）
+- 覆盖率：84.83% lines / 79.34% branches / 91.67% functions / 84.83% statements
+  （vs Step 6 基线 84.85% / 79.42% / 91.66% / 84.85%）。lines / statements
+  / branches 微降 0.02-0.08pp，functions 持平。**全部远超 §9.3 红线
+  80%/75%/80%/80%**。微降原因：新增不变量 2 守门 if 在运行时主路径不可
+  达（dead branch；Phase 10+ 崩溃恢复路径才会触达），但守门本身是必要
+  防御代码——此处优先保证不变量正确性而非追求 100% branch。
+- saga-orchestrator.ts: 421 LOC → ~535 LOC（含 5 不变量代码注释 + 2 个
+  helper export + 重构 runCompensationPhase）
+
+**Step 8 起步条件就绪**：
+
+- defaultStepTimeoutMs Options 字段（已发布）
+- withStepTimeout 私有方法（待 Step 8 增强 watchdog）
+- AUDIT_EVENT_TYPES.SAGA_TIMED_OUT 事件类型（已声明，待 Step 8 触发）
+- runCompensationPhase 已增强为生产级（Step 8 整体超时触发整体补偿时
+  复用本增强后的 runCompensationPhase 逻辑，含双重幂等 + 链式继续）
+
+### Step 8-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -994,7 +1095,75 @@ Phase（Phase 9: KI-P8-001/003 / Phase 11: KI-P8-002）；本 Step 仅核查
 + listIncomplete）。本 Step 接口预留充足（state 模型已就绪），不预先
 实施 resume。
 
-### Step 7-19 拒绝候选
+### Step 7 拒绝候选
+
+**拒绝 α 链式中止策略（裁决 1 候选 α）**。理由：让"saga 失败"对资源占
+用造成永久泄漏——已 succeeded 的 step 资源被锁定但不会回滚，违反《§4.3》
+"严格逆序补偿"的精神（严格逆序意味着遍历所有 succeeded step，不只是失
+败前那批）；运维处理时无法依据失败列表逐个恢复（中止后只看到第一个失
+败）。
+
+**拒绝 γ 配置驱动链式策略（裁决 1 候选 γ）**。理由：《§4》8 条强约束没
+有为"链式策略"预留配置维度——这是编排器内部的固定行为，不是可配置策
+略。引入 Options 字段会在元规则 B 永久冻结一个未来证明无用的选项，违
+反"克制 > 堆砌"。β 链式继续是唯一与《§4》语义一致的策略。
+
+**拒绝 A 仅编排器侧幂等保护（裁决 2 候选 A）**。理由：违反《§4.2》
+"compensate 必须幂等"——这是 step 实现者的契约约束，不能让编排器单方
+面承担。step 自身契约幂等是补偿正确性的最后防线（生产部署 / 回滚误触
+发场景下编排器侧守门可能被绕过）。
+
+**拒绝 B 仅 SagaStep 侧幂等（裁决 2 候选 B）**。理由：完全信任 step 实
+现者的契约——但补偿失败的代价是资金/持仓不一致，需要冗余防护。编排器
+侧通过 stepStatus 检查的额外保护让"step 实现者意外破坏幂等"时不被悄无
+声息地放过。C 双重保护是对高风险场景的合理冗余。
+
+**拒绝 Y 扩展 PersistedSagaState（裁决 3 候选 Y）**。理由：违反 Step 3
+锁定的元规则 B（PersistedSagaState 10 字段已发布即冻结）；Phase 9 已 6
+次实战元规则 B，本 Step 不应破例；强制开局动作 5 实地核查确认 stepStatuses
+字段含 8 值终态语义已能完全表达"已 compensate / 已 dead_lettered"幂等
+判定所需信息——Y 实属画蛇添足。如果未来真有需要（Phase 10+ 崩溃恢复
+深入实施），通过 ADR-0002 修订流程严肃处理而非本 Step 越权。
+
+**拒绝 TQ-SAG-004 SAGA_COMPENSATION_LINK_PARTIAL（裁决 4 候选）**。理由：
+违反惯例 K"仅必需"原则——SagaResult.status === "partially_compensated"
+终态字段已能表达"部分补偿失败"语义；额外引入错误码会在 SagaPortError
+和 SagaResult.status 两处冗余表达同一概念。惯例 K 第 9 次实战仍按"仅
+必需"裁决 0 新增。
+
+**拒绝 TQ-SAG-005 SAGA_COMPENSATION_OUT_OF_ORDER（裁决 4 候选）**。理由：
+顺序异常理论不可能发生——双重幂等保护机制（编排器侧 stepStatus 检查 +
+step 自身契约幂等）让顺序异常被完全堵死。预设错误码代表"我担心实现错
+了所以预防"——这违反"克制 > 堆砌"。如果未来代码确实出错引入顺序异常，
+应该是修 bug，不是预设错误码兜底 bug。
+
+**拒绝 ≤10 上限严守（裁决 5 候选）**。理由：Step 7 性质特殊——5 个不
+变量需要专项 it 覆盖，每条不变量是《§4》协议层条款的运行时落地，不专
+项覆盖等于不变量"流于纸面"。≤10 业务 Engine 风格是 Phase 8 / Sprint F
+确立的惯例 L 上限，但 Step 7 是"接续增强"性质 Step——它在 Step 6 接口
+冻结的前提下增强既有实现，需要"补偿正确性"这一高风险维度的额外测试。
+裁决 5 处置：放宽至 ≤12（既有 it 4 升级不增数 + 新增 2 个不变量 it）；
+本放宽是 Step 7 一次性，不构成惯例 L 修订。
+
+**拒绝增加更多不变量 it（裁决 5 候选 ≤13）**。理由：5 个不变量中：
+- 不变量 1（严格逆序）：4 step it 已强力覆盖
+- 不变量 2（双重保护）：直接调用 helper 的 it 已覆盖 8 状态枚举完备性
+- 不变量 3（死信入队）：既有 it 5 + 新增 it 12 双重覆盖
+- 不变量 4（持久化触发）：既有 it 3 通过 6 触发点 count 已强力覆盖
+- 不变量 5（链式继续 + 终态聚合）：新增 it 12 已覆盖
+
+新增第 13 个 it 会重复覆盖已经被强力覆盖的某条不变量；"克制 > 堆砌"
+原则下 ≤12 是必要且充分的边界。
+
+**拒绝在本 Step 引入崩溃恢复 API（裁决 3 / Phase 10+ 边界）**。理由：
+崩溃恢复涉及（1）SagaStateStore.listIncomplete 扫描；（2）从 PersistedSagaState
+重建 InternalSagaState；（3）resume 入口 API（譬如 resumeSaga(sagaId)）；
+（4）resume 时 stepStatus === "compensating" 中态的处置策略——这些都是
+Phase 10+ 责任，本 Step 仅打基础（在 isStepEligibleForCompensation 守门
+和 aggregateCompensationOutcome 聚合中预留 hook）。提前实施会让 Step 7
+工作量超出"接续增强"性质，违反 Step 边界纪律。
+
+### Step 8-19 拒绝候选
 
 [由后续 Step 增量记录]
 

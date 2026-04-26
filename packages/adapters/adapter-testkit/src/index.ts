@@ -78,3 +78,21 @@ export type {
   SagaContractOptions,
   SagaContractSubject
 } from "./saga-contract.js";
+// Phase 9 / Step 3 — SagaStateStore 契约套件公开 API。
+//   - 基础契约 defineSagaStateStoreContractTests + 持久化契约
+//     definePersistentSagaStateStoreContractTests（元规则 E：持久化契约独立函数）
+//   - 不引入 SagaStateStoreContractProbe（裁决 5 选"不引入"，克制 > 堆砌）
+//   - 参考实现 fixtures/reference-saga-state-store.ts 严格 testkit-only，
+//     不通过 src/index.ts 导出（元规则 F）
+export { defineSagaStateStoreContractTests } from "./saga-state-store-contract.js";
+export type {
+  SagaStateStoreAdapterFactory,
+  SagaStateStoreAdapterUnderTest,
+  SagaStateStoreContractOptions
+} from "./saga-state-store-contract.js";
+export { definePersistentSagaStateStoreContractTests } from "./persistent-saga-state-store-contract.js";
+export type {
+  PersistentSagaStateStoreAdapterFactory,
+  PersistentSagaStateStoreContractOptions,
+  PersistentSagaStateStoreTestSession
+} from "./persistent-saga-state-store-contract.js";

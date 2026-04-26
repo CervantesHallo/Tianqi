@@ -96,3 +96,19 @@ export type {
   PersistentSagaStateStoreContractOptions,
   PersistentSagaStateStoreTestSession
 } from "./persistent-saga-state-store-contract.js";
+// Phase 9 / Step 4 — DeadLetterStore 契约套件公开 API。
+//   - 基础契约 defineDeadLetterStoreContractTests + 持久化契约
+//     definePersistentDeadLetterStoreContractTests（元规则 E 第三次实战）
+//   - 不引入 DeadLetterStoreContractProbe（与 Step 3 同思路，克制 > 堆砌）
+export { defineDeadLetterStoreContractTests } from "./dead-letter-store-contract.js";
+export type {
+  DeadLetterStoreAdapterFactory,
+  DeadLetterStoreAdapterUnderTest,
+  DeadLetterStoreContractOptions
+} from "./dead-letter-store-contract.js";
+export { definePersistentDeadLetterStoreContractTests } from "./persistent-dead-letter-store-contract.js";
+export type {
+  PersistentDeadLetterStoreAdapterFactory,
+  PersistentDeadLetterStoreContractOptions,
+  PersistentDeadLetterStoreTestSession
+} from "./persistent-dead-letter-store-contract.js";

@@ -435,7 +435,129 @@ EventStore 003/004 + SQLite 008 + SagaStateStore 019/020/021 + DeadLetterStore
 - 元规则 Q：第四次实战（含动作 4 审计事件接入路径核查）
 - 惯例 M：第四次实战（本段即是）
 
-### Step 5-19: [待后续 Step 增量填充]
+### Step 5: Sprint F 收官检视（2026-04-26）
+
+#### 性质与产出
+
+性质：Sprint F 5 步收官检视。**不引入任何新 Port / Adapter / 错误码**，
+只做横向核查 + 4 项历史汇总 + Sprint F COMPLETE 显式声明。
+
+产出（仅文档与微小清理）：
+- `docs/phase9/05-sprint-f-closure.md`（10 节按指令 §七 输出格式 A-J 编排）
+- ADR-0002 Step 5 段（本段）+ **Sprint F 收官小结段**（下文独立小节）
+- `docs/00-phase1-mapping.md` 追加 Step 5 + 🎯 Sprint F COMPLETE 标记
+- saga-state-store-{memory,postgres} README 补"不实现的能力"段（4 README
+  结构对齐 dead-letter-store-* 既有模式）
+
+#### 6 项横向完整性核查结果
+
+| 核查 | 结论 | 证据 |
+|---|---|---|
+| 1. 双 Adapter 工程模板一致性 | ✅ PASS（4 个持久化 Adapter 8 项结构维度 100% 同构） | docs/phase9/05 §C.1 |
+| 2. 契约函数签名一致性 | ✅ PASS（5 函数三参数模式严格一致） | docs/phase9/05 §C.2 |
+| 3. 错误码命名空间整洁度 | ✅ PASS（6 新增码 runbook 各自独立；三/六/九码分离断言层层叠加） | docs/phase9/05 §C.3 |
+| 4. probe 模式应用 | ✅ PASS（Step 2 引入 / Step 3-4 不引入；三处留痕） | docs/phase9/05 §C.4 |
+| 5. 测试与覆盖率分布 | ✅ PASS（saga-port.ts 100% / KI-P8-005 局部改善至 11.96%） | docs/phase9/05 §C.5 |
+| 6. Sprint F 暴露的小问题 | ⚠️ 1 项 README 章节不一致已清理 | docs/phase9/05 §C.6 |
+
+#### 强制开局动作 4 第 5 次实战（4 项历史核查汇总）
+
+汇总位置：`docs/phase9/05-sprint-f-closure.md` §B（4 子节 B.1-B.4）
+
+直接供 Step 6 SagaOrchestrator 起草引用：
+- B.1 Phase 4 SagaStatus 状态机骨架现状
+- B.2 Phase 4 OrchestrationSagaState 持久化现状（零持久化）
+- B.3 SQLite 必要性（不需要，坚持双 Adapter）
+- B.4 审计事件接入路径（AuditEventSinkPort 已存在；Step 9 调用方协调）
+
+#### 触发的元规则
+
+- 元规则 B：严守（Step 1-4 锁定签名一字未改）
+- 元规则 F：4 个 Sprint F Adapter 零交叉 import 验证 PASS
+- 元规则 N：4 README 结构对齐（清理后）
+- 元规则 Q：第五次实战（含强制开局动作 4 累计 5 次触发汇总）
+- 惯例 M：第五次实战（本段 + Sprint F 收官小结段同步追写）
+- A / C / D / E / G / H / I / J / K / L / M(probe) / O / P：N/A
+  本 Step 不构建新东西
+
+---
+
+## Sprint F 收官小结（Step 5 完成后）
+
+### Sprint F 5 步实际工作回顾
+
+- **Step 1**：SagaPort 类型契约（11 类型 + 2 brand 工厂 + 2 错误码 +
+  ADR-0002 占位框架）—— Phase 9 立契约起点
+- **Step 2**：defineSagaContractTests 5 类 17 it 套件 + SagaContractProbe
+  4 read 方法 + reference-saga.ts testkit-only harness（**§4 接口纯度
+  5 条约束**翻译为可执行规约）
+- **Step 3**：SagaStateStore 双 Adapter（memory + postgres）+ 13 基础契
+  约 it + 8 持久化契约 it + 3 错误码（**§4.5 状态持久化**完整落地）
+- **Step 4**：DeadLetterStore 双 Adapter（memory + postgres）+ 14 基础
+  契约 it + 8 持久化契约 it + 3 错误码（**§4.6 死信约束**完整落地）
+- **Step 5**：Sprint F 收官检视（**本 Step**：6 项横向核查 + 4 项历史
+  汇总 + Sprint F COMPLETE 显式声明）
+
+### Sprint F 关键裁决（10 项）
+
+1. **Step 1 / 裁决 2 (B)**：SagaPort 是**类型契约而非运行 Port**——编
+   排能力由 Step 6 SagaOrchestrator 落在 application 层（保单职责）
+2. **Step 1 / 裁决 4 (M)**：SagaStepStatus 一次性定义完整 8 值（避免后
+   续 Step 因增删值破坏元规则 B）
+3. **Step 1 命名冲突避让**：Phase 9 saga 整体结果改名 `SagaResultStatus`
+   避开 Phase 4 既有 `SagaStatus`——保元规则 B + 让两层语义清晰可读
+4. **Step 2 / 裁决 1 (α)**：契约对象是 SagaStep 接口实现集合而非
+   Orchestrator——保 Step 1 锁定对象一致性
+5. **Step 2 / 裁决 5 (Q)**：单 Step 超时由 harness 持有的 watchdog 管理，
+   不修改 Step 1 锁定的 SagaStep 接口签名（保元规则 B）
+6. **Step 3 / 裁决 3 (β)**：Saga 状态只写 SagaStateStore；审计事件由
+   SagaOrchestrator 显式写到 EventStore——避免 1PC/2PC 复杂度
+7. **Step 3 / Schema 单表 + JSONB**：克制 > 堆砌；不引入双表分离
+8. **Step 3 + 4 不引入 saga-state-store-sqlite / dead-letter-store-sqlite**：
+   Saga 不需要 SQLite，Phase 9 核心矛盾是补偿编排不是存储介质矩阵
+9. **Step 4 / 裁决 1 (13 字段)**：DeadLetterEntry 不含 initialInput /
+   retry policy—— 隐私 + 大对象 + 语义模糊三方面顾虑
+10. **Step 4 强制开局动作 4 核查 + 元规则 F 严守**：审计事件写入是
+    Step 9 编排器职责，不是 DeadLetterStore Adapter 职责
+
+### 元规则 / 惯例首次实战与累计实战次数
+
+| 规则 / 惯例 | Phase 9 首次 | Sprint F 累计实战次数 |
+|---|---|---|
+| **元规则 Q（Phase 9 强制开局）** | Step 1（首次） | 5 次（Step 1-5 各 1 次；含动作 4 累计 5 次） |
+| **惯例 M（ADR 增量追写）** | Step 1（首次） | 5 次（每 Step 完成后追写） |
+| 元规则 E（持久化契约函数） | Phase 8 第一次 | Sprint F 第二/三次（Step 3 / 4） |
+| 元规则 H（Adapter 自管 schema） | Phase 8 多次 | Sprint F 第六/七次（Step 3 / 4 postgres） |
+| 元规则 I（healthCheck 不抛 / 独立超时 / 只读探测） | Phase 8 多次 | Sprint F 第六/七次 |
+| 元规则 J（测试 env var） | Phase 8 多次 | Sprint F 第六/七次 |
+| 元规则 K（错误码命名空间扩展） | Phase 8 多次 | Sprint F 第六/七/八次（Step 1 / 3 / 4） |
+| 元规则 L（基础设施 ≤6 自有测试） | Phase 8 多次 | Sprint F 第六/七/八/九次（4 个 Sprint F Adapter） |
+| 元规则 N（README Semantics 三条） | Phase 8 多次 | Sprint F 4 次（4 个 Adapter） |
+| **元规则 B（签名兼容）** | Phase 8 多次 | Sprint F 全程贯彻：Step 2/3/4/5 严守 Step 1 锁定签名一字未改 |
+| **元规则 F（Adapter 独立）** | Phase 8 多次 | Sprint F 强护栏：4 Adapter 零交叉 import；DeadLetterStore 严禁主动调 AuditEventSinkPort |
+| 元规则 M（Probe 模式） | Phase 8 多次 | Sprint F 第六次（Step 2 SagaContractProbe）；Step 3-4 选择不引入 |
+| 元规则 A / C / D / G / O / P | N/A | Sprint F 全程 N/A |
+
+### Sprint G 起草所需的全部输入
+
+详见 `docs/phase9/05-sprint-f-closure.md` §G.2 完整清单。
+
+**核心**：
+- 4 项历史核查汇总（docs/phase9/05 §B）
+- Sprint F 累计产出：3 Port + 4 Adapter + 5 契约函数 + 66 契约 it + 8 错误码
+- ADR-0002 Step 1-5 段 + 本 Sprint F 收官小结段
+- Phase 1-7 + Phase 8 既有冻结代码（必读，禁改）
+
+### Sprint G 4 步主题预告（Step 6-9）
+
+- Step 6: SagaOrchestrator 核心实现
+- Step 7: 逆序补偿引擎 + 补偿幂等保证
+- Step 8: 超时机制（单 Step + 整体）
+- Step 9: 人工介入接口（双重审计接入）
+
+**🎯 Phase 9 / Sprint F COMPLETE — 2026-04-26**
+
+### Step 6-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -580,7 +702,30 @@ JSONB 数组的有序性已可保证 failureChain 链；双表会引入 JOIN 与
 信意味着重试已耗尽——这是死信"成立"的前提；含重试调度字段会让"是否真
 的进入死信"语义模糊。
 
-### Step 5-19 拒绝候选
+### Step 5 拒绝候选
+
+**拒绝在 Step 5 引入新 Port / Adapter / 错误码**。理由：Step 5 性质是
+"收官检视"，引入新东西违反指令"严禁引入新功能"边界。
+
+**拒绝在 Step 5 重构 Sprint F Adapter 代码**。理由：清理范围严格限定
+typo / README / lint / 注释；任何"重构"会触发元规则 B 风险。本 Step
+仅修改 saga-state-store-{memory,postgres} README 补"不实现的能力"段。
+
+**拒绝在 Step 5 修改 Phase 4 既有代码以"统一" Phase 4 SagaStatus 与 Phase 9 SagaResultStatus**。理由：Phase Gate 隔离纪律；统一工作如有
+必要由 Sprint G/H 通过 ADR-0002 修订流程进行。
+
+**拒绝在 Step 5 提前定义 SagaOrchestrator 接口（Sprint G Step 6 职责）**。
+理由：本 Step 严禁触碰 Sprint G 任何内容；为 Step 6 提前布局违反 Phase
+Gate 纪律。
+
+**拒绝在 Step 5 修复非本 Step 责任的 KI**。理由：4 项 open KI 各有责任
+Phase（Phase 9: KI-P8-001/003 / Phase 11: KI-P8-002）；本 Step 仅核查
+状态不修复。
+
+**拒绝在 Step 5 引入新 Sprint F 集成测试**。理由：集成测试是 Sprint I
+（Step 16-17）职责；本 Step 仅做"已有测试是否全绿"的回头检查，不新增。
+
+### Step 6-19 拒绝候选
 
 [由后续 Step 增量记录]
 

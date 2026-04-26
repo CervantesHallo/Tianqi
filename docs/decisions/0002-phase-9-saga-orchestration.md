@@ -326,7 +326,116 @@ JSONB（变长数组天然适合）。部分索引仅覆盖 `overall_status IN (
 - 惯例 M（ADR 增量追写）：第三次实战（本段即是）
 - 元规则 Q（Phase 9 强制开局）：第三次实战（含动作 4 + 动作 5 双核查）
 
-### Step 4-19: [待后续 Step 增量填充]
+### Step 4: DeadLetterStorePort + memory/postgres 双 Adapter（2026-04-26）
+
+#### 强制开局动作 4 核查结论：审计事件接入路径
+
+Tianqi 已有完整审计接入：`AuditEventSinkPort`（packages/ports/src/audit-event-sink-port.ts，
+`append(event): Promise<Result<void, ...>>`）+ Phase 4 应用层
+`OrchestrationPorts.audit.publishAuditEvent`。被 application 层
+`command-result-query-handler.ts` / `compensation-command-handler.ts` /
+`liquidation-case-orchestrator.ts` 已消费。
+
+**判断**（同意指令预期）：审计事件发送是**调用方（Step 9 人工介入接口）
+职责**，不是 DeadLetterStore Adapter 的职责。理由：
+- 元规则 F（Adapter 不跨 Adapter 调用）：DeadLetterStore 不应主动调
+  AuditEventSinkPort
+- 单职责：死信存储与审计写入是两个独立数据流向
+- §4.6 + §15.1 双重审计要求的具体落实点是 Step 9 编排器，它将同时调
+  DeadLetterStore.markAsProcessed + AuditEventSinkPort.append
+
+**对 Step 9 起草的关键输入**：
+- markAsProcessed 接受 processedBy / processingNotes 字段供 Step 9 调用方写入审计
+- 失败处理：状态变更成功 + 审计写入失败 → 类似 Step 3 裁决 3 β 模式
+  （不回滚状态，记录降级日志）
+- "双重审计"含义在 Step 9 编排器层级体现（譬如双签名 / 双授权）
+
+#### 核心裁决
+
+**裁决 1（DeadLetterEntry 字段集）：13 字段**
+
+5 强制（《§4.6》）：sagaId / stepName / compensationContext / failureChain / enqueuedAt
++ 必含扩展 3：entryId（主键，调用方生成保 Adapter 纯粹）/ status（裁决 2 选 α）/ attemptCount
++ 可选扩展 5：correlationId / traceId / lastAttemptAt / processedAt / processedBy / processingNotes
+
+**failureChain 关键约束**：是数组（承载"原因 → 中间原因 → 根本原因"链
+式结构），但每环必须是领域级摘要（《§6.5》）—— **严禁原文携带** PG 错
+误码 / HTTP 状态码 / 网络异常文本。
+
+**裁决 2（"已处理"状态）：选 α（引入 status + markAsProcessed）**
+
+引入 `DeadLetterEntryStatus = "pending" | "processed" | "archived"` 三态
+枚举（一次性定义齐全；元规则 B 防止后续 Step 改值）。`archived` 终态值
+预留供 Phase 10+ 引入归档转换 API，**本 Step 不实现归档转换接口**。
+
+理由（拒绝 β / γ）：
+- β（不含 status，仅靠 delete 表达"已处理"）：违反《§4.6》合规长期保留要求
+- γ（仅 processedAt 字段过滤）：等同 α 但少明确状态字段，运维 dashboard 不友好
+
+**裁决 3（DeadLetterStorePort 接口最小方法集）：5 方法**
+
+`enqueue / load / listPending / listBySaga / markAsProcessed`。
+
+**不**提供：
+- `delete`（合规要求长期保留）
+- `listByDateRange` / `listByStatus(status)`（Phase 10+ 运维 Port 责任）
+
+**裁决 4（Saga 查询能力）：提供 listBySaga**
+
+Step 9 人工介入接口直接受益：处理一笔死信前需要看同 Saga 的全部死信记
+录决定处置策略（含已处理 / 归档的历史，用于追溯）。listBySaga 不限状态
+返回所有匹配记录。
+
+**裁决 5（持久化契约函数）：定义 definePersistentDeadLetterStoreContractTests**
+
+类比 Step 3 + Phase 8 元规则 E（第三次实战）。8 it 跨 3 类别：
+- P1 跨重启恢复（3 it）
+- P2 跨实例可见性（3 it）
+- P3 状态变更跨重启一致性（2 it）
+
+memory Adapter **不**挂载本套件。
+
+#### Schema 设计：单表 + JSONB + 双索引
+
+`dead_letter_entries` 单表 14 列；`compensation_context` / `failure_chain` 用 JSONB。
+
+两类索引：
+- `idx_dlq_saga_id`：support listBySaga 高效查询（无 WHERE 限定）
+- `idx_dlq_pending`：部分索引仅覆盖 `status='pending'` 行，按 `enqueued_at`
+  排序——listPending 是最频繁运维操作；已处理 / 归档行不在索引内（节省
+  存储 + 写入性能）
+
+不引入双表分离（克制 > 堆砌）。
+
+#### 错误码新增（惯例 K 第八次扩展）
+
+3 条新增：
+- TQ-INF-022 DEAD_LETTER_STORE_NOT_INITIALIZED
+- TQ-INF-023 DEAD_LETTER_STORE_ALREADY_SHUT_DOWN
+- TQ-INF-024 DEAD_LETTER_STORE_SCHEMA_VERSION_MISMATCH
+
+复用既有：TQ-INF-002 + TQ-INF-009（pg 连接失败时复用 Phase 8 既有码）。
+
+inf.test.ts 新增 4 it：3 工厂 round-trip + 1 九码分离断言（含
+EventStore 003/004 + SQLite 008 + SagaStateStore 019/020/021 + DeadLetterStore
+022/023/024 共 9 schema/lifecycle 类码两两不重）。
+
+#### 触发的元规则
+
+- 元规则 B：严守（Step 1/2/3 锁定签名一字未改）
+- 元规则 E（持久化契约函数）：第三次实战
+- 元规则 F：DeadLetterStore Adapter 严禁主动调用 AuditEventSinkPort 等其他 Adapter
+- 元规则 G：N/A（pg 既注册）
+- 元规则 H：postgres `init()` 6 步 DDL（schema + 表 + 双索引 + schema_version + seed + 校验）
+- 元规则 I：postgres healthCheck 不抛 / 独立超时 / SELECT 1 只读
+- 元规则 J：TIANQI_TEST_POSTGRES_URL 控 skip
+- 元规则 K：错误码命名空间扩展第八次（仅必需 3 条）
+- 元规则 L：基础设施 ≤6 自有测试（memory 4 / postgres 4）
+- 元规则 N：README Semantics 三条 × 2
+- 元规则 Q：第四次实战（含动作 4 审计事件接入路径核查）
+- 惯例 M：第四次实战（本段即是）
+
+### Step 5-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -432,7 +541,46 @@ saga_state 行很大，索引性能下降；隐私敏感字段单独走脱敏管
 责，违反单职责。并发协调由编排器（Step 6+）通过 SagaId 唯一性保证（一
 个 Saga 一次性单实例推进）。
 
-### Step 4-19 拒绝候选
+### Step 4 拒绝候选
+
+**拒绝 DeadLetterStore Adapter 主动发审计事件**。理由：违反元规则 F
+（Adapter 不跨 Adapter 调用）。审计事件写入是 Step 9 编排器职责；让
+DeadLetterStore "顺手"调 AuditEventSinkPort 会让两个独立数据流向耦合，
+未来要切换审计实现（譬如从 in-memory 改为 Kafka）会触发 DeadLetterStore
+Adapter 改动，违反单职责。
+
+**拒绝候选 β（不含 status，仅 delete 表达"已处理"）**。理由：违反《§4.6》
+合规长期保留要求；删除后无法追溯审计；§15.1 双重审计审计追责链断裂。
+
+**拒绝候选 γ（仅 processedAt 字段过滤）**。理由：语义等同 α 但少明确状
+态字段；运维 dashboard 看不到清晰的 pending / processed / archived 三态；
+未来归档（archived）需引入第二个标记字段，进一步复杂。
+
+**拒绝引入 DeadLetterStorePort.delete**。理由：合规要求死信记录长期保留
+（审计追溯）；删除等于丢失追责链；提供 delete 会诱导误用。归档语义由
+未来 Phase 10+ 通过 archived 状态值 + 归档转换 API 表达，不通过 delete。
+
+**拒绝引入 DeadLetterStorePort.listByStatus(status)**。理由：listPending
+已覆盖最常用场景；其他状态（processed / archived）的列表查询是运维工具
+范畴，应在 Phase 10+ 通过专用运维 Port 提供。本 Step 仅承载 Step 9 编
+排器所需。
+
+**拒绝引入 listByDateRange / pruneCompleted / archive 等运维便利方法**。
+理由：克制 > 堆砌；运维查询走 Phase 10+ 工具。
+
+**拒绝双表分离 dead_letter_entries + dead_letter_failure_chains**。理由：
+JSONB 数组的有序性已可保证 failureChain 链；双表会引入 JOIN 与额外索引
+维护成本（与 Step 3 同思路）。
+
+**拒绝 DeadLetterEntry 含 input / output 业务数据字段**。理由：业务数据
+往往含敏感信息（《§15.2》）+ 大对象（影响表行尺寸）；compensationContext
+已是补偿所需最小信息集，重复存储 input/output 既冗余又增加隐私顾虑。
+
+**拒绝 DeadLetterEntry 含 retry policy / next retry at 字段**。理由：死
+信意味着重试已耗尽——这是死信"成立"的前提；含重试调度字段会让"是否真
+的进入死信"语义模糊。
+
+### Step 5-19 拒绝候选
 
 [由后续 Step 增量记录]
 

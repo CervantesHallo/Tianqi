@@ -71,6 +71,16 @@ await store.shutdown();
   同样依赖环境变量
 - 4 个自有 it（身份 / schema 校验 / health check / 不可达 init）
 
+## 不实现的能力
+
+- **Saga 编排算法**：Step 6 SagaOrchestrator 职责，不在本 Adapter 范围
+- **死信存储**：见 [`@tianqi/dead-letter-store-postgres`](../dead-letter-store-postgres)（Step 4 落地）
+- **审计事件写入**：调用方（Step 9 编排器）职责，不在本 Adapter 范围（元规则 F）
+- **状态历史归档 / TTL 清理**：Phase 10+ 责任；当前实现保留所有 saga 状态
+  行（含终态 completed / compensated / partially_compensated / timed_out）
+- **schema 迁移自动化**：当前 `init()` 仅做 idempotent bootstrap；schema_version
+  不匹配时抛 TQ-INF-021 让操作员介入。Phase 11 部署模型 ADR 后引入正式迁移工具
+
 ## 部署提醒
 
 - 推荐 `schema` 名命名空间隔离不同 saga 类型 / 不同环境（譬如 `tianqi_saga_state_prod`、`tianqi_saga_state_test`）

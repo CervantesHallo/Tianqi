@@ -44,3 +44,12 @@ await store.shutdown();
 
 通过一行挂载验证 13 个基础契约 it（`defineSagaStateStoreContractTests`）。
 不挂载 `definePersistentSagaStateStoreContractTests`（设计上不持久化）。
+
+## 不实现的能力
+
+- **Saga 编排算法**：Step 6 SagaOrchestrator 职责，不在本 Adapter 范围
+- **死信存储**：见 [`@tianqi/dead-letter-store-memory`](../dead-letter-store-memory)（Step 4 落地）
+- **审计事件写入**：调用方（Step 9 编排器）职责，不在本 Adapter 范围（元规则 F）
+- **状态历史归档 / TTL 清理**：Phase 10+ 责任
+- **跨进程恢复**：单进程内存实现的设计不变量；跨进程恢复见
+  [`@tianqi/saga-state-store-postgres`](../saga-state-store-postgres)

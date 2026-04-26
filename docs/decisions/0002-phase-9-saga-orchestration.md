@@ -226,7 +226,107 @@ AbortSignal。选 Q。
 - 元规则 Q（Phase 9 强制开局）：第二次实战（含开局动作 4）
 - 惯例 M（ADR 增量追写）：第二次实战（本段即是）
 
-### Step 3-19: [待后续 Step 增量填充]
+### Step 3: SagaStateStorePort + memory/postgres 双 Adapter（2026-04-26）
+
+#### 强制开局动作 4 / 5 核查结论
+
+**动作 4（Phase 4 OrchestrationSagaState 持久化现状）**：Phase 4
+`OrchestrationSagaState` 是**纯内存值对象**，无任何持久化机制。`canResumeSaga`
+/ `prepareSagaForResume` 只接受参数不加载历史；编排函数完成后状态丢失。
+本 Step 引入的 SagaStateStorePort 与 Phase 4 完全不冲突——Phase 9 引入的
+是真正的"跨进程持久化"能力，Phase 4 是"单次内存编排"。
+
+**动作 5（SQLite 必要性）**：核查发现 `event-store-sqlite` 在 Tianqi 全
+仓只在 `event-store-adapter-swap.integration.test.ts` 的 swap-test 中作
+为"中间层"消费，无 application 业务消费方。Saga 状态持久化没有"单机但
+需崩溃恢复"的合法场景。**坚持双 Adapter（不引入 SQLite）**，未来若需
+SQLite 由 Phase 11 部署模型 ADR 决定。
+
+#### 核心裁决
+
+**裁决 1（SagaStateStorePort 接口形状）：4 方法**
+
+`save / load / listIncomplete / delete`。仅承载《§4.5》恢复语义；不预设
+运维查询便利方法（如 `query` / `queryByCorrelationId` / `pruneCompleted`）——
+运维 Port 留 Phase 10+ 由 ADR-0002 修订流程引入。
+
+**裁决 2（PersistedSagaState 字段集）：10 字段**
+
+必含 8（sagaId / sagaStartedAt / lastUpdatedAt / currentStepIndex /
+totalSteps / stepStatuses / compensationContexts / overallStatus）+ 可选 2
+（correlationId / traceId）。**不含** `initialInput`：SagaInvocation 是 saga
+启动前置载荷，应由 Application 层独立持久化（命令存储），不与 Saga 状态
+混存；大对象会让 saga_state 表行很大；隐私敏感字段单独走脱敏管道。
+
+**`PersistedSagaStateOverallStatus`（6 值）与 `SagaResultStatus`（4 值）
+不复用**：前者是"任何时刻的运行时快照"含过渡态（in_progress / compensating），
+后者是"saga 结束时的最终结果"。元规则 B：6 值一次性定义齐全。
+
+**裁决 3（Saga 状态 vs EventStore 关系）：选 β**
+
+候选 α/β/γ：双写 / 只写状态由编排器写审计 / 内部变更日志。选 β。
+- α 强制双写需要 1PC/2PC，复杂度极高
+- γ 让 SagaStateStore 越权承担审计职责
+- β 让两 Port 各管各的：状态服务编排器，事件服务审计/回放
+- 两次写之间的不一致由编排器（Step 6）以"先写状态再发审计事件，审计失败
+  不回滚状态但记录降级日志"承担
+
+**裁决 4（持久化契约独立函数）：定义 `definePersistentSagaStateStoreContractTests`**
+
+类比 Phase 8 元规则 E。8 it 跨 3 类别：P1 进程恢复（3）/ P2 跨实例可见性
+（3）/ P3 并发 save 语义（2）。memory Adapter **不**挂载本套件——其语义
+由设计上不持久化。
+
+**裁决 5（SagaStateStoreContractProbe）：不引入**
+
+save/load/listIncomplete 接口本身已足够支撑契约断言（克制 > 堆砌）。后续
+Step 6 SagaOrchestrator 若需 telemetry probe，应在自己的 ADR 段提出。
+
+#### Schema 设计：单表 + JSONB
+
+`saga_state` 单表 10 列；`step_statuses` 与 `compensation_contexts` 用
+JSONB（变长数组天然适合）。部分索引仅覆盖 `overall_status IN ('in_progress',
+'compensating')` 的行（让索引体积保持小）。schema_version 单行表 CHECK (id=1)
+与 event-store-postgres 同模式。
+
+不引入双表分离（saga_state + saga_compensation_contexts）：JSONB 数组的
+有序性已可保证逆序补偿；双表会引入 JOIN 与额外索引维护成本。
+
+#### 错误码新增
+
+3 条新增（惯例 K"仅必需"）：
+- TQ-INF-019 SAGA_STATE_STORE_NOT_INITIALIZED
+- TQ-INF-020 SAGA_STATE_STORE_ALREADY_SHUT_DOWN
+- TQ-INF-021 SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH（postgres 模式版本不匹配）
+
+复用既有：
+- TQ-INF-002 ADAPTER_INITIALIZATION_FAILED（schema 名格式不合法）
+- TQ-INF-009 POSTGRES_UNREACHABLE（pg 连接失败时复用 Phase 8 既有码）
+
+每条新增码独立运维 runbook：019/020 与 EventStore 既有 003/004 形态相同
+但 runbook 不同（Saga 状态 vs 事件审计）；021 与 SQLite 既有 008 schema
+不匹配各自独立（Saga schema 演进路径与 SQLite 文件状态完全不同的检查动
+作）。inf.test.ts 新增 4 it（3 工厂 round-trip + 1 六码分离断言）。
+
+#### 触发的元规则
+
+- 元规则 B：严守（Step 1/2 锁定签名一字未改；新增 SagaStateStorePort /
+  PersistedSagaState 类型一旦发布同样冻结）
+- 元规则 E（持久化契约函数）：第二次实战
+- 元规则 F：Adapter 之间零交叉 import；fixtures 不导出
+- 元规则 G：N/A（pg 是 Phase 8 既注册依赖；零新依赖）
+- 元规则 H（Adapter 自管 schema）：postgres adapter `init()` 内 5 步 DDL
+  + schema_version 校验
+- 元规则 I（healthCheck）：postgres `healthCheck` 不抛 / 独立超时（2s）/
+  探测只读（SELECT 1）
+- 元规则 J（测试隔离）：`TIANQI_TEST_POSTGRES_URL` 控制 skip
+- 元规则 N（README Semantics 三条）：memory + postgres 各自三条
+- 惯例 K（错误码命名空间扩展）：仅必需 3 条 + 4 测试
+- 惯例 L 修订版基础设施 Adapter ≤6 自有测试：memory 4 / postgres 4
+- 惯例 M（ADR 增量追写）：第三次实战（本段即是）
+- 元规则 Q（Phase 9 强制开局）：第三次实战（含动作 4 + 动作 5 双核查）
+
+### Step 4-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -300,7 +400,39 @@ DeadLetterStorePort / 编译期约束实施细节，违反元规则 B。Phase 8 
 理由：Phase 4 已冻结；本 Step 仅"看清楚"两者关系，不做任何代码改动。
 统一工作（如有必要）由后续 Step 通过 ADR-0002 修订流程完成。
 
-### Step 3-19 拒绝候选
+### Step 3 拒绝候选
+
+**拒绝引入 SagaStateStoreContractProbe（裁决 5 反方）**。理由：save/load/
+listIncomplete 接口本身已足够支撑契约断言；额外 probe 仅是 Phase 8 模式
+的"机械复制"，违反"克制 > 堆砌"。后续 Step 6 SagaOrchestrator 若需观察
+量，应在自己的 ADR 段提出（不修改本 Step 锁定的 Port 形状）。
+
+**拒绝双写 Saga 状态（裁决 3 候选 α）**。理由：写两次违反"克制"；强制
+双写需要 1PC/2PC（XA / 2PC），引入分布式事务复杂度；两次写的不一致更应
+由编排器（Step 6）以补偿/降级日志承担，而非 Port 层。
+
+**拒绝 PersistedSagaState 含 initialInput**。理由：SagaInvocation 是 saga
+启动前置载荷，应由 Application 层独立持久化（命令存储）；混存会让
+saga_state 行很大，索引性能下降；隐私敏感字段单独走脱敏管道（《§15.2》）。
+
+**拒绝引入 SagaStateStorePort.query / queryByCorrelationId / pruneCompleted**。
+理由：本 Step 仅承载《§4.5》"恢复语义"，不预设运维便利方法；运维 Port
+留 Phase 10+ 通过 ADR-0002 修订流程引入（避免 Port 接口被"运维便利"漂移）。
+
+**拒绝双表分离（saga_state + saga_compensation_contexts）**。理由：JSONB
+数组的有序性已可保证逆序补偿；双表会引入 JOIN 与额外索引维护成本；克制 > 堆砌。
+
+**拒绝引入 saga-state-store-sqlite（强制开局动作 5 反方）**。理由：核查
+发现 Tianqi 实际部署中没有"单机但需崩溃恢复"的合法场景；Phase 9 核心矛
+盾是"补偿编排"而非"存储介质矩阵"；引入第三个 Adapter 会稀释 Phase 9 主线。
+未来若 Phase 11 部署模型 ADR 决定需要，再补 ADR-0002 修订段。
+
+**拒绝在 SagaStateStorePort.save 上加版本号实现乐观锁**。理由：本 Step
+明确选 last-write-wins；乐观锁会让 SagaStateStore 越权承担"并发协调"职
+责，违反单职责。并发协调由编排器（Step 6+）通过 SagaId 唯一性保证（一
+个 Saga 一次性单实例推进）。
+
+### Step 4-19 拒绝候选
 
 [由后续 Step 增量记录]
 

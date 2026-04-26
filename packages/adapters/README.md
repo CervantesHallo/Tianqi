@@ -34,5 +34,7 @@
 | [`@tianqi/fund-engine-http`](./fund-engine-http)                   | **业务 Engine**：FundEnginePort HTTP 实现（消费基座；读为主 + 单一弱写） | Phase 8 / Step 17 落地                |
 | [`@tianqi/saga-state-store-memory`](./saga-state-store-memory)     | `SagaStateStorePort` 内存实现（单进程；多实例独立）                      | Phase 9 / Step 3 落地                 |
 | [`@tianqi/saga-state-store-postgres`](./saga-state-store-postgres) | `SagaStateStorePort` Postgres 实现（跨进程恢复；多实例共享同一表）       | Phase 9 / Step 3 落地                 |
+| [`@tianqi/dead-letter-store-memory`](./dead-letter-store-memory)   | `DeadLetterStorePort` 内存实现（单进程；不持久化；多实例独立）           | Phase 9 / Step 4 落地                 |
+| [`@tianqi/dead-letter-store-postgres`](./dead-letter-store-postgres) | `DeadLetterStorePort` Postgres 实现（合规长期保留；多实例共享同一表）  | Phase 9 / Step 4 落地                 |
 
 本表只反映当前仓库实际状态，新增 Adapter 须在合入时同步更新此表，禁止预先列出尚未落地的 Adapter。

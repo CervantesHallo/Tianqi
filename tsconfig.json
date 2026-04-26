@@ -22,6 +22,8 @@
     { "path": "./packages/adapters/mark-price-engine-http" },
     { "path": "./packages/adapters/fund-engine-http" },
     { "path": "./packages/adapters/saga-state-store-memory" },
-    { "path": "./packages/adapters/saga-state-store-postgres" }
+    { "path": "./packages/adapters/saga-state-store-postgres" },
+    { "path": "./packages/adapters/dead-letter-store-memory" },
+    { "path": "./packages/adapters/dead-letter-store-postgres" }
   ]
 }

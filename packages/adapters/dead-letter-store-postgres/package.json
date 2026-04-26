@@ -1,0 +1,21 @@
+{
+  "name": "@tianqi/dead-letter-store-postgres",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@tianqi/contracts": "workspace:*",
+    "@tianqi/ports": "workspace:*",
+    "@tianqi/shared": "workspace:*",
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "@tianqi/adapter-testkit": "workspace:*",
+    "@types/pg": "8.11.10"
+  }
+}

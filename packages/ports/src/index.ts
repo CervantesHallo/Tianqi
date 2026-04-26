@@ -255,3 +255,15 @@ export type {
   SagaStateStoreError,
   SagaStateStorePort
 } from "./saga-state-store-port.js";
+// Phase 9 / Step 4 — DeadLetterStorePort 死信存储契约（《§4.6》）。
+// 本 Step 仅引入类型；运行能力由 dead-letter-store-memory +
+// dead-letter-store-postgres Adapter 落地。审计事件写入是调用方（Step 9）
+// 责任，**不**由 DeadLetterStore Adapter 承担（元规则 F）。
+export type {
+  DeadLetterEntry,
+  DeadLetterEntryStatus,
+  DeadLetterId,
+  DeadLetterStoreError,
+  DeadLetterStorePort
+} from "./dead-letter-store-port.js";
+export { createDeadLetterId } from "./dead-letter-store-port.js";

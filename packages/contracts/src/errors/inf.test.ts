@@ -6,6 +6,9 @@ import {
   adapterInitializationFailedError,
   configFileUnreadableError,
   configHistoryDirectoryUnreadableError,
+  deadLetterStoreAlreadyShutDownError,
+  deadLetterStoreNotInitializedError,
+  deadLetterStoreSchemaVersionMismatchError,
   externalEngineBaseUrlUnreachableError,
   externalEngineCircuitOpenError,
   externalEngineNonRetryableError,
@@ -285,5 +288,74 @@ describe("TQ-INF error namespace", () => {
       ERROR_CODES.SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH
     ]);
     expect(codes.size).toBe(6);
+  });
+
+  // Phase 9 / Step 4 — TQ-INF-022/023/024 DeadLetterStore 工厂的 round-trip
+  // 与三码独立性断言。每条新增码独占字符串槽位（不与既有 21 条 TQ-INF
+  // 重复），且工厂返回的 InfrastructureError layer=infrastructure。
+
+  it("constructs the TQ-INF-022 sample via factory", () => {
+    const error = deadLetterStoreNotInitializedError(
+      "dead-letter-store-memory",
+      "enqueue"
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.DEAD_LETTER_STORE_NOT_INITIALIZED);
+    expect(error.code).toBe("TQ-INF-022");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "dead-letter-store-memory",
+      attemptedAction: "enqueue"
+    });
+  });
+
+  it("constructs the TQ-INF-023 sample via factory", () => {
+    const error = deadLetterStoreAlreadyShutDownError(
+      "dead-letter-store-postgres",
+      "markAsProcessed"
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.DEAD_LETTER_STORE_ALREADY_SHUT_DOWN);
+    expect(error.code).toBe("TQ-INF-023");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "dead-letter-store-postgres",
+      attemptedAction: "markAsProcessed"
+    });
+  });
+
+  it("constructs the TQ-INF-024 sample via factory", () => {
+    const error = deadLetterStoreSchemaVersionMismatchError(
+      "dead-letter-store-postgres",
+      "1.0.0",
+      "0.9.0"
+    );
+    expect(error).toBeInstanceOf(InfrastructureError);
+    expect(error.code).toBe(ERROR_CODES.DEAD_LETTER_STORE_SCHEMA_VERSION_MISMATCH);
+    expect(error.code).toBe("TQ-INF-024");
+    expect(error.layer).toBe(ERROR_LAYERS.INFRASTRUCTURE);
+    expect(error.context).toEqual({
+      adapterName: "dead-letter-store-postgres",
+      expected: "1.0.0",
+      actual: "0.9.0"
+    });
+  });
+
+  it("keeps nine schema/lifecycle TQ-INF codes pairwise distinct (EventStore + SQLite + SagaStateStore + DeadLetterStore)", () => {
+    // 永久留痕：本 Step 完成后，schema 与 lifecycle 类 TQ-INF 码总计 9 条
+    // 独占槽位（EventStore 003/004 + SQLite 008 + SagaStateStore 019/020/021
+    // + DeadLetterStore 022/023/024）。后续 Step 引入新 store 时应在此累加。
+    const codes = new Set<string>([
+      ERROR_CODES.EVENT_STORE_NOT_INITIALIZED,
+      ERROR_CODES.EVENT_STORE_ALREADY_SHUT_DOWN,
+      ERROR_CODES.SQLITE_SCHEMA_VERSION_MISMATCH,
+      ERROR_CODES.SAGA_STATE_STORE_NOT_INITIALIZED,
+      ERROR_CODES.SAGA_STATE_STORE_ALREADY_SHUT_DOWN,
+      ERROR_CODES.SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH,
+      ERROR_CODES.DEAD_LETTER_STORE_NOT_INITIALIZED,
+      ERROR_CODES.DEAD_LETTER_STORE_ALREADY_SHUT_DOWN,
+      ERROR_CODES.DEAD_LETTER_STORE_SCHEMA_VERSION_MISMATCH
+    ]);
+    expect(codes.size).toBe(9);
   });
 });

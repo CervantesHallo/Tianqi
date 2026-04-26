@@ -357,3 +357,55 @@ export const sagaStateStoreSchemaVersionMismatchError = (
       actual
     }
   );
+
+// Phase 9 / Step 4 — DeadLetterStore Adapter 错误工厂。
+// 与 SagaStateStore 同形态（INIT 前调用 / SHUTDOWN 后调用 / schema 不匹
+// 配），但分配独立 code 让运维 runbook 与 SagaStateStore 解耦——同样的
+// "先 init 后操作"错误，死信存储与状态存储的处理路径完全不同（前者影响
+// 死信归档可恢复性，后者影响 Saga 推进；后者属于补偿路径而前者属于已经
+// 失败后的兜底路径）。
+
+export const deadLetterStoreNotInitializedError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.DEAD_LETTER_STORE_NOT_INITIALIZED,
+    "Dead letter store adapter is not initialized",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );
+
+export const deadLetterStoreAlreadyShutDownError = (
+  adapterName: string,
+  attemptedAction: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.DEAD_LETTER_STORE_ALREADY_SHUT_DOWN,
+    "Dead letter store adapter is already shut down",
+    {
+      adapterName,
+      attemptedAction
+    }
+  );
+
+// 与 TQ-INF-021 SAGA_STATE_STORE_SCHEMA_VERSION_MISMATCH / TQ-INF-008
+// SQLITE_SCHEMA_VERSION_MISMATCH 同形态但独立。运维 runbook：检查
+// dead-letter-store-postgres 包的 SCHEMA_VERSION 历史与迁移脚本——具体
+// 升级路径与 SagaStateStore / SQLite 各自独立（死信表结构变更相对低频）。
+export const deadLetterStoreSchemaVersionMismatchError = (
+  adapterName: string,
+  expected: string,
+  actual: string
+): InfrastructureError =>
+  new InfrastructureError(
+    ERROR_CODES.DEAD_LETTER_STORE_SCHEMA_VERSION_MISMATCH,
+    "Dead letter store schema_version does not match adapter expectation",
+    {
+      adapterName,
+      expected,
+      actual
+    }
+  );

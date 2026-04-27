@@ -1,4 +1,5 @@
-// Phase 9 / Step 6 — SagaOrchestrator 核心实现 + Step 7 补偿引擎增强。
+// Phase 9 / Step 6 — SagaOrchestrator 核心实现 + Step 7 补偿引擎增强 +
+// Step 8 超时机制激活。
 //
 // 把《§4》8 条 Saga 强约束（Sprint F 已落 §4.1-§4.7）从纸面规约变成
 // "运行时可执行编排器"。本文件是 Phase 9 至今最重的单文件；接口签名
@@ -30,6 +31,30 @@
 //   - 不变量 3（§4.5）：compensation_failed 的 step 必入死信
 //   - 不变量 4（§4.5）：每次 stepStatus 变化都 persist
 //   - 不变量 5（链式继续 + §4.6）：单点 compensate 失败不阻断后续 step 补偿尝试
+//
+// Step 8 增强（详见 docs/decisions/0002 Step 8 段 + docs/phase9/08）：
+//   - 裁决 1 (α + γ 限制)：单步超时用 Promise.race + setTimeout；step 内
+//     部 task 不被 abort（编排器层"放弃等待" vs step 层"真取消"——后者
+//     需 step 实现侧自负责，编排器无能为力，元规则 B 不允许在 SagaStep
+//     接口加 AbortSignal）
+//   - 裁决 2 (B+C 混合)：每步前算 effectiveStepTimeoutMs = min(stepTimeout,
+//     sagaTimeout - elapsed)；effectiveStepTimeoutMs <= 0 立即视为整体超时
+//   - 裁决 3 (R 精细模式)：超时触发补偿；终态聚合：补偿全成功 "compensated" /
+//     部分 dead_lettered "partially_compensated" / 首步即超时无 succeeded
+//     可补偿 → "timed_out" (vacuous)
+//   - 裁决 4 (III)：saga.timed_out 仅整体超时触发；单步超时由
+//     saga.step.execute.outcome (failed) 表达即可
+//   - 裁决 5：仅 defaultSagaTimeoutMs 一个新增可选 Options 字段（元规则 B
+//     兼容；undefined 表示"无整体超时"——Step 8 之前默认行为）
+//   - 裁决 6 (V)：新增 TQ-SAG-004 SAGA_OVERALL_TIMED_OUT（惯例 K 第 10
+//     次实战："必需"成立——运维语义 / metrics / 终态映射三维度独立）
+//
+// Step 7 5 不变量在 Step 8 超时机制下的兼容性（详见 docs/phase9/08 §C）：
+//   - 不变量 1：超时触发的补偿仍走 succeeded 数组逆序遍历 ✅
+//   - 不变量 2：超时触发的补偿仍走 isStepEligibleForCompensation 守门 ✅
+//   - 不变量 3：补偿过程超时 → dead_lettered + DLQ enqueue ✅
+//   - 不变量 4：整体超时标记 currentStep "failed" 必先 persist ✅
+//   - 不变量 5：超时触发的补偿仍 chain continuation，不在失败处 break ✅
 //
 // §6.5 转译纪律延续：state 持久化失败时返回 SagaPortError；message 是
 // 领域级摘要（"saga state persistence failed"）；cause 字段携带原始
@@ -73,12 +98,19 @@ const DEFAULT_STEP_TIMEOUT_MS = 5_000;
 // 元规则 B 在审计层级：本 Step 锁定 7 个 eventType 字符串。后续 Step 7-9 /
 // Phase 10+ 新增类型必须经 ADR-0002 修订流程；既有 7 类的字符串永久冻结。
 //
-// SAGA_TIMED_OUT 仅声明事件类型不触发——Step 8 整体超时实施时**直接消
-// 费已声明类型**，不扩展事件命名空间。
+// SAGA_TIMED_OUT Step 8 起激活——整体 Saga 超时（非单步超时）触发本事件；
+// 单步超时仍走 saga.step.execute.outcome (failed) 通道（裁决 4 III）。
 //
 // 设计意图：审计事件类型是领域事件分类，自带语义优于 payload 字段过滤；
 // execute / compensate 阶段在事件类型层面分离让运维 / 审计可按事件类型
 // 分组查询，无需 payload.phase 过滤。
+//
+// Step 8 saga.timed_out payload 字段（一旦发布即冻结，元规则 B）：
+//   - lastExecutingStepName: string —— 整体超时触发时正在执行的 step
+//   - elapsedMs: number —— 自 sagaStartedAt 到触发时刻的实际耗时
+//   - configuredSagaTimeoutMs: number —— 配置的 defaultSagaTimeoutMs
+//   - errorCode: "TQ-SAG-004" —— 整体超时专属错误码（与单步超时
+//     TQ-SAG-001 区分；运维 metrics 独立维度）
 export const AUDIT_EVENT_TYPES = {
   SAGA_STARTED: "saga.started",
   SAGA_STEP_EXECUTE_OUTCOME: "saga.step.execute.outcome",
@@ -86,7 +118,7 @@ export const AUDIT_EVENT_TYPES = {
   SAGA_STEP_COMPENSATE_OUTCOME: "saga.step.compensate.outcome",
   SAGA_DEAD_LETTER_ENQUEUED: "saga.dead_letter.enqueued",
   SAGA_COMPLETED: "saga.completed",
-  /** 声明类型；本 Step 不触发；Step 8 整体超时实施时触发。 */
+  /** Step 8 整体超时触发时使用；payload 字段见上方注释。 */
   SAGA_TIMED_OUT: "saga.timed_out"
 } as const;
 
@@ -123,10 +155,45 @@ export type SagaDegradedFailureEvent =
 export type SagaOrchestratorOptions = {
   /**
    * 单 Step 默认超时（毫秒）。每个 step.execute / step.compensate 调用
-   * 用此超时包装。Step 8 watchdog 实施时增强本字段语义，不破坏接口。
+   * 用此超时包装。
+   *
+   * Step 8 起：实际作用于 step 的超时是 effectiveStepTimeoutMs =
+   * min(defaultStepTimeoutMs, defaultSagaTimeoutMs - elapsed)（见
+   * defaultSagaTimeoutMs 注释）。
+   *
    * 默认 5_000。
    */
   readonly defaultStepTimeoutMs?: number;
+  /**
+   * 整体 Saga 超时（毫秒），Step 8 新增。
+   *
+   * 配置后，编排器在每个 step 启动前检查"自 sagaStartedAt 到当前的累计
+   * 耗时是否超过 defaultSagaTimeoutMs"。若超过，立即触发整体超时处置：
+   *
+   *   1. 标记当前正在执行 step 为 "failed"（status + persist + audit
+   *      saga.step.execute.outcome failed）
+   *   2. 进入补偿阶段（runCompensationPhase；Step 7 5 不变量全部生效）
+   *   3. 终态映射（裁决 3 R 精细模式）：
+   *      - 有 succeeded step + 全部 compensated → "compensated"
+   *      - 有 succeeded step + 部分 dead_lettered → "partially_compensated"
+   *      - 无 succeeded step（首步即超时） → "timed_out" (vacuous)
+   *   4. 触发 saga.timed_out 审计事件（无论终态映射如何）
+   *
+   * effectiveStepTimeoutMs = min(defaultStepTimeoutMs, defaultSagaTimeoutMs
+   * - elapsed)：让单 step 不能"借走"整体预算外的时间。补偿阶段的
+   * step.compensate 不受 defaultSagaTimeoutMs 限制（整体预算已耗光，
+   * 补偿是善后清理；仅受 defaultStepTimeoutMs 限制以防 compensate 失控）。
+   *
+   * undefined（默认）= 无整体超时，编排器按 Step 6/7 行为运行（无任何
+   * elapsed 检查）。元规则 B 兼容：Step 6/7 调用方不传此字段时行为零变化。
+   *
+   * 与 SagaInvocation.sagaTimeoutMs 字段的关系：SagaInvocation 字段是
+   * Step 1 锁定的"调用侧申报的 saga 时间预算"；Options 字段是"编排器侧
+   * 配置的默认整体超时"。编排器优先使用 invocation.sagaTimeoutMs > 0
+   * 时取该值；否则回退到 options.defaultSagaTimeoutMs；都未提供则视为
+   * 无整体超时。
+   */
+  readonly defaultSagaTimeoutMs?: number;
   /**
    * 调用方提供的"当前时刻"获取器。便于测试注入 fake clock。
    * 默认 () => new Date()。
@@ -270,6 +337,8 @@ export const createSagaOrchestrator = (
   const generateDeadLetterId =
     options.generateDeadLetterId ?? defaultGenerateDeadLetterId;
   const onDegradedFailure = options.onDegradedFailure;
+  // Step 8: undefined → 无整体超时（Step 6/7 行为）；正数 → 整体预算
+  const optionsSagaTimeoutMs = options.defaultSagaTimeoutMs;
 
   // ============================================================
   // 内部状态形状：1:1 映射 PersistedSagaState
@@ -366,15 +435,34 @@ export const createSagaOrchestrator = (
   });
 
   // ============================================================
-  // withStepTimeout —— Step 8 钩子（私有）
-  // 超时即产出 TQ-SAG-001。task 本身不被 abort（与 Step 1 接口不含
-  // AbortSignal 一致；元规则 B）。Step 8 增强 watchdog 时仅扩展本方法。
+  // withStepTimeout —— Step 6 起钩子（私有），Step 8 激活 effectiveTimeoutMs
+  //
+  // 超时即产出 TQ-SAG-001 SAGA_STEP_TIMEOUT。task 本身不被 abort——这是
+  // 裁决 1 γ 限制的诚实表述（与 Step 1 接口不含 AbortSignal 一致；元规则
+  // B 不允许在 SagaStep 接口加 AbortSignal；step 实现侧若无内部取消机
+  // 制，超时仅放弃等待——step 仍可能在后台跑直到自然结束，资源占用直
+  // 至 GC 回收）。
+  //
+  // Step 8 增强：effectiveTimeoutMs 由调用方传入（forward phase 传
+  // min(stepTimeoutMs, sagaTimeoutMs - elapsed)；compensation phase 传
+  // stepTimeoutMs，因整体预算已耗光不再叠加）。effectiveTimeoutMs ===
+  // Number.POSITIVE_INFINITY 表示"无超时"（不启动 setTimeout，直接
+  // await task）——这种调用法主要给 Step 6/7 既有调用路径的兼容钩子。
+  //
+  // setTimeout handle 在 finally 中 clearTimeout，避免泄漏（即使 task
+  // 先 resolve / reject 也会清理；G11）。
   // ============================================================
   const withStepTimeout = async <T>(
     task: () => Promise<Result<T, SagaPortError>>,
     sagaId: SagaId,
-    stepName: string
+    stepName: string,
+    effectiveTimeoutMs: number
   ): Promise<Result<T, SagaPortError>> => {
+    if (!Number.isFinite(effectiveTimeoutMs)) {
+      // 无超时：直接 await，不启动 setTimeout（避免 setTimeout(Infinity)
+      // 平台行为差异；裁决 1 α 边界处置）
+      return task();
+    }
     let timer: ReturnType<typeof scheduleTimer> | undefined;
     const timeoutPromise = new Promise<Result<T, SagaPortError>>(resolve => {
       timer = scheduleTimer(() => {
@@ -386,7 +474,7 @@ export const createSagaOrchestrator = (
             message: "step exceeded timeout budget"
           })
         );
-      }, stepTimeoutMs);
+      }, effectiveTimeoutMs);
     });
     try {
       return await Promise.race([task(), timeoutPromise]);
@@ -509,10 +597,14 @@ export const createSagaOrchestrator = (
       if (!persistC1.ok) return persistC1;
 
       const sagaContext = buildSagaContextForStep(state, entry.idx);
+      // Step 8：补偿阶段不受 defaultSagaTimeoutMs 约束（整体预算已耗光，
+      // 补偿是善后清理）；仅受 defaultStepTimeoutMs 限制以防 compensate
+      // 失控。这是裁决 2 B+C 混合的语义边界。
       const compResult = await withStepTimeout(
         () => step.compensate(entry.compensationContext, sagaContext),
         state.sagaId,
-        step.name
+        step.name,
+        stepTimeoutMs
       );
 
       if (compResult.ok) {
@@ -578,7 +670,39 @@ export const createSagaOrchestrator = (
     invocation: SagaInvocation<unknown>,
     steps: ReadonlyArray<SagaStep<unknown, unknown, unknown>>
   ): Promise<Result<SagaResult<TOutput>, SagaPortError>> => {
-    const sagaStartedAt = clock().toISOString();
+    const sagaStartedAtDate = clock();
+    const sagaStartedAt = sagaStartedAtDate.toISOString();
+    const sagaStartedAtMs = sagaStartedAtDate.getTime();
+
+    // ============================================================
+    // Step 8: 整体 Saga 超时预算解析（裁决 5）
+    //
+    // 优先级：invocation.sagaTimeoutMs（Step 1 锁定字段）> options.defaultSagaTimeoutMs
+    // > Number.POSITIVE_INFINITY（无整体超时）
+    //
+    // invocation.sagaTimeoutMs 类型 number（必填），但 <=0 当作"未配置"
+    // 处理（避免 0 被误读为"立即超时"）。
+    // ============================================================
+    const sagaTimeoutMs: number =
+      invocation.sagaTimeoutMs > 0
+        ? invocation.sagaTimeoutMs
+        : optionsSagaTimeoutMs !== undefined && optionsSagaTimeoutMs > 0
+          ? optionsSagaTimeoutMs
+          : Number.POSITIVE_INFINITY;
+
+    const computeElapsedMs = (): number => clock().getTime() - sagaStartedAtMs;
+
+    // 给定当前 elapsed，计算单步实际可用预算（裁决 2 B+C 混合）：
+    //   - 无整体超时：返回 stepTimeoutMs
+    //   - 有整体超时：min(stepTimeoutMs, sagaTimeoutMs - elapsed)
+    //   - elapsed 已超 sagaTimeoutMs → 返回 0（调用方将其当作整体超时
+    //     已发生）
+    const computeEffectiveStepTimeoutMs = (elapsed: number): number => {
+      if (!Number.isFinite(sagaTimeoutMs)) return stepTimeoutMs;
+      const remaining = sagaTimeoutMs - elapsed;
+      if (remaining <= 0) return 0;
+      return Math.min(stepTimeoutMs, remaining);
+    };
 
     const state: InternalSagaState = {
       sagaId: invocation.sagaId,
@@ -613,10 +737,45 @@ export const createSagaOrchestrator = (
     let firstFailureIdx = -1;
     let currentInput: unknown = invocation.initialInput;
     let lastOutput: unknown = null;
+    // Step 8: 标记本次 runSaga 是否被整体超时触发，影响终态聚合（裁决 3 R）
+    let overallTimedOut = false;
+    let overallTimeoutInfo: {
+      lastExecutingStepName: string;
+      elapsedMs: number;
+    } | null = null;
 
     for (let i = 0; i < steps.length; i += 1) {
       const step = steps[i]!;
       state.currentStepIndex = i;
+
+      // Step 8: 每步启动前检查整体预算（裁决 2 B+C 混合的"B"部分）
+      const elapsedBeforeStep = computeElapsedMs();
+      const effectiveStepTimeoutMs = computeEffectiveStepTimeoutMs(elapsedBeforeStep);
+      if (effectiveStepTimeoutMs <= 0) {
+        // 整体超时：本步骤不启动；标记当前 step 为 failed + 进入补偿
+        const failureReason = "saga overall execution time exceeded";
+        state.stepStatuses[i] = {
+          ...state.stepStatuses[i]!,
+          status: "failed",
+          failureReason
+        };
+        const persistTimeout = await persist(state);
+        if (!persistTimeout.ok) return persistTimeout;
+        await auditAppend(AUDIT_EVENT_TYPES.SAGA_STEP_EXECUTE_OUTCOME, state, {
+          stepName: step.name,
+          stepIndex: i,
+          outcome: "failed",
+          failureReason,
+          errorCode: "TQ-SAG-004"
+        });
+        overallTimedOut = true;
+        overallTimeoutInfo = {
+          lastExecutingStepName: step.name,
+          elapsedMs: elapsedBeforeStep
+        };
+        firstFailureIdx = i;
+        break;
+      }
 
       // Persist 触发点 2：step.execute 启动前（pending → executing）
       state.stepStatuses[i] = { ...state.stepStatuses[i]!, status: "executing" };
@@ -627,7 +786,8 @@ export const createSagaOrchestrator = (
       const execResult = await withStepTimeout(
         () => step.execute(currentInput, sagaContext),
         state.sagaId,
-        step.name
+        step.name,
+        effectiveStepTimeoutMs
       );
 
       if (execResult.ok) {
@@ -666,6 +826,19 @@ export const createSagaOrchestrator = (
           outcome: "failed",
           failureReason
         });
+        // Step 8: TQ-SAG-001 单步超时触发后，若整体预算也已耗光，仍按
+        // 整体超时聚合终态（裁决 3 R）。
+        if (
+          execResult.error.code === "TQ-SAG-001" &&
+          Number.isFinite(sagaTimeoutMs) &&
+          computeElapsedMs() >= sagaTimeoutMs
+        ) {
+          overallTimedOut = true;
+          overallTimeoutInfo = {
+            lastExecutingStepName: step.name,
+            elapsedMs: computeElapsedMs()
+          };
+        }
         firstFailureIdx = i;
         break;
       }
@@ -677,10 +850,11 @@ export const createSagaOrchestrator = (
     if (firstFailureIdx >= 0) {
       if (succeeded.length === 0) {
         // 首步即失败 → 无前序 succeeded → 无补偿可做。
-        // overallStatus 取 "compensated"（vacuous：0 of 0 compensated；与
-        // Step 2 reference-saga.ts harness 一致；SagaResultStatus 4 值
-        // 集合不含"failed"独立值，"compensated"是最贴近的语义类别）。
-        state.overallStatus = "compensated";
+        // 终态映射（裁决 3 R 精细模式）：
+        //   - 整体超时触发 → "timed_out"（vacuous，无 step 可补偿）
+        //   - 普通失败 → "compensated"（vacuous，0 of 0；与 Step 2
+        //     reference-saga.ts harness 一致）
+        state.overallStatus = overallTimedOut ? "timed_out" : "compensated";
       } else {
         const compResult = await runCompensationPhase(state, steps, succeeded);
         if (!compResult.ok) return compResult;
@@ -706,7 +880,7 @@ export const createSagaOrchestrator = (
         sagaResultStatus = "partially_compensated";
         break;
       case "timed_out":
-        // Step 8 整体超时实施时进入此分支；本 Step 不会到达此处
+        // Step 8 整体超时 vacuous 路径（无 succeeded 可补偿）
         sagaResultStatus = "timed_out";
         break;
       default:
@@ -717,6 +891,20 @@ export const createSagaOrchestrator = (
 
     const finalOutput =
       sagaResultStatus === "completed" ? (lastOutput as TOutput) : null;
+
+    // Step 8: 整体超时触发 saga.timed_out 审计事件（裁决 4 III）。
+    // 触发时机：在 saga.completed 之前；payload 字段一旦发布即冻结
+    // （元规则 B 在审计层级；详见 AUDIT_EVENT_TYPES 段注释）。
+    if (overallTimedOut && overallTimeoutInfo !== null) {
+      await auditAppend(AUDIT_EVENT_TYPES.SAGA_TIMED_OUT, state, {
+        lastExecutingStepName: overallTimeoutInfo.lastExecutingStepName,
+        elapsedMs: overallTimeoutInfo.elapsedMs,
+        configuredSagaTimeoutMs: Number.isFinite(sagaTimeoutMs)
+          ? sagaTimeoutMs
+          : null,
+        errorCode: "TQ-SAG-004"
+      });
+    }
 
     await auditAppend(AUDIT_EVENT_TYPES.SAGA_COMPLETED, state, {
       overallStatus: sagaResultStatus,

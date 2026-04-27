@@ -1,4 +1,4 @@
-// Phase 9 / Step 6 + Step 7 — saga-orchestrator 单元测试。
+// Phase 9 / Step 6 + Step 7 + Step 8 — saga-orchestrator 单元测试。
 //
 // Step 6 起 10 it：工厂签名 / 零步快路径 / persist 触发点 / 逆序补偿 /
 // 死信入队 / 状态致命 / 死信降级 / 审计降级 / 7 类审计事件 /
@@ -11,9 +11,24 @@
 //     全部入死信 + partially_compensated + 不变量 1/3/5 联动验证
 //   - 既有 it 4 升级（不变量 1 增强）：2 step 反向 → 4 step 严格逆序
 //
+// Step 8 增量（≤12 → ≤16）：新增 4 个超时专项 it。
+//   - it 13 单步超时（裁决 1 α）：slowStep 自然耗时 50ms + stepTimeout
+//     5ms → TQ-SAG-001 触发 + 进入补偿 + 终态 compensated
+//   - it 14 整体 saga 超时 vacuous（裁决 3 R）：sagaTimeout 5ms + 首步
+//     slowStep → 整体超时触发 + 终态 timed_out + saga.timed_out 审计事件
+//   - it 15 整体 saga 超时含补偿（裁决 3 R）：1 succeeded step + 第 2 步
+//     超时整体预算 → 进入补偿 + 终态 compensated（含 timed_out 标记）
+//   - it 16 effectiveStepTimeoutMs 混合（裁决 2 B+C）：3 step 中 sagaTimeout
+//     比 stepTimeout 紧 → 末步超时由 sagaTimeout 触发而非 stepTimeout
+//
+// 时序刻意拉开 fast/slow 比例 ≥1:10（KI-P8-003 缓解）：step 自然耗时
+// ≥50ms，超时配 ≤5ms 或 ≥500ms，避免与 step 自然耗时形成竞态。
+//
 // Mock 策略：本测试用 mock ports（可控制 save / append / enqueue 失败行
 // 为）；契约测试 saga-orchestrator.contract.test.ts 用真实 in-memory 适
 // 配器驱动 Step 2 17 契约 it。两者互补。
+
+import { setTimeout as scheduleTimer } from "node:timers";
 
 import { describe, expect, it } from "vitest";
 
@@ -223,6 +238,30 @@ const buildContextEchoStep = (
   async compensate(ctx, _sagaContext) {
     recorder.compensates.push(name);
     recorder.receivedCtx.set(name, ctx);
+    return ok(undefined);
+  }
+});
+
+// Step 8 — slowStep 工厂（natural delay >> timeout 触发 TQ-SAG-001）
+const buildSlowStep = (
+  name: string,
+  delayMs: number,
+  recorder: { executes: string[]; compensates: string[] }
+): AnyStep => ({
+  name,
+  async execute(input, _ctx) {
+    recorder.executes.push(name);
+    await new Promise<void>(resolve => {
+      scheduleTimer(resolve, delayMs);
+    });
+    const exec: SagaStepExecution<unknown, unknown> = {
+      output: { stepName: name, input },
+      compensationContext: { kind: "slow", stepName: name }
+    };
+    return ok(exec);
+  },
+  async compensate(_ctx, _sagaContext) {
+    recorder.compensates.push(name);
     return ok(undefined);
   }
 });
@@ -637,5 +676,197 @@ describe("saga-orchestrator: unit tests", () => {
       e => e.eventType === AUDIT_EVENT_TYPES.SAGA_DEAD_LETTER_ENQUEUED
     );
     expect(dlqEnqueued.length).toBe(2);
+  });
+
+  // ============================================================
+  // Step 8 超时专项 it（裁决 1-6 行为验证）
+  //
+  // 时序刻意拉开 fast/slow 比例 ≥1:10（KI-P8-003 缓解）：step 自然耗时
+  // ≥50ms，超时配 ≤5ms 或 ≥500ms。
+  // ============================================================
+
+  it("test_runSaga_with_step_timeout_triggers_TQ_SAG_001_and_compensation", async () => {
+    // 裁决 1（α）单步超时机制：slowStep 自然耗时 50ms + defaultStepTimeoutMs
+    // 5ms → withStepTimeout 触发 TQ-SAG-001 → step status "failed" + 进入
+    // 补偿 + 终态聚合（无 succeeded → "compensated" vacuous）。
+    //
+    // 验证 saga.timed_out 事件**不触发**（裁决 4 III：单步超时不触发该
+    // 事件，仅整体超时触发；不变量 5 兼容性）。
+    const recorder = { executes: [] as string[], compensates: [] as string[] };
+    const auditSink = createMockAuditSink();
+    const orchestrator = createSagaOrchestrator(
+      {
+        sagaStateStore: createMockSagaStateStore(),
+        deadLetterStore: createMockDeadLetterStore(),
+        auditEventSink: auditSink
+      },
+      { defaultStepTimeoutMs: 5 }
+    );
+    const steps = [buildSlowStep("step-slow", 50, recorder)];
+    const result = await orchestrator.runSaga(buildInvocation("c13"), steps);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.status).toBe("compensated"); // vacuous（裁决 3 R）
+      expect(result.value.stepStatuses[0]?.status).toBe("failed");
+      expect(result.value.stepStatuses[0]?.failureReason).toBe(
+        "step exceeded timeout budget"
+      );
+    }
+
+    // saga.timed_out 不触发（裁决 4 III）
+    const timedOutEvents = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_TIMED_OUT
+    );
+    expect(timedOutEvents.length).toBe(0);
+    // saga.step.execute.outcome 触发 1 次（failed）
+    const executeOutcomes = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_STEP_EXECUTE_OUTCOME
+    );
+    expect(executeOutcomes.length).toBe(1);
+  });
+
+  it("test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out", async () => {
+    // 裁决 2 (B+C) + 裁决 3 (R vacuous) + 裁决 4 (III) + 裁决 5 + 裁决 6：
+    // defaultSagaTimeoutMs 5ms + 首步 slowStep 自然耗时 50ms → forward
+    // 阶段单步 effectiveStepTimeoutMs = min(5000, 5 - elapsed) ≈ 5ms →
+    // step 内部 setTimeout race → TQ-SAG-001 触发 → 同时 elapsed >= 5ms
+    // → overallTimedOut = true → 终态 timed_out (vacuous，无 succeeded
+    // 可补偿) + saga.timed_out 审计事件 1 次（含 4 个 payload 字段全集）。
+    const recorder = { executes: [] as string[], compensates: [] as string[] };
+    const auditSink = createMockAuditSink();
+    const orchestrator = createSagaOrchestrator(
+      {
+        sagaStateStore: createMockSagaStateStore(),
+        deadLetterStore: createMockDeadLetterStore(),
+        auditEventSink: auditSink
+      },
+      { defaultSagaTimeoutMs: 5, defaultStepTimeoutMs: 5_000 }
+    );
+    const steps = [buildSlowStep("step-slow", 50, recorder)];
+    // 显式覆盖 invocation.sagaTimeoutMs 为 0 让 options 生效
+    const invocation: SagaInvocation<unknown> = {
+      ...buildInvocation("c14"),
+      sagaTimeoutMs: 0
+    };
+    const result = await orchestrator.runSaga(invocation, steps);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // 裁决 3 R vacuous：无 succeeded → "timed_out"
+      expect(result.value.status).toBe("timed_out");
+      expect(result.value.finalOutput).toBeNull();
+      expect(result.value.stepStatuses[0]?.status).toBe("failed");
+    }
+
+    // saga.timed_out 触发 1 次（裁决 4 III）
+    const timedOutEvents = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_TIMED_OUT
+    );
+    expect(timedOutEvents.length).toBe(1);
+    const payload = timedOutEvents[0]?.payload as Record<string, unknown>;
+    // payload 4 字段冻结（元规则 B 在审计层级）
+    expect(payload.lastExecutingStepName).toBe("step-slow");
+    expect(typeof payload.elapsedMs).toBe("number");
+    expect(payload.configuredSagaTimeoutMs).toBe(5);
+    expect(payload.errorCode).toBe("TQ-SAG-004");
+  });
+
+  it("test_runSaga_with_overall_timeout_after_first_step_succeeds_compensates_and_emits_saga_timed_out", async () => {
+    // 裁决 3 (R 含补偿)：1 succeeded step + 第 2 步因 sagaTimeout 耗光
+    // 触发整体超时 → 进入 runCompensationPhase 补偿第 1 步（不变量 1+2+5
+    // 兼容性证据）→ 终态 "compensated"（含 succeeded + 全部 compensated）
+    // + saga.timed_out 审计事件 1 次。
+    //
+    // 时序设计：sagaTimeout 30ms；step-a fast (5ms)；step-b slow (200ms
+    // 自然耗时 + effectiveStepTimeout 是 25ms 还剩) → step-b 单步超时
+    // 同时 elapsed >= sagaTimeout → overallTimedOut = true。
+    const recorder = { executes: [] as string[], compensates: [] as string[] };
+    const auditSink = createMockAuditSink();
+    const deadLetterStore = createMockDeadLetterStore();
+    const orchestrator = createSagaOrchestrator(
+      {
+        sagaStateStore: createMockSagaStateStore(),
+        deadLetterStore,
+        auditEventSink: auditSink
+      },
+      { defaultSagaTimeoutMs: 30, defaultStepTimeoutMs: 5_000 }
+    );
+    const steps = [
+      buildSlowStep("step-a-fast", 5, recorder),
+      buildSlowStep("step-b-slow", 200, recorder)
+    ];
+    const invocation: SagaInvocation<unknown> = {
+      ...buildInvocation("c15"),
+      sagaTimeoutMs: 0
+    };
+    const result = await orchestrator.runSaga(invocation, steps);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // 裁决 3 R：有 succeeded + 全部 compensated → "compensated"
+      expect(result.value.status).toBe("compensated");
+      // 不变量 1（严格逆序）：补偿仅触发 step-a-fast
+      expect(result.value.stepStatuses[0]?.status).toBe("compensated");
+      expect(result.value.stepStatuses[1]?.status).toBe("failed");
+    }
+    // 不变量 1 联动：compensate 调用顺序仅 step-a-fast（step-b-slow 不补偿）
+    expect(recorder.compensates).toEqual(["step-a-fast"]);
+    // 不变量 3 兼容：补偿成功不入死信
+    expect(deadLetterStore.enqueued.length).toBe(0);
+
+    // saga.timed_out 触发 1 次
+    const timedOutEvents = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_TIMED_OUT
+    );
+    expect(timedOutEvents.length).toBe(1);
+    expect(
+      (timedOutEvents[0]?.payload as Record<string, unknown>).lastExecutingStepName
+    ).toBe("step-b-slow");
+  });
+
+  it("test_effectiveStepTimeoutMs_clamps_to_remaining_saga_budget", async () => {
+    // 裁决 2 B+C 混合：sagaTimeout 紧 (40ms) + stepTimeout 松 (5_000ms) →
+    // step-a 自然耗时 30ms 顺利完成；step-b 启动时 elapsed ≈ 30ms，
+    // effectiveStepTimeoutMs = min(5_000, 40 - 30) ≈ 10ms；step-b 自然耗
+    // 时 200ms → withStepTimeout 在 10ms 而非 5_000ms 触发 TQ-SAG-001。
+    //
+    // 这验证 stepTimeout 不会"借走"sagaTimeout 之外的时间——effective
+    // 计算让单步预算被 sagaTimeout 钳制。
+    const recorder = { executes: [] as string[], compensates: [] as string[] };
+    const auditSink = createMockAuditSink();
+    const orchestrator = createSagaOrchestrator(
+      {
+        sagaStateStore: createMockSagaStateStore(),
+        deadLetterStore: createMockDeadLetterStore(),
+        auditEventSink: auditSink
+      },
+      { defaultSagaTimeoutMs: 40, defaultStepTimeoutMs: 5_000 }
+    );
+    const steps = [
+      buildSlowStep("step-a", 30, recorder),
+      buildSlowStep("step-b", 200, recorder)
+    ];
+    const invocation: SagaInvocation<unknown> = {
+      ...buildInvocation("c16"),
+      sagaTimeoutMs: 0
+    };
+    const startedAt = Date.now();
+    const result = await orchestrator.runSaga(invocation, steps);
+    const elapsed = Date.now() - startedAt;
+    expect(result.ok).toBe(true);
+    // 实际耗时应远小于 stepTimeout 5_000ms；预期 ≤200ms（含 step-a 30ms +
+    // step-b clamp 至 ~10ms 后立即超时 + 补偿耗时）
+    expect(elapsed).toBeLessThan(500);
+    if (result.ok) {
+      // step-b 因 sagaTimeout clamp 而非 stepTimeout 触发超时
+      expect(result.value.stepStatuses[1]?.status).toBe("failed");
+      expect(result.value.stepStatuses[1]?.failureReason).toBe(
+        "step exceeded timeout budget"
+      );
+    }
+
+    // 整体超时确实触发（saga.timed_out 1 次）
+    const timedOutEvents = auditSink.events.filter(
+      e => e.eventType === AUDIT_EVENT_TYPES.SAGA_TIMED_OUT
+    );
+    expect(timedOutEvents.length).toBe(1);
   });
 });

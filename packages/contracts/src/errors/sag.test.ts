@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ERROR_CODES } from "../error-code.js";
 import { ERROR_LAYERS } from "./error-layer.js";
 import {
+  sagaOverallTimedOutError,
   sagaStepCompensationFailedError,
   SagaError,
   sagaStepExecutionFailedError,
@@ -92,15 +93,45 @@ describe("TQ-SAG error namespace", () => {
     expect(error.cause).toBe(cause);
   });
 
-  it("keeps three TQ-SAG codes pairwise distinct", () => {
-    // 永久留痕：本 Step 引入的 003 码与既存 001 + 新增 002 三两互不重复。
+  // Phase 9 / Step 8 — 新增 TQ-SAG-004 整体 Saga 超时码工厂的 round-trip
+  // + 四码分离断言。整体超时与单 step 超时（001）在运维监控/SLO 上需要独
+  // 立计数（《§14.2》metrics 重试率 / 失败率）。
+
+  it("constructs the TQ-SAG-004 sample via factory", () => {
+    const error = sagaOverallTimedOutError(
+      "saga-deleverage-acct-001",
+      31_200,
+      30_000,
+      "settle-fund-pool"
+    );
+    expect(error).toBeInstanceOf(SagaError);
+    expect(error.code).toBe(ERROR_CODES.SAGA_OVERALL_TIMED_OUT);
+    expect(error.code).toBe("TQ-SAG-004");
+    expect(error.layer).toBe(ERROR_LAYERS.SAGA);
+    expect(error.context).toEqual({
+      sagaId: "saga-deleverage-acct-001",
+      elapsedMs: 31_200,
+      configuredSagaTimeoutMs: 30_000,
+      lastExecutingStepName: "settle-fund-pool"
+    });
+  });
+
+  it("preserves cause on TQ-SAG-004 factory", () => {
+    const cause = new Error("upstream orchestrator wallclock budget exhausted");
+    const error = sagaOverallTimedOutError("saga-1", 60_000, 45_000, "step-x", cause);
+    expect(error.cause).toBe(cause);
+  });
+
+  it("keeps four TQ-SAG codes pairwise distinct", () => {
+    // 永久留痕：本 Step 引入的 004 码与既存 001/002/003 四码两两互不重复。
     // 后续 Phase 9 Step 引入新 TQ-SAG-* 时，应继续在此添加分离断言（按
     // sag.test.ts 既定模式累积），确保命名空间分隔不被悄然破坏。
     const codes = new Set<string>([
       ERROR_CODES.SAGA_STEP_TIMEOUT,
       ERROR_CODES.SAGA_STEP_EXECUTION_FAILED,
-      ERROR_CODES.SAGA_STEP_COMPENSATION_FAILED
+      ERROR_CODES.SAGA_STEP_COMPENSATION_FAILED,
+      ERROR_CODES.SAGA_OVERALL_TIMED_OUT
     ]);
-    expect(codes.size).toBe(3);
+    expect(codes.size).toBe(4);
   });
 });

@@ -83,3 +83,39 @@ export const sagaStepCompensationFailedError = (
     },
     cause
   );
+
+// Phase 9 / Step 8 — TQ-SAG-004 工厂。
+// 整体 Saga 超时与单 Step 超时（TQ-SAG-001）在运维监控上需要独立计数
+// （《§14.2》metrics）：
+//   - TQ-SAG-001：单 step.execute / step.compensate 超过 effectiveStepTimeoutMs
+//   - TQ-SAG-004：整个 saga 在编排器视角下的总耗时超过 defaultSagaTimeoutMs
+//
+// 惯例 K 第 10 次实战："必需"成立：
+//   1. 运维语义独立——整体超时与单步超时根因不同（前者业务流程过长 /
+//      后者下游单点慢）
+//   2. metrics 维度独立——告警与 SLO 指标分别 owner（业务团队 / 平台团队）
+//   3. 终态映射独立——TQ-SAG-001 触发后 saga 仍可能 compensated 完毕；
+//      TQ-SAG-004 触发后 saga 终态固定为 timed_out / partially_compensated
+//      / compensated（裁决 3 R 精细模式）。
+//
+// §6.5 纪律延续：message 领域级摘要"saga overall execution time exceeded"
+// 不透下游异常文本；context 含 elapsed + configuredSagaTimeoutMs + 末次
+// 执行的 step 名称便于运维定位"saga 卡在哪一步触发整体超时"。
+export const sagaOverallTimedOutError = (
+  sagaId: string,
+  elapsedMs: number,
+  configuredSagaTimeoutMs: number,
+  lastExecutingStepName: string,
+  cause?: Error
+): SagaError =>
+  new SagaError(
+    ERROR_CODES.SAGA_OVERALL_TIMED_OUT,
+    "Saga overall execution time exceeded",
+    {
+      sagaId,
+      elapsedMs,
+      configuredSagaTimeoutMs,
+      lastExecutingStepName
+    },
+    cause
+  );

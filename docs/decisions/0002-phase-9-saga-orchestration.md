@@ -880,7 +880,107 @@ export const AUDIT_EVENT_TYPES = {
 - runCompensationPhase 已增强为生产级（Step 8 整体超时触发整体补偿时
   复用本增强后的 runCompensationPhase 逻辑，含双重幂等 + 链式继续）
 
-### Step 8-19: [待后续 Step 增量填充]
+### Step 8: 单 Step 超时 + 整体 Saga 超时（2026-04-27）
+
+**裁决摘要**：
+
+- **裁决 1（单步超时机制）**：α + γ 限制——Promise.race + setTimeout；
+  step 内部 task 不被 abort（编排器层"放弃等待" vs step 层"真取消"
+  必须诚实区分；元规则 B 不允许在 SagaStep 接口加 AbortSignal）。Step 6
+  已有基本 withStepTimeout 实现，本 Step 仅扩展为接受 effectiveTimeoutMs
+  参数 + 处理 Number.POSITIVE_INFINITY（无超时）边界。
+- **裁决 2（整体超时机制）**：B+C 混合——每步前算 effectiveStepTimeoutMs
+  = min(stepTimeoutMs, sagaTimeoutMs - elapsed)；effectiveStepTimeoutMs
+  <= 0 立即视为整体超时触发，不启动该 step。补偿阶段不受 sagaTimeoutMs
+  叠加（整体预算耗光后善后清理；仅受 stepTimeoutMs 限制）。
+- **裁决 3（处置 + 终态）**：R 精细模式——超时触发补偿；终态聚合：
+  - 有 succeeded + 全部 compensated → "compensated"
+  - 有 succeeded + 部分 dead_lettered → "partially_compensated"
+  - 无 succeeded（首步即超时） → "timed_out"（vacuous）
+  这是 Step 1 锁定 SagaResultStatus 4 值的最大化利用。
+- **裁决 4（审计事件）**：III——saga.timed_out 仅整体超时触发；单步超时
+  仍走 saga.step.execute.outcome (failed) 通道。语义清晰：单步超时本质
+  是"step 失败"；整体超时是 saga 级别事件。
+- **裁决 5（Options 扩展）**：仅新增 defaultSagaTimeoutMs 一个可选字段
+  （元规则 B 兼容；undefined 表示"无整体超时"——Step 6/7 默认行为零变
+  化）。优先级：invocation.sagaTimeoutMs > 0 > options.defaultSagaTimeoutMs
+  > 0 > Number.POSITIVE_INFINITY。
+- **裁决 6（错误码新增）**：V 新增 TQ-SAG-004 SAGA_OVERALL_TIMED_OUT
+  （**惯例 K 第 10 次实战**——"必需"成立：运维语义独立 / metrics
+  独立 / 终态映射独立三维度证据）。
+
+**关键实现细节**：
+
+- Forward phase 改造：每步循环顶部计算 elapsed + effectiveStepTimeoutMs；
+  effectiveStepTimeoutMs <= 0 → 整体超时触发分支（标 currentStep failed
+  + persist + audit 含 errorCode "TQ-SAG-004" + 设 overallTimedOut +
+  break）；正值 → 进入 step.execute 走 withStepTimeout 包装。
+- 单步超时双触发（裁决 3 R 联动）：execResult.error.code === "TQ-SAG-001"
+  && elapsed >= sagaTimeoutMs → 视为"单步超时同时整体预算耗光"，标
+  overallTimedOut = true（这让单步超时刚好踩在整体边界时不会被错误归
+  类为普通失败）。
+- 终态映射：整体超时 vacuous（无 succeeded）→ "timed_out"；其他路径
+  按 Step 7 aggregateCompensationOutcome 聚合（不变量 5 兼容）。
+- saga.timed_out 审计触发：在 saga.completed 之前；payload 4 字段
+  lastExecutingStepName / elapsedMs / configuredSagaTimeoutMs / errorCode
+  全部一旦发布即冻结（元规则 B 在审计层级延续 Step 6）。
+- 补偿阶段 withStepTimeout 调用：传 stepTimeoutMs（不叠加 sagaTimeoutMs；
+  裁决 2 边界）。
+
+**Step 7 5 个不变量在超时机制下的兼容性证据**：
+
+| 不变量 | §4 协议层条款 | 超时机制下的兼容性 |
+|---|---|---|
+| 1 严格逆序 | §4.3 | 整体超时触发的补偿仍走 succeeded 数组逆序遍历（runCompensationPhase 主循环未变化）；it 15 验证 step-a-fast 单独补偿（不变量 1 联动） |
+| 2 双重幂等保护 | §4.2 | 整体超时触发的补偿仍走 isStepEligibleForCompensation 守门（Step 7 helper 未变化） |
+| 3 死信入队 | §4.5 | 补偿过程中 step.compensate 超时（受 stepTimeoutMs 限制）→ TQ-SAG-001 → dead_lettered + DLQ enqueue（既有 path） |
+| 4 stepStatus 持久化 | §4.5 | 整体超时标记 currentStep "failed" 在 audit 之前必先 await persist（forward phase 整体超时分支显式 persist）；it 14 间接验证 |
+| 5 链式继续 + 终态聚合 | §4.6 | 超时触发的补偿仍 chain continuation；终态聚合改用 aggregateCompensationOutcome（Step 7 helper） + overallTimedOut vacuous 路径单独映射至 "timed_out" |
+
+**裁决 1 γ 局限性诚实表述**：
+
+setTimeout race 触发后，编排器立即 resolve 为 TQ-SAG-001 错误并继续推进
+（标 step "failed" + 进入补偿）。但 step 内部的 promise / async 任务仍
+在后台运行——编排器**无能为力终止它**，因为：
+
+1. Step 1 锁定的 SagaStep 接口不含 AbortSignal 参数（元规则 B 永久冻结）
+2. JavaScript Promise 没有内建取消机制（除 AbortController）
+3. 只能依靠 step 实现侧自负责——譬如 step.execute 内部调用 fetch 时
+   传 AbortSignal，由 step 实现者自己监听取消事件
+
+**生产暴露面**：
+- step 实现侧若无内部取消机制（譬如调用阻塞 IO 或 setTimeout 长延时），
+  超时后 task 仍在后台跑直至自然结束，资源占用直至 GC 回收
+- 在高并发场景下可能累积"幽灵 task"——但这不破坏正确性（编排器已
+  返回正确终态 + 持久化 + 审计），仅影响内存 / 文件句柄使用率
+- 推荐：业务 Saga 实现者（Step 10-13 责任）在 step.execute 内部使用
+  AbortController + 在 SagaContext 增量字段中暴露取消信号，本 Step
+  不引入此机制（元规则 B 严守）
+
+**测试结果**：
+
+- unit test 12 → 16（+4 超时专项）
+- contract test 17 → 17（无修改，验证增强不破坏既有契约）
+- 总数 1816 → 1822（+6 = 4 saga-orchestrator + 3 sag.test.ts - 1 既有
+  it 4 in-place 升级未增数）。等式验证：1816 + 4 + 3 - 1 = 1822 ✓
+- 覆盖率：84.78% lines / 79.31% branches / 91.69% functions / 84.78%
+  statements（vs Step 7 基线 84.83% / 79.34% / 91.67% / 84.83%）。微降
+  0.03-0.05pp（lines / branches）；functions +0.02pp。**全部远超 §9.3
+  红线 80%/75%/80%/80%**（branches 79.31% > 75% +4.31pp）。
+- saga-orchestrator.ts: ~535 LOC → ~660 LOC（+~125 含整体超时 logic +
+  helper + 注释）
+- saga-orchestrator.test.ts: 460 LOC → ~640 LOC（+~180 含 4 个超时 it）
+- contracts/sag.ts +sagaOverallTimedOutError 工厂；contracts/sag.test.ts
+  +3 tests；contracts/error-code.ts +1 字面量 SAGA_OVERALL_TIMED_OUT
+
+**Step 9 起步条件就绪**：
+
+- DeadLetterStorePort.markAsProcessed（Step 4 已就位）
+- AuditEventSinkPort.append（Phase 4 已存在）
+- 编排器对 Step 9 透明（Step 6 决策延续）
+- 错误码命名空间：TQ-SAG-* 4 码已就位；Step 9 视情况是否新增
+
+### Step 9-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -1163,7 +1263,61 @@ Phase 10+ 责任，本 Step 仅打基础（在 isStepEligibleForCompensation 守
 和 aggregateCompensationOutcome 聚合中预留 hook）。提前实施会让 Step 7
 工作量超出"接续增强"性质，违反 Step 边界纪律。
 
-### Step 8-19 拒绝候选
+### Step 8 拒绝候选
+
+**拒绝 β AbortSignal（裁决 1 候选 β）**。理由：要求修改 Step 1 锁定的
+SagaStep 接口加 AbortSignal 参数——直接违反元规则 B 永久冻结约定；
+Phase 9 已 7 次实战元规则 B，本 Step 不破例。Step 实现侧若需真正取消
+能力，由业务 Saga 自己在 step.execute 内部使用 AbortController + 通过
+SagaContext 增量字段暴露——这是 Phase 10+ 议题。
+
+**拒绝 γ 无 setTimeout 监测（裁决 1 候选 γ 完全形态）**。理由：完全
+放弃超时则编排器无法保证"saga 在合理时间内返回"——这违反《§14.2》
+延迟分位数 metrics 的可观测性前提。本 Step 采用 α + γ 限制混合：用
+setTimeout 实现编排器层"放弃等待" + 诚实承认无法终止 step 内部 task。
+
+**拒绝 A 全局 setTimeout（裁决 2 候选 A）**。理由：全局 setTimeout 在
+runSaga 启动时设置无法适应运行时变化（譬如某 step 完成后剩余预算变化
+时 setTimeout 句柄无法动态更新）；setTimeout 触发回调是异步的，与
+forward phase 主循环的同步 await 路径形成竞态——可能导致 setTimeout
+触发时 saga 已经在补偿阶段，此时整体超时处置语义混乱。B+C 混合（每步
+前算 elapsed）是唯一与状态机推进同步、避免竞态的设计。
+
+**拒绝 P 全局 timed_out 终态（裁决 3 候选 P）**。理由：忽视"整体超时
++ 补偿全成功"的常见场景——这种场景下补偿是正常完成的（仅整体耗时超
+预算），SagaResult.status 应反映补偿结果。若全部用 "timed_out"，运维
+看不出"超时但已善后"vs"超时且补偿失败"的区别。
+
+**拒绝 Q 强制 timed_out 覆盖补偿结果（裁决 3 候选 Q）**。理由：与 P
+同理，但更激进——补偿全成功的整体超时被强制标 "timed_out" 让运维误
+以为"saga 失败"。R 精细模式让终态语义对齐实际运维状态。
+
+**拒绝 I 单步超时也触发 saga.timed_out（裁决 4 候选 I）**。理由：单步
+超时本质是 step 失败（可能是下游单点慢或网络抖动），由 saga.step.execute.outcome
+(failed) 表达完整；额外触发 saga.timed_out 让审计事件冗余 + metrics
+计数双重计算（违反《§14.2》分维度统计原则）。
+
+**拒绝 II 单步与整体超时都触发 saga.timed_out（裁决 4 候选 II）**。
+理由：与 I 同理。语义层面 saga.timed_out 应仅表达"saga 级别事件"。
+
+**拒绝 W 复用 TQ-SAG-002（裁决 6 候选 W）**。理由：TQ-SAG-002 是
+SAGA_STEP_EXECUTION_FAILED 通用 step 执行失败包装，与"saga 整体超时"
+语义冲突——前者描述"某 step 业务失败"，后者描述"saga 时间预算耗光"
+（运维处置路径完全不同）。复用让运维 grep TQ-SAG-002 看不出整体超时
+事件。
+
+**拒绝在 SagaOrchestratorOptions 增加 onTimeout 回调（裁决 5 候选）**。
+理由：onDegradedFailure 已存在；超时不是"降级失败"（saga 仍正常推进
+补偿 + 持久化 + 审计——是控制流路径而非降级）。saga.timed_out 审计事
+件 + onDegradedFailure（仅 audit/dlq 失败）已能完整表达；新增 onTimeout
+是"画蛇添足"违反"克制 > 堆砌"。
+
+**拒绝引入 watchdog / monitor 独立组件（最终硬指令禁止）**。理由：用户
+指令明示"不引入 watchdog / monitor 等独立组件；直接在 runSaga 内实施"；
+独立 watchdog 增加架构复杂度（线程间通信 / 共享状态）但带来收益有限
+（forward phase 主循环已是合适的检查点）。
+
+### Step 9-19 拒绝候选
 
 [由后续 Step 增量记录]
 

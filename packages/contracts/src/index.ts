@@ -34,7 +34,14 @@ export {
   sqliteDatabaseUnreachableError,
   sqliteSchemaVersionMismatchError
 } from "./errors/index.js";
-export { sagaStepTimeoutError, SagaError } from "./errors/index.js";
+export {
+  sagaManualInterventionFailedError,
+  sagaOverallTimedOutError,
+  sagaStepCompensationFailedError,
+  SagaError,
+  sagaStepExecutionFailedError,
+  sagaStepTimeoutError
+} from "./errors/index.js";
 export {
   adapterConfigActivationAuditFailedError,
   adapterConfigVersionNotFoundError,

@@ -84,6 +84,45 @@ export const sagaStepCompensationFailedError = (
     cause
   );
 
+// Phase 9 / Step 9 — TQ-SAG-005 工厂。
+// 人工介入处理死信记录失败的通用包装。本错误码统一承载多种 reason
+// （moniker）：
+//   - "requestor_and_approver_must_differ"：双签名校验失败
+//     （input.requestedBy === input.approvedBy）
+//   - "audit_request_event_failed"：requested 审计事件写入失败（致命；
+//     操作未授权不能继续）
+//   - "dead_letter_entry_not_found"：entry 不存在
+//   - "dead_letter_entry_already_processed"：entry 已被处理（status !==
+//     "pending"；幂等保护）
+//   - "dead_letter_mark_as_processed_failed"：DeadLetterStore.markAsProcessed
+//     调用失败
+//
+// 惯例 K 第 11 次实战——"必需"成立证据：
+//   1. 业务语义独立——"人工介入"是与 saga step / compensation / 整体
+//      超时不同的运维路径，运维监控独立计数
+//   2. message moniker 表达细分故障类型——保持单一码 + reason 字段细分
+//      （避免错误码爆炸违反"克制"）
+//   3. 与 §15.1 双重审计绑定的运维流程：当 TQ-SAG-005 出现时运维必查
+//      "双签名是否合法 / requested 事件是否存在 / 是否被重复处理"——
+//      错误码本身就是运维 runbook 入口
+//
+// §6.5 转译纪律延续：reason moniker 是领域语义槽位，不携带原始异常文本；
+// cause 是诊断辅助仅供编排器内部审计。
+export const sagaManualInterventionFailedError = (
+  entryId: string,
+  reason: string,
+  cause?: Error
+): SagaError =>
+  new SagaError(
+    ERROR_CODES.SAGA_MANUAL_INTERVENTION_FAILED,
+    "Saga manual intervention failed",
+    {
+      entryId,
+      reason
+    },
+    cause
+  );
+
 // Phase 9 / Step 8 — TQ-SAG-004 工厂。
 // 整体 Saga 超时与单 Step 超时（TQ-SAG-001）在运维监控上需要独立计数
 // （《§14.2》metrics）：

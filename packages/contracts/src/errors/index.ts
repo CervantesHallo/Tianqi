@@ -25,6 +25,8 @@ export {
   sqliteSchemaVersionMismatchError
 } from "./inf.js";
 export {
+  sagaManualInterventionFailedError,
+  sagaOverallTimedOutError,
   sagaStepCompensationFailedError,
   SagaError,
   sagaStepExecutionFailedError,

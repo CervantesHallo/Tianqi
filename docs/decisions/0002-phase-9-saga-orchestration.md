@@ -1240,7 +1240,168 @@ Sprint E 业务 Engine 的"模板复制"模式。
 
 Phase 9 / Sprint G 进度 4/4 完成。Phase 9 进入 Sprint H 业务 Saga 落地阶段。
 
-### Step 10-19: [待后续 Step 增量填充]
+### Step 10: Liquidation Saga 业务落地（2026-04-27）
+
+**Sprint H 启程战 + Phase 9 第一个业务 Saga**。性质与 Sprint F-G 完全
+不同——不构建基础设施或编排器，而是把 Sprint G 锁定的 SagaOrchestrator
++ Phase 8 5 业务 Engine 编排成第一个具体业务 Saga。本模块的工程模板将
+被 Step 11-13（ADL / InsuranceFund / StateTransition）复制 3 次。
+
+**裁决摘要**：
+
+- **裁决 1（模块归属）**：α `packages/application/src/saga/liquidation-saga.ts`
+  与 saga-orchestrator.ts / saga-manual-intervention.ts 同目录平级；扁平
+  结构（宗旨第 5 条）；β 子目录冗余 / γ 脱离 saga 域被拒绝
+- **裁决 2（SagaStep 集合粒度）**：B 中粒度 5 个 step——每个外部 Engine
+  调用一个 step（fetch-mark-price / list-open-positions / submit-close-orders
+  / release-margin / settle-fund-transfer）；A 太粗违反 step 单一职责 / C
+  太细让运维事件流冗余被拒绝
+- **裁决 3（Engine 注入）**：X 直接注入 8 Port（3 saga 基础设施 + 5 业务
+  Engine）；Y Service 抽象违反"短路径" / Z 混合不必要被拒绝
+- **裁决 4（入口函数）**：I 工厂闭包 createLiquidationSaga(ports, options?)
+  + runForCase 单方法（与 SagaOrchestrator / SagaManualIntervention 风格
+  一致）
+- **裁决 5（LiquidationInput 字段集）**：14 字段含 caseId / 4 brand 账户
+  ID（margin/position/match/fund）/ symbol / marginCurrency / fundCurrency
+  / marginLockId / fundDestinationAccountId / fundAmount / closeOrderSide
+  / closeOrderQuantity / triggerReason —— 一旦发布即冻结（元规则 B）
+- **裁决 6（死信处置）**：消费既有 SagaManualIntervention（Step 9 通用
+  机制；不引入 liquidation 专属死信处置——克制）
+- **裁决 7（测试策略）**：unit ≤8（实测 8）+ 集成 ≤4（实测 4 含 dead-
+  letter-store-memory + saga-state-store-memory 真实 adapter）+ contract
+  17（一行挂载 defineSagaContractTests）= 总数 29
+
+**Phase 1-7 既有 Liquidation 业务代码核查结果**（强制开局动作 4）：
+
+| 维度 | 实地观察 | Step 10 处置 |
+|---|---|---|
+| domain 层 | LiquidationCase 状态机骨架（id / sourceRiskCaseId / state / 时间戳）；不含业务字段 | **不修改不消费**（Phase Gate 隔离） |
+| policy 层 | 无 liquidation 业务策略实现 | N/A |
+| application 层 | liquidation-case-orchestrator.ts 是"配置 + policy bundle"骨架——伪代码 6 步骤名（load_case / load_active_config / resolve_bundle / candidate_selection / ranking / fund_waterfall / finalize）；**未真正调用 5 业务 Engine** | **不修改不消费**（Step 6 决策延续：与 Phase 4 共存独立新建） |
+
+**关键认知**：Phase 4 既有编排器是"领域状态机骨架 + 配置解析骨架"，
+Phase 9 LiquidationSaga 是"5 业务 Engine 编排成完整业务流程"——两者
+并存（Step 6 裁决 4 α 已明示），不冲突也不互相消费；元规则 B 严守
+不修改 Phase 1-7 任何代码。
+
+**Sprint F+G 接口可用性核查结果**（强制开局动作 5）：
+
+| 接口 | 来源 Step | 本 Step 消费方式 |
+|---|---|---|
+| createSagaOrchestrator | Step 6 | 内部组装 + 业务 step 集合驱动 |
+| SagaOrchestratorOptions 5 字段 | Step 6/8 | spread 选择性传入（exactOptionalPropertyTypes 兼容） |
+| AUDIT_EVENT_TYPES 7 类 | Step 6 | 编排器自动触发；业务 Saga 不直接消费 |
+| 5 不变量 + 双重幂等保护 | Step 7 | 业务 step compensate 默认满足（每个写 step 设计反向 Engine 调用） |
+| 整体超时 + saga.timed_out | Step 8 | options.defaultSagaTimeoutMs 透传 |
+| SagaManualIntervention | Step 9 | 集成测试验证模板协同（Sprint G + H 衔接证据） |
+| MarginEnginePort / PositionEnginePort / MatchEnginePort / MarkPriceEnginePort / FundEnginePort | Phase 8 | LiquidationSagaPorts 直接注入 |
+| SagaStateStorePort / DeadLetterStorePort / AuditEventSinkPort | Sprint F + Phase 4 | LiquidationSagaPorts 直接注入 |
+| dead-letter-store-memory / saga-state-store-memory | Sprint F | 集成测试 + contract test 真实 adapter |
+| defineSagaContractTests 17 it | Step 2 | 一行挂载（业务 Saga 第一次） |
+
+**全部 11 类接口可用**，无需任何扩展——Sprint F+G 设计完整性的兑现。
+
+**SagaStep 集合详细设计**（裁决 2 + 业务流程图）：
+
+| # | step name | Engine 方法 | execute 副作用 | compensate 反向操作 | compensationContext |
+|---|---|---|---|---|---|
+| 1 | fetch-mark-price | MarkPriceEngine.queryMarkPrice | 无（只读） | noop（《§4.1》read-only 显式空体） | { kind: "noop", stepName } |
+| 2 | list-open-positions | PositionEngine.listOpenPositions | 无（只读） | noop | { kind: "noop", stepName } |
+| 3 | submit-close-orders | MatchEngine.placeOrder | 提交平仓订单 | MatchEngine.cancelOrder（用 orderId） | { kind: "cancel-order", orderId } |
+| 4 | release-margin | MarginEngine.releaseMargin | 释放保证金锁 | MarginEngine.lockMargin（重新锁定，金额一致） | { kind: "relock-margin", accountId, currency, amount } |
+| 5 | settle-fund-transfer | FundEngine.transferFund | 资金从源到目的 | FundEngine.transferFund（反向 from/to 对调，金额一致） | { kind: "reverse-transfer", fromAccountId, toAccountId, currency, amount } |
+
+**关键设计要点**：
+
+- 每个 SagaStep 显式声明 compensate（即使 noop——G12 要求）
+- compensationContext 全部可序列化 plain object（《§4.4》一致）
+- step.execute 内部仅做"业务请求 → Engine 调用 → 响应解析"三步翻译，
+  不实现重试 / 超时 / 熔断（Engine 已封装；Saga Orchestrator 已封装）
+- §6.5 转译纪律延续：translateEngineError() 把 Engine error code +
+  message 转译为 SagaPortError TQ-SAG-002（cause 字段携带 engineCode +
+  engineMessage 仅供编排器内部审计；外部 SagaResult 不透出）
+
+**关键实现细节**：
+
+- LiquidationSagaPorts 含 8 字段（3 saga 基础设施 + 5 Engine）；
+  LiquidationSagaOptions 5 字段透传给底层 SagaOrchestrator（spread 仅展开
+  实际定义字段，exactOptionalPropertyTypes 兼容）
+- runForCase 内部生成 sagaId（"liquidation-saga-{caseId}-{stamp}"）+
+  traceId / correlationId 三件套；invocation.sagaTimeoutMs = 0 表示无
+  saga 级整体超时（由 options.defaultSagaTimeoutMs 控制）
+- 5 业务 step 通过共享 StepCtx（含 input + idempotencyKey）传递业务上
+  下文；每个 step.execute 不接 saga 级 input 字段（Step 1 设计 saga step
+  之间通过 input/output 链式传递）——本模块业务字段固定来自 LiquidationInput
+  闭包，不依赖 saga 级 input 流转
+
+**业务输入与上下文（LiquidationInput）字段集**：
+
+```
+caseId                     业务案件标识
+marginAccountId            MarginEngine 账户（保证金）
+positionAccountId          PositionEngine 账户（持仓查询）
+matchAccountId             MatchEngine 账户（撮合下单）
+fundSourceAccountId        FundEngine 源账户（资金清算来源）
+symbol                     标的合约符号
+marginCurrency             保证金币种
+fundCurrency               资金币种
+marginLockId               待释放的保证金锁 ID
+fundDestinationAccountId   资金清算目标账户（保险池或损失账户）
+fundAmount                 资金清算金额
+closeOrderSide             平仓订单方向（与持仓方向相反）
+closeOrderQuantity         平仓订单数量
+triggerReason              触发原因 domain moniker
+```
+
+**Sprint H 模板首次实战**（供 Step 11-13 复制）：
+
+模板组成：
+
+1. **模块文件结构**：3 文件（saga.ts + saga.test.ts + saga.integration.test.ts
+   + saga.contract.test.ts）；与 Sprint G saga-orchestrator / saga-manual-
+   intervention 同模式
+2. **Ports 类型形态**：业务 SagaPorts 包含"3 saga 基础设施 + N 业务 Engine"
+3. **Options 类型形态**：透传 SagaOrchestrator 5 个 Options 字段（exactOptionalPropertyTypes
+   兼容 spread 模式）
+4. **Input 字段集设计**：单一业务案件输入 + 多 brand 账户标识 + 业务参数
+5. **SagaStep 集合粒度**：4-6 个 step（中粒度），每个外部 Engine 调用一个
+   step；只读 step 显式 noop compensate；写 step 反向 Engine 调用
+6. **§6.5 错误转译**：translateEngineError() helper 模式
+7. **测试三件套**：unit（mock Engine + 真实 Saga 基础设施）+ 集成（真实
+   Saga 基础设施 + 简单 mock Engine）+ contract 一行挂载
+8. **编排器透明性**：通过 createSagaOrchestrator 调用，不修改 saga-
+   orchestrator.ts；git diff 验证
+
+Step 11 ADL Saga 涉及多账户公平减仓策略 + 保险资金联动（更复杂）——但
+模板组成 1-8 全部沿用；ADL 业务流程图 step 集合数量不同但结构同型。
+
+**测试结果**：
+
+- unit test 8（factory / happy 5 step / first-step failure vacuous /
+  step 3 failure no compensate / step 4 failure cancel / step 5 failure
+  full reverse / compensation failure dead-letter / engine error 翻译）
+- 集成 test 4（full happy / dead-letter audit chain / 多 saga 隔离 /
+  Sprint G+H 模板协同 SagaManualIntervention 处理 LiquidationSaga 死信）
+- contract test 17（一行挂载 defineSagaContractTests("liquidation-saga", ...)；
+  Phase 9 第一次在业务 Saga 上挂载）
+- 总数 1837 → 1866（+29）
+- 覆盖率：84.84%/79.45%/91.77%/84.84%（vs Step 9 基线 84.82%/79.39%/91.73%/
+  84.82%）—— **四指标全部改善** +0.02pp ~ +0.06pp；全部远超 §9.3 红线
+- liquidation-saga.ts ~530 LOC（含完整 JSDoc + 5 step 工厂 + StepCtx +
+  translateEngineError + createLiquidationSaga 工厂）
+
+**编排器透明性证明**：
+
+- `git diff origin/main -- packages/application/src/saga/saga-orchestrator.ts`
+  zero diff
+- liquidation-saga.ts 仅 import `./saga-orchestrator.js` 的
+  `createSagaOrchestrator` + `SagaDegradedFailureEvent` type；零修改编排器
+  内部代码
+- Step 6 设计远见再次兑现：编排器对业务 Saga 透明（Step 9 manual
+  intervention 是"独立编排"；Step 10 LiquidationSaga 是"消费组装"——
+  两种模式都不修改编排器）
+
+### Step 11-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -1652,7 +1813,72 @@ adapter 的实际兼容性（譬如 markAsProcessed 自身幂等覆写 vs Step 9
 saga 状态如何恢复）—— 这些是 Phase 10+ 议题；Step 9 仅承担"前向人工
 介入"职责，"撤销"由后续 Step 通过 ADR-0002 修订流程严肃处理。
 
-### Step 10-19 拒绝候选
+### Step 10 拒绝候选
+
+**拒绝 β 子目录归属（裁决 1 候选 β）**。理由：
+`packages/application/src/saga/liquidation/index.ts` 引入子目录冗余——
+Sprint H 4 个业务 Saga（Step 10-13）平铺成 4 个文件已足够清晰；违反
+"文件结构扁平 > 目录嵌套"原则；与 Sprint G saga-orchestrator.ts +
+saga-manual-intervention.ts 平铺模式不一致。
+
+**拒绝 γ 脱离 saga 子目录（裁决 1 候选 γ）**。理由：
+`packages/application/src/risk-cases/liquidation-saga.ts` 与既有
+risk-case-orchestrator.ts 同居可能引发命名混淆——Phase 4 既有 risk-case-
+orchestrator.ts 是配置 + policy bundle 骨架；Phase 9 LiquidationSaga 是 5
+业务 Engine 编排——语义不同应物理分离（saga 子目录是 Phase 9 saga 域
+专属位置）。
+
+**拒绝 A 粗粒度 3-4 step（裁决 2 候选 A）**。理由：单 step 内含多个 Engine
+调用违反"每个 step 单一职责"——补偿语义不清晰（譬如"评估 + 平仓"
+合并为一个 step 时，平仓失败但评估已完成无补偿语义）。
+
+**拒绝 C 细粒度 7-10 step（裁决 2 候选 C）**。理由：每个原子操作一个 step
+让运维事件流冗余——譬如把"placeOrder"拆为"validateOrder + buildOrderRequest
++ submitToMatchEngine + parseResponse"四 step 是过度细分；audit event 数
+量爆炸（5 step → 7-10 step 让单 saga 触发 audit 事件数量约 50% 增长但运
+维实际只关心"哪个 Engine 调用失败"）。
+
+**拒绝 Y Application 层 Service 抽象（裁决 3 候选 Y）**。理由：业务 Saga
+是"业务流程的运行时"——直接消费 Adapter 是其本职；引入 Service 抽象
+让 Saga → Service → Adapter 三层调用链增加间接性，违反"短路径"。
+
+**拒绝 Z 混合注入（裁决 3 候选 Z）**。理由：核心 Saga 基础设施 + 业务
+Engine 的混合分离是无意义的——LiquidationSagaPorts 8 字段已统一注入；
+混合方案没有架构理由，仅是"看起来更整齐"的伪需求。
+
+**拒绝 II 直接函数入口（裁决 4 候选 II）**。理由：与 SagaOrchestrator /
+SagaManualIntervention 工厂闭包风格不一致；工厂闭包让"orchestrator 实例
++ step 集合"组装在创建时一次完成，runForCase 调用时仅传业务输入——这
+是 Sprint G 已建立的接口风格延续。
+
+**拒绝 III 类（裁决 4 候选 III）**。理由：与 Tianqi 既有风格不符——除
+SagaError class（错误抽象）外，全仓所有 Saga / Adapter / Engine 都用工厂
+闭包模式；引入 class 让类型推断 + IDE 跳转体验下降。
+
+**拒绝业务专属 saga 错误码 TQ-SAG-006/007 等（R3 下限）**。理由：业务 Saga
+不引入业务专属 saga 错误码——5 业务 Engine 的错误已通过 translateEngineError
+统一为 TQ-SAG-002（Engine 调用失败的语义已足够通用）；业务专属错误码
+（如 SAGA_LIQUIDATION_INSUFFICIENT_POSITION）违反惯例 K"仅必需"原则；
+业务运维 grep 通过 stepName + Engine code 即可定位故障。
+
+**拒绝 liquidation 专属死信处置（裁决 6 候选）**。理由：死信入队由
+SagaOrchestrator 自动处理；死信人工介入由 SagaManualIntervention（Step 9）
+通用处理；本 Step 引入"liquidation 专属死信处置"会让 Sprint H 每个业务
+Saga 都引入自己的死信机制——违反"克制"+ Sprint H 模板复制原则。
+
+**拒绝预先实现"批量 liquidation"（强边界声明）**。理由：批量场景由
+Application 层调用方循环 runForCase 实现——本模块单笔触发是"业务 Saga
+的最小职责单元"；批量协调是 Step 14 跨 Saga 协调或 Phase 10+ 业务编排
+层议题，不在 Step 10 边界内。
+
+**拒绝在 step.execute 内部实施重试 / 超时 / 熔断（强边界声明）**。理由：
+Engine 已封装这些（Phase 8 external-engine-http-base + 5 业务 Engine
+Adapter）；Saga Orchestrator 也已封装（Step 8 单步 + 整体超时）；business
+Saga step 仅需要"业务请求 → Engine 调用 → 响应解析"三步翻译；step 内
+部重试会导致"双重重试"语义混乱（Engine 重试 N 次 + Saga step 重试 M 次
+= N×M 总重试次数；运维监控难以拆分）。
+
+### Step 11-19 拒绝候选
 
 [由后续 Step 增量记录]
 

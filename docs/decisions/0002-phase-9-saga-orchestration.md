@@ -1539,7 +1539,138 @@ $ grep "from.*saga-orchestrator\|from.*liquidation-saga" \
   91.77%/84.84%）—— Statements/Functions/Lines 三指标改善 + branches
   持平；全部远超 §9.3 红线
 
-### Step 12-19: [待后续 Step 增量填充]
+### Step 12: InsuranceFund Saga 业务落地 — Sprint H 模板低复杂度反向验证战（2026-04-27）
+
+**Sprint H 第三战 + 业务复杂度低于 Step 10/11 + Sprint H 模板"低复杂度
+业务"反向可复用性验证**。Step 11 已证明 Sprint H 模板能承载更高复杂度
+（多账户 LOC +1.2%）；本 Step 完成"低复杂度业务也能 1:1 复用"的反向
+证明。两端都守住，模板才真正可复用。
+
+**裁决摘要**：
+
+- **裁决 1（SagaStep 集合）**：4 step 紧凑模式 —— query-insurance-balance
+  / deduct-from-insurance / credit-to-affected-account / record-coverage-completion
+  —— 业务最少必需步骤；与 Sprint H 模板"4-6 step 中粒度"裁决兼容；
+  紧凑 3-step（合并 query 进 deduct）/ 详细 5-step（与 Liquidation 同
+  step 数）被拒绝（违反"克制"或过度对齐）
+- **裁决 2 (γ)**：`InsuranceFundSagaPorts = LiquidationSagaPorts` 类型
+  别名复用（与 Step 11 ADL 同模式）—— **R5 严守不允许 β 精简版 Ports**；
+  即使 InsuranceFund 不消费 markPrice / match / margin / position Engine，
+  Ports 字段冗余成本极低；Sprint H 模板纪律一致性优先于"精简优化"
+- **裁决 3（InsuranceFundInput 8 字段 + Output 6 字段）**：caseId /
+  affectedAccountId / lossAmount / lossCurrency / insuranceFundAccountId
+  / lossAbsorptionTargetAccountId / coverageRatio / triggerReason —— 一旦
+  发布即冻结
+- **裁决 4（错误码新增）**：0 —— **惯例 K 第 14 次实战 R3 下限严守**；
+  保险资金不足通过 step.execute 内部业务校验返回 TQ-SAG-002 + reason
+  moniker 表达；coverageRatio 超出范围属输入合法性同样复用
+- **裁决 5（部分覆盖语义）**：C 业务策略外移 —— 本 Saga 不实现部分覆盖
+  判断；coverageRatio 由调用方按 policy 计算（policy 层未来 Phase 引入
+  InsuranceFundCoveragePolicy 决定覆盖比例）；Saga 仅做"按 Input 编排
+  执行"，不做策略决策；A 严格模式（保险资金不足 step 失败）/ B 部分覆
+  盖（Saga 内重新计算）被拒绝（违反 Saga "纯粹流程编排"语义）
+- **裁决 6（测试策略）**：unit ≤8 + 集成 ≤4 + contract 17 = 29（与 Step
+  10/11 同）
+- **裁决 7（设计阶段）**：不拆两阶段 —— Sprint H 模板已被 Step 11 100%
+  验证；业务复杂度低于 Step 11，无新接口需审视
+
+**关键实现细节**：
+
+- **三账户语义**：保险资金账户 → 中转账户（lossAbsorptionTargetAccount）
+  → 受影响账户。两段 transferFund 设计是为了让保险资金路径可审计——单
+  一 transferFund 会让"扣减保险"和"补偿损失"在审计事件层合并，运维
+  难以分离。本 Saga 将业务语义拆为 step 2 deduct + step 3 credit 让审计
+  粒度精确（裁决 1 紧凑 4-step 的语义价值）。调用方可让 lossAbsorptionTargetAccountId
+  = affectedAccountId（无中转）或独立中转账户（合规审计需求）
+- **金额计算位置**：deductedAmount = lossAmount * coverageRatio 在 step
+  2 内部计算（floating point；调用方 Input 决定 coverageRatio）。step 3
+  通过 SagaStep input chain 接收 step 2 output 的 deductedAmount，金额
+  一致；防御性 fallback 退回到 lossAmount * coverageRatio 重新计算（不
+  应触发，前向 phase 链式传递保证）
+- **step 4 record-coverage-completion 设计意图**：无 Engine 调用；仅 audit
+  留痕"覆盖完成"语义。在 SagaResultStatus.completed 之前显式留出"覆
+  盖完成"语义标记让审计事件 saga.step.execute.outcome 中含本 step 名
+  称，运维通过 grep "record-coverage-completion" 即知 saga 已业务完成
+  （vs 早期失败终态）
+- **§6.5 转译纪律延续**：translateEngineError 不需 accountIdMoniker 增
+  强（单账户场景；与 Step 10 同模式，与 Step 11 多账户增强不同）；stepName
+  已含足够语义让运维定位
+
+**Phase 1-7 既有 InsuranceFund 业务代码核查结果**（强制开局动作 4）：
+
+| 维度 | 实地观察 | Step 12 处置 |
+|---|---|---|
+| domain 层 | 仅 RiskCaseType 中的 `InsuranceFundDeficit` 字面量；无独立 InsuranceFund / InsurancePool / InsuranceFundAccount domain 类型 | **不修改不消费** |
+| policy 层 | 通用 FundWaterfallPolicy（资金分配框架，含 FundSource / FundAllocationEntry 类型；非 InsuranceFund 业务专属）；无 InsuranceFundCoveragePolicy | **不消费**（Saga 不实现部分覆盖；裁决 5 C 外移） |
+| application 层 | 无既有 insurance-fund-orchestrator.ts | **N/A** |
+
+**关键认知**：Phase 1-7 没有真正的 InsuranceFund 业务流程实现：domain
+层仅是 RiskCaseType 字面量；policy 层 fund-waterfall-policy 是通用资金
+分配框架（不专属 InsuranceFund）；application 层无编排器。本 Step 与
+Phase 1-7 完全独立新建。裁决 5 C 外移业务策略到调用方决定 coverageRatio
+是合理的——policy 层未来可以引入 InsuranceFundCoveragePolicy 计算 coverageRatio。
+
+**Sprint H 模板低复杂度复用证明**（强制开局动作 5 + R4 关键证据）：
+
+| 模板组成 | Step 10 | Step 11 | Step 12 | 复用方式 |
+|---|---|---|---|---|
+| 1 模块文件结构（4 文件） | ✅ | ✅ | ✅ | **100% 复用** |
+| 2 Ports 类型形态 | LiquidationSagaPorts 8 字段 | 类型别名复用 | 类型别名复用（裁决 2 γ；R5 严守） | **100% 复用** |
+| 3 Options 类型形态 | LiquidationSagaOptions 5 字段 | 类型别名复用 | 类型别名复用 | **100% 复用** |
+| 4 Input 字段集 | 14 字段 | 10 字段 + DeleveragingTarget 8 字段 | 8 字段（业务最少） | **业务差异化**（预期内）|
+| 5 SagaStep 集合 | 5 step | 5 step + 多账户循环 | 4 step 紧凑（无循环） | **结构 100% 模板** + **粒度业务差异化** |
+| 6 createXxxSaga 工厂闭包 | spread Options 透传 | 同模式 | 同模式 | **100% 复用** |
+| 7 §6.5 translateEngineError | 3 参数 | + 可选 accountIdMoniker | 3 参数（单账户不需增强） | **回退基础形态** |
+| 8 测试三件套 | unit 8 + 集成 4 + contract 17 | 同 | 同 | **100% 复用** |
+
+**LOC 量级对比**（R4 核心检验）：
+
+| 文件 | Step 10 | Step 11 | Step 12 | 增减 vs Step 10 |
+|---|---|---|---|---|
+| saga 主体 | 556 | 666 | 518 | **-38 (-6.8%)** |
+| unit test | 627 | 562 | 436 | -191 (-30.5%) |
+| integration test | 458 | 437 | 378 | -80 (-17.5%) |
+| contract test | 299 | 298 | 304 | +5 (+1.7%) |
+| **总计** | **1940** | **1962** | **1636** | **-304 (-15.7%)** |
+
+**结论：Sprint H 模板"双向可复用性"100% 证明！**
+
+- Step 11 高复杂度（多账户 / 保险资金联动）：LOC +1.2%
+- Step 12 低复杂度（4 step 紧凑 / 单账户）：LOC **-15.7%**
+- 两端都守住模板纪律 —— 8 项模板组成中 4 项 100% 复用 + 1 项业务字段
+  差异化（预期内）+ 1 项粒度业务差异化（4 vs 5 step）+ 1 项 §6.5 helper
+  回退基础形态 + 1 项无变化
+
+**编排器透明性证明**：
+
+```
+$ git diff origin/main -- \
+    packages/application/src/saga/saga-orchestrator.ts \
+    packages/application/src/saga/saga-manual-intervention.ts \
+    packages/application/src/saga/liquidation-saga.ts \
+    packages/application/src/saga/adl-saga.ts
+# zero diff（Step 9-12 跨 4 个 Step 都不修改既有 saga 模块）
+```
+
+元规则 F（Adapter 独立 / 独立编排）跨 Step 9-10-11-12 四次落地。
+
+**测试结果**：
+
+- unit test 8（factory / happy 4 step / query 失败 vacuous / deduct 失败
+  self 不补偿 / credit 失败反向 deduct / 补偿失败 dead-letter / 不同
+  coverageRatio / 三账户路径）
+- 集成 test 4（完整业务流程 / credit 失败 audit chain / 多 case 隔离 /
+  Sprint G+H 模板协同）
+- contract test 17（一行挂载 defineSagaContractTests("insurance-fund-saga", ...);
+  Phase 9 第三次在业务 Saga 上挂载——双向可复用性反向验证）
+- 总数 1895 → 1924（+29，与 Step 10/11 同）
+- 覆盖率：84.85%/79.36%/91.76%/84.85%（vs Step 11 基线 84.86%/79.45%/
+  91.81%/84.86%）—— 四指标轻微下降 -0.01pp ~ -0.09pp（**minimal mock
+  Engine 字段冗余的 Sprint H 模板纪律代价**：4 个非 Fund Engine 的 mock
+  方法 err 路径未被覆盖；裁决 2 R5 严守接受这个代价）；全部仍超 §9.3
+  红线（branches 79.36% > 75% +4.36pp）
+
+### Step 13-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -2075,7 +2206,70 @@ Sprint H 4 个 Saga 出现各自 N 个码；TQ-SAG 命名空间膨胀失控。
 runForCase 实现；批量协调是 Step 14 跨 Saga 协调或 Phase 10+ 业务编排
 层议题。
 
-### Step 12-19 拒绝候选
+### Step 12 拒绝候选
+
+**拒绝紧凑 3-step（裁决 1 候选 紧凑）**。理由：合并 query-balance 进
+deduct-from-insurance 让"查询保险资金余额"语义与"扣减"语义在同一
+step 内混合，audit 事件层面无法独立查询"触发时刻保险资金余额"——
+失去运维事后核查覆盖决策合理性的能力；3 step 节省的 LOC 极少但语义损
+失明显。
+
+**拒绝详细 5-step（裁决 1 候选 详细）**。理由：与 LiquidationSaga 同 step
+数仅是表面对齐——业务实质不需要 5 step；强行拆分（譬如 deduct 拆为
+"freeze + transfer + unfreeze"）违反"克制 > 堆砌"原则；Sprint H 模板
+纪律是"4-6 step 中粒度"范围，不是"必须 5 step 同 Step 10/11"。4 step
+紧凑模式在保 audit 粒度的同时减少冗余 step。
+
+**拒绝 β 精简版 InsuranceFundSagaPorts（裁决 2 候选 β）**。理由：**R5
+严守不允许**——精简版（仅含 fund + saga 基础设施 = 4-5 字段）让 Step
+12-14 出现 Ports 形态分歧，破坏模板一致性；调用方传入 mock 4 个不消费
+的 Engine 即可（测试稍冗余但接受作为模板纪律代价）；如未来真有"业务
+Saga 类型差异化 Ports"需求，通过 ADR-0002 修订流程严肃处理而非本 Step
+开口子。
+
+**拒绝独立 InsuranceFundSagaPorts 类型 α（裁决 2 候选 α）**。理由：α
+"100% 复用 LiquidationSagaPorts" 与 γ "类型别名" 表达力相同——但 γ 显
+式使用 `type X = Y` 让模板复用关系在源代码层面显式可见，未来读者通过
+"go-to-definition" 直接跳到 LiquidationSagaPorts 定义；α 隐式复用让模板
+一致性需要靠注释说明。γ 是 Step 11 已建立模式，本 Step 沿用。
+
+**拒绝业务专属 saga 错误码（裁决 4 候选 1+）**。理由：业务专属场景两
+个候选：
+- 保险资金不足 → 通过 step.execute 业务校验返回 TQ-SAG-002 + reason
+  moniker（如 "insurance_balance_insufficient"）表达
+- coverageRatio 超出 0-1 → 输入合法性问题，同样复用 TQ-SAG-002 + reason
+  "coverage_ratio_out_of_range"
+- 不构成 SAGA_INSURANCE_INSUFFICIENT_BALANCE / SAGA_INSURANCE_RATIO_INVALID
+  等独立码——**惯例 K 第 14 次实战 R3 下限严守 0 错误码新增**
+
+**拒绝 A 严格模式部分覆盖（裁决 5 候选 A）**。理由：让 Saga 在"保险资
+金不足"时整体失败 + 触发补偿 + 终态 timed_out / partially_compensated
+——把"保险资金余额是否充足"业务判断耦合到 Saga 编排层；调用方应在
+Input 准备阶段（通过 FundEngine.queryFundBalance 查询）按 policy 决定
+是否触发本 Saga，不应让 Saga 重复这一判断。
+
+**拒绝 B 部分覆盖在 Saga 内重新计算（裁决 5 候选 B）**。理由：让 Saga
+内部读取保险资金余额 + 重新计算 actualCoverageRatio < input.coverageRatio
++ Output 含两个 ratio 字段——把业务策略（保险资金分配规则）混入 Saga
+编排；违反"Saga 是流程编排，policy 是策略计算"两者解耦。本 Saga
+仅做"按 Input 编排执行"的纯粹流程编排语义。
+
+**拒绝拆两阶段（裁决 7 候选 拆）**。理由：Sprint H 模板已被 Step 11
+100% 验证；业务复杂度低于 Step 11 不需要新接口审视；强制开局动作 4-5
+实地核查后判断业务确实在模板范围内——4 step 紧凑模式 + 三账户路径都
+是模板覆盖范围。
+
+**拒绝预先实现保险资金多币种自动结算（强边界声明）**。理由：本 Step
+通过 lossCurrency / fundCurrency / coverageRatio 等 Input 字段允许调用
+方按业务决定多币种处置；本 Saga 不实现汇率换算 / 多币种聚合等业务策
+略——这些是 policy 层未来 Phase 责任，通过 ADR-0002 修订流程引入。
+
+**拒绝预先实现"批量保险触发"（强边界声明）**。理由：本模块单笔触发
+是"业务 Saga 的最小职责单元"；批量场景由 Application 层调用方循环
+runForCase 实现；批量协调是 Step 14 跨 Saga 协调或 Phase 10+ 业务编排
+层议题。
+
+### Step 13-19 拒绝候选
 
 [由后续 Step 增量记录]
 

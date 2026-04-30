@@ -1401,7 +1401,145 @@ Step 11 ADL Saga 涉及多账户公平减仓策略 + 保险资金联动（更复
   intervention 是"独立编排"；Step 10 LiquidationSaga 是"消费组装"——
   两种模式都不修改编排器）
 
-### Step 11-19: [待后续 Step 增量填充]
+### Step 11: ADL Saga 业务落地 — Sprint H 模板真实考验战（2026-04-27）
+
+**Sprint H 第二战 + 业务复杂度显著高于 Step 10 + Sprint H 模板可复用性
+关键验证**。涉及多账户公平减仓 + 保险资金联动；本 Step 是 Sprint H 模板
+是否能在更高业务复杂度下守住的真实考验。
+
+**裁决摘要**：
+
+- **裁决 1（多账户场景映射）**：C 三阶段 + C-fail-fast —— 多账户复杂度
+  封装在 step 内部循环，对编排器透明；任一账户失败 → 立即整个 step 失败
+  → 触发逆序补偿。A 每账户一 step（破坏"step 数固定"约束）/ B 单 step
+  内多失败点（违反单一职责）/ C-continue（语义模糊）/ C-mixed（违反"克
+  制"）被拒绝。
+- **裁决 2（SagaStep 集合）**：5 step（与 Step 10 同量级）：fetch-mark-prices
+  / verify-targets / submit-deleveraging-orders / insurance-fund-deduction
+  / settle-account-funds —— 严格遵守 Sprint H 模板"4-6 step 中粒度"
+- **裁决 3（Ports 复用）**：`ADLSagaPorts = LiquidationSagaPorts` 类型别名
+  —— Sprint H 模板纪律一致性；ADL 与 Liquidation 都消费"5 业务 Engine
+  + 3 saga 基础设施"；业务差异通过 Input 字段集表达
+- **裁决 4（ADLInput 字段集）**：10 字段含 caseId / 保险资金账户 / 损失
+  吸收目标 / 系统损失金额 + 币种 / matchAccountId 已隐含在 targets[] /
+  symbols[] / targets[] 候选盈利账户列表 / deleveragingStrategy moniker
+  / triggerReason —— 一旦发布即冻结
+- **裁决 5（错误码新增）**：0 —— **惯例 K 第 13 次实战 R3 下限严守**：
+  targets 空数组属合法业务输入（ok 返回 + 多账户循环 0 次）；targets 全
+  失败由 SagaResultStatus.partially_compensated 表达；复用 TQ-SAG-002 +
+  reason moniker（含 accountId 标识让运维 grep 区分失败账户）
+- **裁决 6（设计阶段）**：不拆两阶段 —— Sprint H 模板已立；ADL 复杂度在
+  业务层（多账户 / 保险资金）不在 Saga 编排层；编排层仍是模板复制。强制
+  开局动作 4-5 实地核查后判断业务确实在模板范围内不需要新接口
+- **裁决 7（测试策略）**：unit 8 + 集成 4 + contract 17 = 29（与 Step 10
+  同；模板复制证据）
+
+**关键实现细节**：
+
+- DeleveragingTarget 子类型 8 字段：accountId / fundAccountId /
+  matchAccountId / positionId / symbol / deleveragingSide /
+  deleveragingQuantity / expectedDeleveragingPrice / accountSettleAmount
+  —— 单 target 内含 3 个 brand 账户 ID（与 LiquidationInput 4 brand 账户
+  ID 设计延续）
+- 公平算法**不在本模块实现**——targets 数组的顺序和组成由调用方按公平
+  算法（按盈利率排序 / 按杠杆排序等）选定；SagaStep 仅按 targets 顺序遍
+  历。policy 层未来 Phase 引入公平算法时通过 ADR-0002 修订流程
+- 多账户 step 内部循环（裁决 1 C-fail-fast）：verify-targets / submit-
+  deleveraging-orders / settle-account-funds 三个 step 内部按 targets[]
+  顺序循环；任一失败立即 break 返回 err；compensationContext 含已成功部
+  分（仅在 step 整体 succeeded 时持久化——execute 失败路径不留 compensationContext，
+  反向由前序 succeeded step 的 compensate 负责）
+- §6.5 转译纪律延续：translateEngineError(engineError, sagaId, stepName,
+  accountIdMoniker?) —— 多账户 step 内首次失败立即返回 + 携带 accountId
+  到 message moniker（便于运维 grep "TQ-SAG-002 ... acct-X" 定位失败账
+  户；不携带 raw HTTP 状态 / 网络异常文本）
+- compensationContext 全部可序列化 plain object：cancel-orders 含
+  orders[] 列表；reverse-insurance / reverse-settlements 含 from/to/currency/
+  amount 标准 4 字段 —— 与 Step 10 同模式
+
+**Phase 1-7 既有 ADL 业务代码核查结果**（强制开局动作 4）：
+
+| 维度 | 实地观察 | Step 11 处置 |
+|---|---|---|
+| domain 层 | ADLCase 状态机骨架（与 LiquidationCase 同结构，仅 brand id 不同）；不含 ADL 业务字段 | **不修改不消费** |
+| policy 层 | **无 ADL 公平算法**——grep deleveraging / 公平 / fairness / profit 全零结果；只有通用 ranking-policy / candidate-selection-policy / fund-waterfall-policy 等 stub | **不消费**——本 Step 通过 ADLInput.targets 接收调用方按公平算法计算结果；公平算法是未来 Phase 责任 |
+| application 层 | 仅 create-adl-case-from-risk-case-command.ts / transition-adl-case-command.ts / create-adl-case-command.ts 三个命令文件——状态机命令骨架 | **不修改不消费** |
+
+**关键认知**：Phase 1-7 没有真正的 ADL 业务流程实现——仅状态机骨架 +
+通用 policy stub。本 Step ADL Saga 与 Phase 1-7 完全独立新建（Step 6 决
+策延续：与 Phase 4 共存），业务上以 ADLInput.targets 作为公平算法的边
+界——公平算法实现何时何地（policy 层未来 Phase / Step 14 跨 Saga 协
+调 / Phase 10+）由后续 ADR 修订流程决定。
+
+**Sprint H 模板可复用性验证**（强制开局动作 5 + 关键证据）：
+
+| 模板组成 | Step 10 实现 | Step 11 复制 | 复制成本 / 差异化点 |
+|---|---|---|---|
+| 1 模块文件结构（4 文件） | liquidation-saga.{ts/test/integration/contract} | adl-saga.{ts/test/integration/contract} | **100% 复用**——文件命名 1:1 对应 |
+| 2 Ports 类型形态 | LiquidationSagaPorts 8 字段 | `ADLSagaPorts = LiquidationSagaPorts` 类型别名 | **100% 复用**——零差异 |
+| 3 Options 类型形态 | LiquidationSagaOptions 5 字段 | `ADLSagaOptions = LiquidationSagaOptions` 类型别名 | **100% 复用**——零差异 |
+| 4 Input 字段集设计 | LiquidationInput 14 字段（含 4 brand 账户） | ADLInput 10 字段 + DeleveragingTarget 8 字段（含 3 brand 账户）| **70% 模板** + **30% 业务差异**（多账户 targets[] 是 ADL 特性） |
+| 5 SagaStep 集合粒度 | 5 step（每个 Engine 一 step） | 5 step（每个 Engine 一 step）+ 3 step 内含多账户循环 | **100% 模板** + **多账户循环封装**（裁决 1 C） |
+| 6 §6.5 错误转译 | translateEngineError(engineError, sagaId, stepName) | translateEngineError(... , accountIdMoniker?) **+ 1 可选参数** | **95% 模板** + **5% 多账户增强** |
+| 7 测试三件套 | unit 8 + 集成 4 + contract 17 = 29 | unit 8 + 集成 4 + contract 17 = 29 | **100% 模板**——同测试数；contract test 几乎逐字复制 |
+| 8 编排器透明性（grep + git diff） | git diff zero | git diff zero | **100% 复用**——零差异 |
+
+**LOC 量级对比**（R4 核心检验）：
+
+| 文件 | Step 10 | Step 11 | 增减 |
+|---|---|---|---|
+| saga 主体 | 556 | 666 | +110 (+19.8%；多账户循环 + DeleveragingTarget 子类型 + 5 step 反向逻辑) |
+| unit test | 627 | 562 | -65 (-10.4%) |
+| integration test | 458 | 437 | -21 (-4.6%) |
+| contract test | 299 | 298 | -1 (-0.3%；几乎逐字复制) |
+| **总计** | **1940** | **1963** | **+23 (+1.2%)** |
+
+**结论：Sprint H 模板可复用性证明！**业务复杂度上升（多账户 / 保险资金
+联动）但 LOC 仅上升 1.2%——R4 严守。8 项模板组成中：
+- 6 项 100% 复用（模块结构 / Ports / Options / SagaStep 集合 / 测试三
+  件套 / 编排器透明性）
+- 1 项 95% + 5% 增强（错误转译 helper 增加可选 accountIdMoniker 参数）
+- 1 项 70% + 30% 业务差异（Input 字段集——业务字段必然差异化，模板差
+  异化是预期范围内）
+
+**模板缺口分析**：本 Step 未发现任何模板"独特化"或必须扩展的需求；多
+账户复杂度通过裁决 1 C-fail-fast 完全封装在 step 内部，对编排器 / 模板
+均透明。Step 12-13（InsuranceFund / StateTransition）预期复制成本同等
+（< 1.2% LOC 增长）。
+
+**编排器透明性证明**：
+
+```
+$ git diff origin/main -- packages/application/src/saga/saga-orchestrator.ts \
+    packages/application/src/saga/saga-manual-intervention.ts \
+    packages/application/src/saga/liquidation-saga.ts
+# zero diff（Step 9/10/11 跨 3 Step 都不修改 saga-orchestrator）
+
+$ grep "from.*saga-orchestrator\|from.*liquidation-saga" \
+    packages/application/src/saga/adl-saga.ts
+# 仅 import { createSagaOrchestrator } 从 ./saga-orchestrator.js
+# 仅 import type { LiquidationSagaPorts, LiquidationSagaOptions } 从 ./liquidation-saga.js
+```
+
+元规则 F（Adapter 独立 / 独立编排）跨 Step 9-10-11 三次落地。
+
+**测试结果**：
+
+- unit test 8（factory / happy 5 step 多账户全成功 / 空 targets vacuous
+  / verify-targets fail-fast / submit 失败 self 不补偿 / insurance 失败
+  反向 cancel-orders × 3 / settle 失败完整反向链 / 补偿失败 dead-letter
+  partial）
+- 集成 test 4（完整业务流程多账户持久化 / 多账户 compensate dead-letter
+  step 级而非账户级 / 多 case 隔离 / Sprint G+H 模板协同）
+- contract test 17（一行挂载 defineSagaContractTests("adl-saga", ...);
+  Phase 9 第二次在业务 Saga 上挂载 Sprint F 契约——多账户复杂度对契约
+  透明）
+- 总数 1866 → 1895（+29，与 Step 10 同）
+- 覆盖率：84.86%/79.45%/91.81%/84.86%（vs Step 10 基线 84.84%/79.45%/
+  91.77%/84.84%）—— Statements/Functions/Lines 三指标改善 + branches
+  持平；全部远超 §9.3 红线
+
+### Step 12-19: [待后续 Step 增量填充]
 
 ## Consequences
 
@@ -1878,7 +2016,66 @@ Saga step 仅需要"业务请求 → Engine 调用 → 响应解析"三步翻译
 部重试会导致"双重重试"语义混乱（Engine 重试 N 次 + Saga step 重试 M 次
 = N×M 总重试次数；运维监控难以拆分）。
 
-### Step 11-19 拒绝候选
+### Step 11 拒绝候选
+
+**拒绝 A 每账户一 step（裁决 1 候选 A）**。理由：账户数动态 = step 数
+动态——破坏 Sprint H 模板"step 数固定"约束；Sprint G Step 6 锁定的
+SagaOrchestrator runSaga 接受 `ReadonlyArray<SagaStep>` 但每次调用 step
+集合应对应固定业务流程语义；动态 step 数让 audit 事件流冗余 + contract
+17 it 难以稳定挂载。
+
+**拒绝 B 单 step 内多失败点继续（裁决 1 候选 B）**。理由：违反"每个 step
+单一职责"——单 step 内多账户调用其中一个失败时整体应继续 / 失败语义
+不清；C 三阶段 + C-fail-fast 让"step 失败"语义统一（任一账户失败 →
+整体失败 → 触发逆序补偿）。
+
+**拒绝 C-continue 部分继续（裁决 1 候选 C-continue）**。理由：让 SagaStep
+的 outcome 语义模糊——step status 为 succeeded 但内部含 partialFailures
+让运维 grep "status: succeeded" 看不到部分失败；ADL 是高风险操作，部分
+成功 = 系统状态不一致；C-fail-fast 让"step 整体一致"成为不变量。
+
+**拒绝 C-mixed 失败比例阈值（裁决 1 候选 C-mixed）**。理由：引入策略配
+置复杂度——譬如"≤20% 失败则继续；>20% 则 step 失败"需要 Options 字段
++ runtime 计算 + audit event payload；违反"克制"+ 模板纪律一致性（Step
+10 Liquidation 也无此机制）；如未来真有此需求通过 ADR-0002 修订流程。
+
+**拒绝独立 ADLSagaPorts 类型（裁决 3 候选独立）**。理由：ADL 与 Liquidation
+都消费"5 业务 Engine + 3 saga 基础设施"；业务差异通过 Input 字段集表
+达不需要新 Ports 形态；独立 ADLSagaPorts 类型让 Sprint H 4 个业务 Saga
+出现 4 套 Ports 类型——违反"Sprint H 模板纪律一致性"；Step 12-13 也
+应复用同形 Ports（除非 InsuranceFund / StateTransition 真有独立 Engine
+需求，由 ADR 修订决定）。
+
+**拒绝扩展 Phase 4 policy 层 helper（裁决 3 候选扩展）**。理由：增加
+fairAlgorithmRunner 等 helper 让 ADLSagaPorts 形态独特化——破坏与
+LiquidationSagaPorts 的对齐；公平算法是 policy 层独立责任，不应通过
+Saga Ports 注入；本 Step 严守"通过 ADLInput.targets 接收调用方计算结
+果"边界。
+
+**拒绝业务专属 saga 错误码（裁决 5 候选 1+）**。理由：targets 空 / 全
+失败两个候选场景：
+- targets 空属业务输入合法性 → ok 返回 + 多账户循环 0 次（合规业务流程）
+- targets 全失败 → SagaResultStatus.partially_compensated 已表达
+不需要 SAGA_ADL_TARGETS_EMPTY / SAGA_ADL_ALL_TARGETS_FAILED 等独立码；
+**惯例 K 第 13 次实战 R3 下限严守 0 错误码新增**——业务专属错误码会让
+Sprint H 4 个 Saga 出现各自 N 个码；TQ-SAG 命名空间膨胀失控。
+
+**拒绝拆两阶段（裁决 6 候选拆）**。理由：Sprint H 模板已立（Step 10 锁
+定）；ADL 复杂度在业务层（多账户 / 保险资金）不在 Saga 编排层；编排
+层仍是模板复制；拆两阶段适用于"接口与实现一起新建"的情况，本 Step
+没有新接口。强制开局动作 4-5 实地核查后判断业务确实在模板范围内。
+
+**拒绝预先实现公平算法（强边界声明）**。理由：公平算法是 policy 层独
+立责任——按盈利率 / 杠杆 / 持仓规模等多维度排序；本 Step ADL Saga 仅
+按 ADLInput.targets 顺序执行，不计算公平性。policy 层未来 Phase 引入
+公平算法时通过 ADR-0002 修订流程。
+
+**拒绝预先实现"批量 ADL 触发"（强边界声明）**。理由：本模块单笔触发
+是"业务 Saga 的最小职责单元"；批量场景由 Application 层调用方循环
+runForCase 实现；批量协调是 Step 14 跨 Saga 协调或 Phase 10+ 业务编排
+层议题。
+
+### Step 12-19 拒绝候选
 
 [由后续 Step 增量记录]
 

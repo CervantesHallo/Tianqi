@@ -1909,10 +1909,45 @@ Sprint H 模板纪律延续。纯消费 SagaStateStorePort.listIncomplete。
 - 不构造业务 Saga，不适合挂载 SagaContractTests
 - 集成测试覆盖跨 Saga 真实并发场景（G24）
 
-#### 接口草案要点（详见草案文档）
+#### v2 用户审视后修订（2026-05-01）
+
+用户回执 REQUEST_CHANGES + 反馈：判断 I.2 / I.3 / I.4 / I.5 同意草案处置；判断 I.1 选方案 A 修正。
+
+**核心修订（I.1 方案 A — sagaId 命名约定从"事实约定"升级为"显式约定 + helper"）**：
+
+1. **export `SAGA_ID_NAMING_CONVENTION` 常量**：说明前缀格式 `{kind}-saga-{caseId}-{stamp}` + 4 业务 Saga 字面量映射 + 元规则 B 冻结声明
+2. **export `parseSagaIdToInfo(sagaId): ParsedSagaIdInfo | null` 纯函数**：命名约定的可执行编码；元规则 N pure helper export 第 2 次实战；元规则 B 自此锁定签名 + 行为
+3. **CrossSagaCoordinationOptions 新增 `onDegradedFailure?` 回调**：解析失败时通知调用方（事件类型：`{ kind: "unparseable_saga_id"; sagaId: string }`）；与 SagaOrchestrator.SagaDegradedFailureEvent / SagaManualIntervention.ManualInterventionDegradedFailureEvent 同精神（裁决 5 分级模式）但事件命名空间独立
+4. **unit test 新增至少 1 个 it 验证 onDegradedFailure 触发条件**
+
+**修订理由（用户陈述）**：sagaId 命名约定从"事实约定"升级为"显式约定 + helper"，让命名约定在类型 + 代码层面双重落地，避免静默失败成为隐藏隐患。这不破坏 Step 10-13 任何代码（既有 sagaId 字符串恰好满足约定），仅在 Step 14 引入显式的解析与失败回调。
+
+**v2 关键证据**（grep 实地验证 4 业务 Saga 既有 sagaId 满足约定）：
+- `liquidation-saga-{caseId}-{stamp}` ✅
+- `adl-saga-{caseId}-{stamp}` ✅
+- `insurance-fund-saga-{caseId}-{stamp}` ✅
+- `state-transition-saga-{caseId}-{stamp}` ✅
+
+#### 接口草案要点（v2 修订版；详见草案文档 §F）
 
 ```typescript
 export type BusinessSagaKind = "liquidation" | "adl" | "insurance-fund" | "state-transition";
+
+// v2 新增：命名约定显式声明 + 元规则 B 冻结
+export const SAGA_ID_NAMING_CONVENTION: {
+  readonly pattern: "{kind}-saga-{caseId}-{stamp}";
+  readonly separator: "-saga-";
+  readonly kindPrefixes: ReadonlyArray<BusinessSagaKind>;
+};
+
+// v2 新增：命名约定的可执行编码 + 元规则 N pure helper export
+export type ParsedSagaIdInfo = {
+  readonly sagaKind: BusinessSagaKind;
+  readonly caseId: string;
+  readonly stamp: string;
+};
+export const parseSagaIdToInfo: (sagaId: string) => ParsedSagaIdInfo | null;
+
 export type ActiveSagaInfo = {
   readonly sagaId: SagaId;
   readonly caseId: string;
@@ -1920,38 +1955,91 @@ export type ActiveSagaInfo = {
   readonly startedAt: string;
   readonly overallStatus: "in_progress" | "compensating";
 };
+
 export type CrossSagaCoordinationPorts = { readonly sagaStateStore: SagaStateStorePort };
+
+// v2 新增：解析失败的降级事件
+export type CrossSagaCoordinationDegradedFailureEvent = {
+  readonly kind: "unparseable_saga_id";
+  readonly sagaId: string;
+};
+
 export type CrossSagaCoordinationOptions = {
   readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
+  // v2 新增：解析失败回调（防御式留痕）
+  readonly onDegradedFailure?: (event: CrossSagaCoordinationDegradedFailureEvent) => void;
 };
+
 export type CrossSagaCoordination = {
   checkActiveSagaForCase(input: {
     readonly caseId: string;
     readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
   }): Promise<Result<ReadonlyArray<ActiveSagaInfo>, SagaPortError>>;
 };
+
 export const createCrossSagaCoordination: (
   ports: CrossSagaCoordinationPorts,
   options?: CrossSagaCoordinationOptions
 ) => CrossSagaCoordination;
 ```
 
-#### 元规则 / 惯例触发（DRAFT 阶段）
+#### v2 元规则 B 锁定形态（自 Step 14 起冻结）
 
-- 元规则 B：严守 —— Step 1-13 任何已锁定签名一字未改；预期跨 6 个 saga 模块 git diff zero
-- 元规则 F：严守 —— 协调模块零 import 既有 saga 模块
+本 Step 引入并冻结的接口形态：
+- `BusinessSagaKind` 4 字面量
+- `SAGA_ID_NAMING_CONVENTION` 常量结构
+- `ParsedSagaIdInfo` 3 字段
+- `parseSagaIdToInfo` 函数签名 + 解析行为
+- `ActiveSagaInfo` 5 字段
+- `CrossSagaCoordinationDegradedFailureEvent` 形态
+- `CrossSagaCoordinationOptions` 2 可选字段
+- `CrossSagaCoordination.checkActiveSagaForCase` 接口
+- `createCrossSagaCoordination` 工厂签名
+
+后续 Step / Phase 10+ 任何调整必须经 ADR-0002 修订流程。
+
+#### I.3 / I.4 留痕（用户审视后同意接受）
+
+**I.3 BusinessSagaKind 字面量与未来 Saga 扩展（Phase 10+ ADR 承接）**：
+- 当前 4 字面量与 Sprint H 4 业务 Saga 命名约定一一对应
+- Phase 10+ 引入第 5 个业务 Saga 时**必须**修改 BusinessSagaKind 类型 + SAGA_ID_NAMING_CONVENTION.kindPrefixes 数组
+- 这是惯例 M（ADR 修订流程）天然支撑的演进路径
+- 不引入更宽松的 `string` 类型（损失类型安全 + 失去命名约定证据）
+- **承接 ADR**：Phase 10+ 引入新 Saga 时由独立 ADR 段记录类型扩展决定，本 ADR-0002 不预占空位
+
+**I.4 listIncomplete O(n) 扫描扩展性边界（Phase 10+ Adapter 扩展承接）**：
+- 当前实现：每次 checkActiveSagaForCase 都调用 listIncomplete()（O(n) 全表扫描，n = 当前活跃 saga 数）
+- 协调模块在 Application 层做字符串过滤 —— Adapter 没有"按 caseId 过滤"的索引能力
+- **生产场景边界**：当同时活跃 saga 数量小于约 1000 时性能可接受；超过此规模需要引入索引查询
+- **不在本 Step 引入新 Port 接口**（违反裁决 6）
+- **承接 Adapter 扩展**：Phase 10+ 若发现性能瓶颈，引入"by caseId 索引查询" Adapter 扩展（通过 ADR-0002 修订流程扩展 SagaStateStorePort 接口或新增 Phase 10+ 专属查询 Port）；本 ADR 不预占空位
+
+#### 元规则 / 惯例触发（v2 修订版）
+
+- 元规则 B：严守 —— Step 1-13 任何已锁定签名一字未改；预期跨 6 个 saga 模块 git diff zero。**v2 新增**：本 Step 引入的接口形态全部锁定（自 Step 14 起元规则 B 在协调模块层级生效）
+- 元规则 F：严守 —— 协调模块零 import 既有 saga 模块；onDegradedFailure 回调注入符合元规则 F（协调模块不主动调 logger）
+- **元规则 N（pure helper export + unit test）：v2 触发**（确定）—— `parseSagaIdToInfo` 是 export 的纯函数；至少 1 个 unit it 单独验证解析结果 + 至少 1 个 unit it 单独验证 onDegradedFailure 触发条件。第 2 次实战（首次 Step 7 isStepEligibleForCompensation / aggregateCompensationOutcome）
 - 元规则 Q：第十四次实战
 - 惯例 K：第十六次实战（0 新错误码）
-- 惯例 L：≤ 6 单元 it
+- 惯例 L：≤ 6 单元 it（v2 修订后预期：parseSagaIdToInfo 解析 it 1-2 + onDegradedFailure 触发 it 1 + checkActiveSagaForCase 行为 it 3-4）
 - 惯例 M：第十四次实战（含 Sprint H 收官小结段）
-- 拆两阶段流程：第二次实战
-- 其他元规则：A / C / D / E / G / H / I / J / N / O / P 全 N/A
+- 拆两阶段流程：第二次实战；v2 是用户审视后修订草案，证明拆两阶段的实证价值
+- 其他元规则：A / C / D / E / G / H / I / J / O / P 全 N/A
+
+#### v2 LOC 预估（修订版）
+
+| 文件 | v1 | v2 | 备注 |
+|---|---|---|---|
+| `cross-saga-coordination.ts` | ~150-200 | ~200-260 | v2 增量 ~50-60 LOC（常量 + helper + 类型 + onDegradedFailure 调用点） |
+| `cross-saga-coordination.test.ts` | ~250-300 | ~290-340 | v2 增量 ~40 LOC（onDegradedFailure 触发 it + parseSagaIdToInfo 解析 it） |
+| `cross-saga-coordination.integration.test.ts` | ~200-250 | ~200-250 | 不变（集成测试不涉及 helper / 回调） |
+| **合计** | ~600-750 | ~690-850 | v2 仍在轻量场景"克制"范围内 |
 
 #### 实施细节（第二阶段产出 — 待补充）
 
 [第二阶段 PHASE_IMPLEMENT 完成后填充]
-- LOC 实测 vs DRAFT 预估
-- 与 DRAFT 草案的差异（如有）
+- LOC 实测 vs v2 DRAFT 预估
+- 与 v2 DRAFT 草案的差异（如有）
 - Sprint H 收官小结段
 
 ### Step 15-19: [待 Sprint I 增量填充]

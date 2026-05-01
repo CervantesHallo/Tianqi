@@ -341,7 +341,16 @@ type SagaStateStorePort = {
 
 ---
 
-## F. 接口草案要点（5-10 行高亮）
+## F. 接口草案要点（v2 — 用户审视后修订：sagaId 命名约定显式化）
+
+> **修订说明（v2）**：用户审视后选择方案 A 修正 I.1（sagaId 字符串前缀解析的脆弱性）。
+> 修订要点：
+> 1. export `SAGA_ID_NAMING_CONVENTION` 常量（说明前缀格式 + 示例 + 元规则 B 冻结声明）
+> 2. export `parseSagaIdToInfo(sagaId): ParsedSagaIdInfo | null` 纯函数（命名约定的可执行编码）
+> 3. `CrossSagaCoordinationOptions` 新增 `onDegradedFailure?` 回调（解析失败时通知调用方）
+> 4. unit test 至少 1 个 it 验证 onDegradedFailure 触发条件
+>
+> **不破坏 Step 10-13**：4 业务 Saga 既有 sagaId 字符串恰好满足约定；Step 14 仅引入显式的解析与失败回调，命名约定从"事实约定"升级为"显式约定 + helper"。
 
 ```typescript
 // packages/application/src/saga/cross-saga-coordination.ts
@@ -352,6 +361,64 @@ export type BusinessSagaKind =
   | "adl"
   | "insurance-fund"
   | "state-transition";
+
+/**
+ * sagaId 命名约定的显式声明（v2 新增）。
+ *
+ * 业务 Saga 内部 runForCase 构造 sagaId 时遵循模式：
+ *   `{kind}-saga-{caseId}-{stamp}`
+ * 其中：
+ *   - kind ∈ BusinessSagaKind 4 字面量之一
+ *   - caseId 业务案件标识（不允许含 `-saga-` 子串；caseId 内可含 `-`）
+ *   - stamp = `${Date.now()}-${invocationCounter}`（同进程内唯一递增）
+ *
+ * **元规则 B 锁定（v2，自 Step 14 起）**：
+ *   - 既有 4 业务 Saga（Step 10-13）的 sagaId 构造必须继续满足本约定
+ *   - Phase 10+ 引入第 5 个业务 Saga 时，sagaId 构造**必须**满足本约定
+ *   - parseSagaIdToInfo 是本约定的可执行编码；本常量与 helper 一并冻结
+ *   - 任何调整必须经 ADR-0002 修订流程
+ *
+ * 示例（与 Step 10-13 锁定一致）：
+ *   liquidation-saga-{caseId}-{stamp}
+ *   adl-saga-{caseId}-{stamp}
+ *   insurance-fund-saga-{caseId}-{stamp}
+ *   state-transition-saga-{caseId}-{stamp}
+ */
+export const SAGA_ID_NAMING_CONVENTION: {
+  readonly pattern: "{kind}-saga-{caseId}-{stamp}";
+  readonly separator: "-saga-";
+  /** 4 业务 Saga sagaId 前缀对应的 BusinessSagaKind */
+  readonly kindPrefixes: ReadonlyArray<BusinessSagaKind>;
+};
+
+/** parseSagaIdToInfo 解析结果 */
+export type ParsedSagaIdInfo = {
+  readonly sagaKind: BusinessSagaKind;
+  readonly caseId: string;
+  readonly stamp: string;
+};
+
+/**
+ * 把 sagaId 字符串解析为结构化信息（v2 新增；命名约定的可执行编码）。
+ *
+ * 解析失败返回 null（不抛错；调用方决定如何处置）：
+ *   - sagaId 不含 `-saga-` 分隔符
+ *   - kind 部分（首个 `-saga-` 之前）不是 BusinessSagaKind 4 字面量之一
+ *   - 剩余部分（首个 `-saga-` 之后）不能再拆出 stamp 段
+ *
+ * **元规则 N（pure helper export）**：本函数是纯函数；可被 unit test 单独
+ * 验证；元规则 N 第 2 次实战（首次 Step 7 isStepEligibleForCompensation /
+ * aggregateCompensationOutcome）。
+ *
+ * **元规则 B 锁定（v2）**：本函数自 Step 14 起锁定签名 + 行为；后续 Step
+ * 任何 sagaId 命名约定调整必须经 ADR-0002 修订流程同步更新本函数与
+ * SAGA_ID_NAMING_CONVENTION 常量。
+ *
+ * **不抛错原则**：解析失败永远返回 null；调用方（CrossSagaCoordination
+ * 内部）收到 null 时通过 onDegradedFailure 回调通知运维（防御式留痕，
+ * 避免静默失败成为隐藏隐患）。
+ */
+export const parseSagaIdToInfo: (sagaId: string) => ParsedSagaIdInfo | null;
 
 /** 同 caseId 活跃 Saga 摘要 */
 export type ActiveSagaInfo = {
@@ -366,9 +433,42 @@ export type CrossSagaCoordinationPorts = {
   readonly sagaStateStore: SagaStateStorePort;
 };
 
+/**
+ * 解析失败的降级事件（v2 新增）。
+ *
+ * 触发条件：listIncomplete() 返回的某个 saga 其 sagaId 不满足
+ * SAGA_ID_NAMING_CONVENTION 约定，parseSagaIdToInfo 返回 null。
+ *
+ * 协调模块行为：
+ *   - 静默跳过该 saga（不计入 ActiveSagaInfo[] 返回值）
+ *   - 调用 onDegradedFailure 回调（如配置）通知运维
+ *   - 不中止 checkActiveSagaForCase 调用（其他可解析的 saga 正常返回）
+ *
+ * 这是"防御式留痕"模式：解析失败不让调用方失败，但留痕便于运维诊断
+ * 命名约定漂移（譬如 Phase 10+ 引入新 Saga 但忘记同步 BusinessSagaKind）。
+ *
+ * 与 SagaOrchestrator.SagaDegradedFailureEvent / SagaManualIntervention.
+ * ManualInterventionDegradedFailureEvent 同精神（裁决 5 分级模式）但事件
+ * 命名空间独立——避免协调模块的降级被误归到编排器或人工介入模块。
+ */
+export type CrossSagaCoordinationDegradedFailureEvent = {
+  readonly kind: "unparseable_saga_id";
+  readonly sagaId: string;
+};
+
 export type CrossSagaCoordinationOptions = {
   /** 仅检查指定 sagaKind 子集；undefined = 检查全部 4 种 */
   readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
+  /**
+   * sagaId 解析失败时的降级回调（v2 新增）。
+   *
+   * 调用方注入观察函数：通常是 logger.warn / metrics counter / 运维报警。
+   * 协调模块本身不实现观察实现（元规则 F：协调模块不主动调 logger）。
+   * undefined 表示不做任何降级动作（解析失败的 saga 仍静默跳过）。
+   */
+  readonly onDegradedFailure?: (
+    event: CrossSagaCoordinationDegradedFailureEvent
+  ) => void;
 };
 
 export type CrossSagaCoordination = {
@@ -389,6 +489,10 @@ export type CrossSagaCoordination = {
    *   }
    *   // 安全启动新 Saga
    *   await liquidationSaga.runForCase(input);
+   *
+   * 解析失败处置（v2 新增）：listIncomplete 返回的 saga 中若有 sagaId
+   * 不满足 SAGA_ID_NAMING_CONVENTION，会被静默跳过 + 触发 onDegradedFailure
+   * 回调（如配置）。其他可解析的 saga 正常返回。
    */
   checkActiveSagaForCase(input: {
     readonly caseId: string;
@@ -402,17 +506,19 @@ export const createCrossSagaCoordination: (
 ) => CrossSagaCoordination;
 ```
 
-**接口要点**（≤10 行）：
+**接口要点（v2 修订版）**：
 1. `BusinessSagaKind` 4 字面量与 Step 10-13 命名约定锁定一致
-2. `ActiveSagaInfo` 5 字段（sagaId / caseId / sagaKind / startedAt / overallStatus）
-3. `CrossSagaCoordinationPorts` 仅含 1 Port（SagaStateStore） —— 最小依赖
-4. `CrossSagaCoordinationOptions` 1 可选字段 sagaKindFilter
-5. 主接口 `checkActiveSagaForCase` 返回 `Result<ReadonlyArray<ActiveSagaInfo>, SagaPortError>`
-6. 工厂闭包 `createCrossSagaCoordination(ports, options?)` 与既有 saga 模块风格一致
-7. 0 新错误码 / 0 新 Port
-8. 调用方在 runForCase 前显式调用 —— **不修改任何业务 Saga 接口**（元规则 B 严守）
-9. 字符串前缀解析作为 sagaId → (sagaKind, caseId) 映射机制
-10. 终态 Saga 自动被 listIncomplete 排除 —— 无需协调模块额外过滤
+2. **`SAGA_ID_NAMING_CONVENTION` 常量（v2 新增）**：命名约定的显式声明 + 元规则 B 冻结
+3. **`parseSagaIdToInfo(sagaId)` 纯函数（v2 新增）**：命名约定的可执行编码 + 元规则 N pure helper export
+4. `ActiveSagaInfo` 5 字段（sagaId / caseId / sagaKind / startedAt / overallStatus）
+5. `CrossSagaCoordinationPorts` 仅含 1 Port（SagaStateStore）—— 最小依赖
+6. `CrossSagaCoordinationOptions` 2 可选字段：sagaKindFilter + **onDegradedFailure（v2 新增）**
+7. 主接口 `checkActiveSagaForCase` 返回 `Result<ReadonlyArray<ActiveSagaInfo>, SagaPortError>`
+8. 工厂闭包 `createCrossSagaCoordination(ports, options?)` 与既有 saga 模块风格一致
+9. 0 新错误码 / 0 新 Port
+10. 调用方在 runForCase 前显式调用 —— **不修改任何业务 Saga 接口**（元规则 B 严守）
+11. **解析失败防御式留痕（v2 新增）**：静默跳过 + onDegradedFailure 回调通知，不中止其他 saga 处理
+12. 终态 Saga 自动被 listIncomplete 排除 —— 无需协调模块额外过滤
 
 ---
 
@@ -489,39 +595,74 @@ git diff origin/main -- packages/application/src/saga/state-transition-saga.ts
 
 ---
 
-## H. 元规则 / 惯例触发（DRAFT 阶段）
+## H. 元规则 / 惯例触发（v2 修订版）
 
 | 规则 / 惯例 | 触发情况 |
 |---|---|
-| **元规则 B（接口冻结）** | 严守 —— Step 1-13 任何已锁定签名一字未改；预期跨 6 个 saga 模块 git diff zero |
-| **元规则 F（独立编排）** | 严守 —— 协调模块零 import 既有 saga 模块；不修改任何 saga 内部 |
+| **元规则 B（接口冻结）** | 严守 —— Step 1-13 任何已锁定签名一字未改；预期跨 6 个 saga 模块 git diff zero。**v2 新增**：本 Step 引入的 `SAGA_ID_NAMING_CONVENTION` 常量 + `parseSagaIdToInfo` helper + `BusinessSagaKind` 4 字面量 + `ActiveSagaInfo` 5 字段 + `CrossSagaCoordinationDegradedFailureEvent` + `CrossSagaCoordinationOptions` 形态全部锁定（自 Step 14 起元规则 B 在协调模块层级生效） |
+| **元规则 F（独立编排）** | 严守 —— 协调模块零 import 既有 saga 模块；不修改任何 saga 内部；onDegradedFailure 回调注入符合元规则 F（协调模块不主动调 logger） |
+| **元规则 N（pure helper export + unit test）** | **v2 触发**（确定）—— `parseSagaIdToInfo` 是 export 的纯函数；至少 1 个 unit it 单独验证解析结果 + 至少 1 个 unit it 单独验证 onDegradedFailure 触发条件。第 2 次实战（首次 Step 7 isStepEligibleForCompensation / aggregateCompensationOutcome） |
 | **元规则 Q（强制开局）** | 第十四次实战（Phase 9 全部 Step 都执行强制开局） |
 | **惯例 K（错误码"仅必需"）** | 第十六次实战 —— 0 新错误码（裁决 5） |
-| **惯例 L（unit 上限）** | ≤ 6 单元 it（业务模块单独计算） |
+| **惯例 L（unit 上限）** | ≤ 6 单元 it（业务模块单独计算）；v2 新增 1 个 onDegradedFailure 触发 it + 1-2 个 parseSagaIdToInfo 解析 it，仍在 6 it 上限内 |
 | **惯例 M（ADR 增量追写）** | 第十四次实战（含 Sprint H 收官小结段） |
-| **拆两阶段流程** | 第二次实战（首次 Step 6） |
-| 元规则 A / C / D / E / G / H / I / J / N / O / P | 全 N/A |
-| 元规则 N（pure helper 单测） | 视实施时是否 export sagaId 解析 helper 决定（DRAFT 阶段未定） |
+| **拆两阶段流程** | 第二次实战（首次 Step 6）；v2 是用户审视后修订草案，证明拆两阶段的实证价值 |
+| 元规则 A / C / D / E / G / H / I / J / O / P | 全 N/A |
 
 ---
 
 ## I. 核心未决判断（请重点审视）
 
-### I.1 sagaId 字符串前缀解析的脆弱性
+### I.1 sagaId 字符串前缀解析的脆弱性 — **v2 用户审视后修订（方案 A）**
 
 **事实**：协调模块通过 sagaId 字符串前缀（`{kind}-saga-{caseId}-{stamp}`）反推 sagaKind 和 caseId。这是 Step 10-13 4 业务 Saga 的事实命名约定。
 
-**潜在风险**：
-- 命名约定**未在类型层面强制**（任何 Saga 都可以构造任意 sagaId 字符串）
-- 若 Phase 10+ 引入第 5 个业务 Saga 但命名不遵循 `{kind}-saga-{caseId}-{stamp}` 模式，协调模块的解析会失效
-- 若 caseId 内部含 `-saga-` 子串（极端情况），解析会出错
+**用户回执（v2）**：选方案 A —— 命名约定从"事实约定"升级为"显式约定 + helper"，让命名约定在类型 + 代码层面双重落地，避免静默失败成为隐藏隐患。
 
-**草案处置**：
-- 在 ADR-0002 Step 14 段显式记录命名约定为"事实契约"
-- 解析器实现侧用宽松匹配 + 防御式 null 返回（解析失败的 saga 不计入活跃集合）
-- 不引入"sagaId 必须符合命名约定"的运行时验证（违反元规则 B）
+**v2 处置（用户审视后锁定）**：
 
-**审视点**：用户是否同意"接受字符串前缀解析的脆弱性，作为 Sprint H 模板纪律延续的代价"？或要求引入更显式的字段（譬如 PersistedSagaState 增加 caseId 字段，但这会破坏元规则 B）？
+1. **export `SAGA_ID_NAMING_CONVENTION` 常量**（cross-saga-coordination.ts 内部）
+   - 字段：`pattern: "{kind}-saga-{caseId}-{stamp}"` / `separator: "-saga-"` / `kindPrefixes: ReadonlyArray<BusinessSagaKind>`
+   - 元规则 B 锁定（自 Step 14 起本常量被冻结）
+   - Phase 10+ 任何调整必须经 ADR-0002 修订流程
+
+2. **export `parseSagaIdToInfo(sagaId): ParsedSagaIdInfo | null` 纯函数**
+   - 命名约定的可执行编码
+   - 解析失败返回 null（不抛错）
+   - 元规则 N pure helper export（第 2 次实战）
+   - 元规则 B 锁定签名 + 行为（自 Step 14 起冻结）
+
+3. **CrossSagaCoordinationOptions 新增 `onDegradedFailure?` 回调**
+   - 类型：`(event: { kind: "unparseable_saga_id"; sagaId: string }) => void`
+   - 触发条件：listIncomplete 返回的某个 saga 其 sagaId 解析失败
+   - 协调模块行为：静默跳过该 saga + 调用 onDegradedFailure 回调
+   - 调用方典型注入：`logger.warn` / `metrics counter` / 运维报警
+   - undefined 表示不做任何降级动作（解析失败的 saga 仍静默跳过）
+
+4. **unit test 新增至少 1 个 it 验证 onDegradedFailure 触发条件**
+   - 在 6 it 上限内（v2 修订后预期：parseSagaIdToInfo 解析 it 1-2 + onDegradedFailure 触发 it 1 + checkActiveSagaForCase 行为 it 3-4）
+
+**v2 修订理由**（用户陈述）：sagaId 命名约定从"事实约定"升级为"显式约定 + helper"，让命名约定在类型 + 代码层面双重落地，避免静默失败成为隐藏隐患。这不破坏 Step 10-13 任何代码（既有 sagaId 字符串恰好满足约定），仅在 Step 14 引入显式的解析与失败回调。
+
+**v2 关键证据**：
+- 4 业务 Saga 既有 sagaId 字符串（grep 实地验证 §D.1）：
+  - `liquidation-saga-{caseId}-{stamp}` ✅ 满足约定
+  - `adl-saga-{caseId}-{stamp}` ✅ 满足约定
+  - `insurance-fund-saga-{caseId}-{stamp}` ✅ 满足约定
+  - `state-transition-saga-{caseId}-{stamp}` ✅ 满足约定
+- Step 10-13 既有代码 git diff zero（命名约定显式化不修改既有 saga 模块）
+
+**v2 接口形态**（详见 §F）：
+```typescript
+export const SAGA_ID_NAMING_CONVENTION: { ... };
+export const parseSagaIdToInfo: (sagaId: string) => ParsedSagaIdInfo | null;
+export type CrossSagaCoordinationOptions = {
+  readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
+  readonly onDegradedFailure?: (event: CrossSagaCoordinationDegradedFailureEvent) => void;
+};
+```
+
+**状态**：v2 处置已锁定。等待 APPROVE 启动 PHASE_IMPLEMENT。
 
 ### I.2 不替业务做"拒绝/等待"决策
 
@@ -568,16 +709,18 @@ git diff origin/main -- packages/application/src/saga/state-transition-saga.ts
 
 **审视点**：用户是否同意"接受 O(n) 扫描成本作为轻量场景的折中"？或要求引入"按 caseId 过滤"接口扩展（这会破坏元规则 B）？
 
-### I.5 草案 LOC 预估
+### I.5 草案 LOC 预估（v2 修订版）
 
-| 文件 | 预估 LOC |
-|---|---|
-| `cross-saga-coordination.ts` | ~150-200 |
-| `cross-saga-coordination.test.ts` | ~250-300（≤6 unit it） |
-| `cross-saga-coordination.integration.test.ts` | ~200-250（≤4 集成 it 含跨 Saga 真实并发） |
-| **合计** | ~600-750 |
+v2 增量：SAGA_ID_NAMING_CONVENTION 常量（~25 LOC） + parseSagaIdToInfo helper（~30 LOC） + onDegradedFailure 类型与行为（~15 LOC） + 新增 1-2 个 unit it（~40 LOC）。
 
-**审视点**：用户是否接受合计 ~600-750 LOC（轻量场景预期 ≤300 LOC 已超 —— 但测试占大头）？
+| 文件 | v1 预估 | v2 预估 | 备注 |
+|---|---|---|---|
+| `cross-saga-coordination.ts` | ~150-200 | ~200-260 | v2 增量 ~50-60 LOC（常量 + helper + 类型 + onDegradedFailure 调用点） |
+| `cross-saga-coordination.test.ts` | ~250-300 | ~290-340 | v2 增量 ~40 LOC（onDegradedFailure 触发 it + parseSagaIdToInfo 解析 it） |
+| `cross-saga-coordination.integration.test.ts` | ~200-250 | ~200-250 | 不变（集成测试不涉及 helper / 回调） |
+| **合计** | ~600-750 | ~690-850 | v2 仍在轻量场景"克制"范围内 |
+
+**v2 用户已同意**：合计 ~690-850 LOC（v2 增量 ~90-100 LOC）作为方案 A 修正的工程代价。
 
 ---
 

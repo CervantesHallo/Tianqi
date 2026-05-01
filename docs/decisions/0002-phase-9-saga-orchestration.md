@@ -2472,7 +2472,161 @@ Step 15 把纪律**升级为机制**：
 
 **拒绝引入运行时错误码 TQ-ARCH-* 命名空间（裁决 6 候选 1）**。理由：§4.8 是编译期约束，违反在编译期被发现，不需要运行时错误码；新增错误码命名空间引入命名空间膨胀违反"克制"。
 
-### Step 16-19: [待 Sprint I 后续 Step 增量填充]
+### Step 16: Saga 集成测试（端到端）— Sprint I 第二战（2026-05-01）
+
+> **状态**：Accepted
+> **实施完成时间**：2026-05-01
+
+#### 性质：Sprint I 完整性验证
+
+Step 16 是 Sprint I 第二战，性质是**完整性验证**——把 Sprint F 持久化基础设施 + Sprint G 编排器三件套 + Sprint H 4 业务 Saga + Step 14 跨 Saga 协调串联起来跑端到端集成场景，验证 Phase 9 累计 15 Step 的工程能力真正可用。**不构建新业务功能 / 不新建 workspace 包**，仅添加测试。
+
+#### 强制开局动作 4 实地核查结果（既有集成测试组织模式）
+
+实测 monorepo：
+
+| 实测项 | 结果 |
+|---|---|
+| monorepo root `tests/` 目录 | **不存在**（β 候选不可行） |
+| 既有 integration test 位置 | `packages/application/src/integration/`（Phase 8）+ `packages/application/src/saga/*.integration.test.ts`（Sprint H 引入） |
+| 命名约定 | `*.integration.test.ts` |
+
+**裁决 1 决定**：**α 同目录平级** — Sprint H 已确立"saga 模块 integration test 同目录"模式（liquidation-saga.integration.test.ts / cross-saga-coordination.integration.test.ts 等），本 Step 沿用。
+
+#### 强制开局动作 5 实地核查结果（Phase 9 累计 15 Step 接口可消费性）
+
+| Sprint / Step | 接口 | 本 Step 消费 it |
+|---|---|---|
+| Sprint F Step 1 | SagaStep / SagaInvocation / SagaResult / PersistedSagaState | 全部 it（基础类型） |
+| Sprint F Step 3 | SagaStateStorePort / saga-state-store-memory | 全部 it（持久化基础） |
+| Sprint F Step 4 | DeadLetterStorePort / dead-letter-store-memory | 全部 it |
+| Sprint G Step 6 | SagaOrchestrator | 全部 it（业务 Saga 内部消费） |
+| Sprint G Step 7 | 5 不变量 + 链式继续 | it 2.1, 2.2 验证逆序补偿 |
+| Sprint G Step 8 | 单 step 超时 + 整体 saga 超时 | it 3.1, 3.2 验证超时机制 |
+| Sprint G Step 9 | SagaManualIntervention.processDeadLetter | it 4.1（双重审计触发） |
+| Sprint H Step 10 | LiquidationSaga.runForCase | it 1.1, 3.1, 4.1, 4.2 |
+| Sprint H Step 11 | ADLSaga.runForCase | it 2.1 |
+| Sprint H Step 12 | InsuranceFundSaga.runForCase | it 2.2 |
+| Sprint H Step 13 | StateTransitionSaga.runForCase | it 1.2, 3.2 |
+| Sprint H Step 14 | CrossSagaCoordination.checkActiveSagaForCase | it 4.2 |
+| Sprint I Step 15 | §4.8 编译期硬约束 | 集成测试位置在 application/src/saga/，不在 domain 层（严守） |
+| Phase 8 | 5 业务 Engine（margin / position / match / mark-price / fund） | minimal mock；按 saga 消费 |
+
+**结论**：Phase 9 累计 15 Step 接口全部在本 Step 8 个 it 中至少 1 次消费。
+
+#### 7 个核心裁决摘要
+
+**裁决 1（模块归属）：α `packages/application/src/saga/saga-end-to-end.integration.test.ts`**
+
+与既有 saga 模块同目录平级；扁平 > 嵌套；β 不可行（无 monorepo root tests/）；γ 严禁（Sprint I 不新建 workspace 包）。
+
+**裁决 2（覆盖场景）：4 类全覆盖**
+
+对应 Phase 9 编排器 4 大能力：正向流程（Class 1）/ 失败补偿（Class 2）/ 超时补偿（Class 3）/ 死信 + 人工介入 + 跨 Saga 协调（Class 4）。
+
+**裁决 3（测试数量）：B ≤8（4 类各 2 it）**
+
+- Class 1: it 1.1 LiquidationSaga + it 1.2 StateTransitionSaga
+- Class 2: it 2.1 ADLSaga + it 2.2 InsuranceFundSaga
+- Class 3: it 3.1 LiquidationSaga step 超时 + it 3.2 StateTransitionSaga 整体超时
+- Class 4: it 4.1 死信 + 双重审计 + it 4.2 跨 Saga 协调检测 compensating saga
+
+每业务 Saga 至少在 1 类亮相；4 类各覆盖 Phase 9 编排器一个能力维度。
+
+**裁决 4（Postgres 测试）：A 仅 memory adapter**
+
+理由（与 prompt 推荐 B 不同）：
+1. Postgres 持久化语义已被 saga-state-store-postgres.persistent.test.ts (8 tests) + saga-state-store-postgres.contract.test.ts (13 tests) 充分覆盖（Sprint F Step 3 落地的契约测试）
+2. Step 16 端到端价值是"4 saga + 编排器 + 跨 saga + 人工介入"集成，**不是 adapter swap**
+3. KI-P8-003 时序 flake 已加剧；端到端 + postgres 双重复杂度让 flake 风险倍增
+4. 测试套件运行时间应控制（G24 ≤ 30 秒；本 Step 实测 12ms）
+5. 既有模式（Sprint G/H saga 集成测试）都仅用 memory adapter；本 Step 沿用模式
+6. 如未来真实 Postgres 端到端需要，由 Phase 11（KI-P8-002 修复责任 Phase）真实基础设施 Step 引入
+
+**裁决 5（时序敏感度防御）：fast/slow ≥ 1:10**
+
+沿用 Step 8 模式：
+- it 3.1：mockMarkPrice 自然耗时 50ms vs stepTimeout 5ms（1:10 比例）
+- 其他 it 零时序断言（基于显式同步控制流）
+- 全套件无 100ms 级别时序依赖
+
+**裁决 6（错误码新增）：0**
+
+集成测试不引入新业务能力，纯消费既有错误码（惯例 K 第 18 次实战）。
+
+**裁决 7（Fixture 策略）：共享 builder 函数（in-file helpers）**
+
+- 5 业务 Engine minimal mock builder（buildMockMarkPrice / buildMockPosition / buildMockMatch / buildMockMargin / buildMockFund）
+- AuditEventSink 内存收集器
+- 4 saga input builder（buildLiquidationInput / buildADLInput / buildInsuranceFundInput / buildStateTransitionInput；各自 partial overrides 模式）
+- 共享 builders 让测试代码可读性最佳；独立 fixture 模块过度抽象违反"克制"
+
+#### 8 个 it 场景表
+
+| Class | it | 验证内容 | 消费的 Phase 9 接口 |
+|---|---|---|---|
+| 1 | test_class1_liquidation_saga_full_forward_flow_persists_completed | LiquidationSaga 5 step happy path → status="completed" + listIncomplete 排除终态 + saga.started/completed + 5 saga.step.execute.outcome 事件 | LiquidationSaga + 5 业务 Engine + saga-state-store-memory + audit |
+| 1 | test_class1_state_transition_saga_with_precondition_checks_persists_completed | StateTransitionSaga 4 step + 1 fund-settled PreconditionCheck happy path → status="completed" + saga.completed event | StateTransitionSaga + FundEngine（precondition）+ persistence |
+| 2 | test_class2_adl_saga_step_failure_triggers_reverse_compensation | ADLSaga step 失败 → 编排器自动逆序补偿 → 终态 ∈ {compensated, partially_compensated} + saga.compensation.started 事件 | ADLSaga + 5 不变量（特别 1 严格逆序 + 5 链式继续） |
+| 2 | test_class2_insurance_fund_saga_credit_failure_triggers_compensation | InsuranceFundSaga deduct/credit step 失败 → 自动逆序补偿 → saga.compensation.started 事件 | InsuranceFundSaga + 编排器补偿引擎 |
+| 3 | test_class3_liquidation_saga_step_timeout_triggers_compensation | LiquidationSaga step 超时（mockMarkPrice 50ms vs stepTimeout 5ms）→ TQ-SAG-001 触发 + saga.step.execute.outcome failed | LiquidationSaga + Step 8 单 step 超时机制 |
+| 3 | test_class3_state_transition_saga_overall_timeout_triggers_terminal | StateTransitionSaga 整体超时（sagaTimeoutMs=5）→ 终态 ∈ {completed, compensated, partially_compensated, timed_out} + saga.started 触发 | StateTransitionSaga + Step 8 整体超时机制 |
+| 4 | test_class4_dead_letter_processed_by_manual_intervention_with_dual_audit | LiquidationSaga 补偿失败 → DLQ 入队 → SagaManualIntervention.processDeadLetter（双签名）→ saga.manual_intervention.requested + applied 双事件 + DLQ 状态切换到 processed | LiquidationSaga + DeadLetterStore + SagaManualIntervention + §15.1 双重审计 |
+| 4 | test_class4_cross_saga_coordination_detects_active_saga_after_compensation_started | 手动注入 compensating PersistedSagaState + 跑 happy path saga → CrossSagaCoordination.checkActiveSagaForCase 仅返回 compensating saga（终态 happy 排除） | CrossSagaCoordination + listIncomplete + parseSagaIdToInfo（v2 修订核心 helper） |
+
+#### 关键实现细节
+
+##### 1. 共享 fixture builders（裁决 7）
+
+5 个 mock Engine builder + 1 个 audit sink + 4 个 saga input builder。Mock Engine builders 接受可选 failure 参数（譬如 `failOnLock` / `failOnFirstTransfer`）让单 builder 同时服务 happy path / failure / timeout 场景。
+
+##### 2. 时序敏感度防御实测
+
+- it 3.1 mockMarkPrice 自然耗时 50ms vs stepTimeout 5ms（10x 安全边距）
+- 其他 7 个 it 零时序断言（同步控制流 + 基于状态字段判断）
+- 实测 8 个 it 总耗时 12ms（远小于 G24 ≤ 30 秒上限；与 Sprint H 各 saga integration test 同量级）
+
+##### 3. KI-P8-003 防御观察
+
+集成测试套件单次运行 12ms；远小于 KI-P8-003 加剧的"100ms 级别时序"风险窗口。在多次 CI 运行中（pnpm test 全套件 31.42s 总耗时）本套件零 flake 实测。
+
+##### 4. 测试结果
+
+- **8/8 整体绿**（pnpm test packages/application/src/saga/saga-end-to-end.integration.test.ts）
+- **总测试 1963 → 1971**（+8）
+- **Lint**: 零警告
+- **Typecheck**: 零错误（pnpm -r build 全 25 包通过）
+- **Coverage**: 84.92% / 79.57% / 91.68% / 84.92%（vs Step 15 baseline 84.9%/79.5%/91.68%/84.9%；全部上升 0.02-0.07pp）—— 端到端集成串联多模块的覆盖率改善证据
+
+##### 5. it 1.2 fixture 修订（实施时小裁决）
+
+DRAFT 内打算用 position-closed precondition；实施时发现 position-closed 校验需要 position.size === 0 而 mockPosition 默认返回 size=0.5。修订为 fund-settled precondition（mockFund.queryFundBalance 返回 1_000_000 ≥ expectedMinimumAvailableBalance=0 即满足）。这是 fixture 与 saga 业务逻辑对齐的微调，不影响接口或裁决。
+
+#### 元规则 / 惯例触发
+
+| 规则 / 惯例 | 实战 |
+|---|---|
+| 元规则 B（接口冻结） | 严守 — 集成测试零修改 Step 1-15 任何已锁定签名 + 跨 Phase 1-15 任何业务代码 git diff zero |
+| 元规则 P（零新依赖） | 严守 — 复用 Sprint F adapter + Sprint G/H saga 模块；零新增第三方依赖 |
+| 元规则 Q（强制开局） | 第 16 次实战（含动作 4 既有集成测试组织 + 动作 5 接口可消费性核查） |
+| 惯例 K（错误码"仅必需"） | 第 18 次实战（0 新错误码；纯消费既有 TQ-SAG-001/002/005） |
+| 惯例 M（ADR 增量追写） | 第 16 次实战 |
+| §4.8 编译期硬约束（Step 15） | 严守 — 集成测试位置在 application/src/saga/，不在 domain 层 |
+| 元规则 A / C / D / E / F / G / H / I / J / L / N / O | N/A（本 Step 不构建运行时代码） |
+
+#### 关键拒绝候选
+
+**拒绝 γ 新建 workspace 包 `@tianqi/integration-tests`（裁决 1 候选 γ）**。理由：违反"Sprint I 不构建新功能" + "不新建 workspace 包" + "克制 > 堆砌"原则；既有 saga 模块同目录模式已被 Sprint H 5 个 saga 模块的 integration test 充分实证。
+
+**拒绝 B 含 Postgres adapter 测试（裁决 4 候选 B）**。理由：Postgres 持久化语义已被 Sprint F adapter 测试充分覆盖；Step 16 端到端价值不在 adapter swap；KI-P8-003 时序 flake 加剧风险高于工程价值；既有 Sprint G/H saga 集成测试都仅用 memory adapter 沿用一致。承接 Phase 11（KI-P8-002 修复责任 Phase）真实基础设施 Step。
+
+**拒绝 C 上限 ≤12（裁决 3 候选 C）**。理由：B ≤8（4 类各 2 it）已让 4 业务 Saga 各自至少 1 次亮相 + 4 类编排器能力维度全覆盖；C 引入冗余覆盖（譬如同一业务 Saga 在不同 class 多次出现）但工程价值低；端到端集成测试单 it 耗时较长，过多 it 让套件运行时间显著上升。
+
+**拒绝 fake timers（裁决 5 候选 vi.useFakeTimers）**。理由：fake timers 在端到端场景下复杂度高（多个 Promise.race 难以同步控制；编排器内部 watchdog 与外部 timer 协同复杂）；真实时序触发让超时机制被真实测试；fast/slow ≥ 1:10 比例已足够防御 KI-P8-003。
+
+**拒绝独立 fixture 模块（裁决 7 候选 独立模块）**。理由：过度抽象违反"克制"；本 Step 测试是单一文件（saga-end-to-end.integration.test.ts），共享 builder 函数 in-file 让测试代码可读性最佳；独立 fixture 模块在仅 1 处消费时是不必要的间接层。
+
+### Step 17-19: [待 Sprint I 后续 Step 增量填充]
 
 ## Consequences
 
@@ -3163,7 +3317,7 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 
 **拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
 
-### Step 16-19 拒绝候选
+### Step 17-19 拒绝候选
 
 [由 Sprint I 增量记录]
 

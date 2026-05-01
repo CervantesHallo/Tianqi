@@ -2285,7 +2285,194 @@ Sprint I 不引入新业务功能，主要做完整性核查 + 收官。Step 15 
 
 Phase 9 / Sprint H 进度 5/5 完成。Phase 9 进入 Sprint I 收官阶段。
 
-### Step 15-19: [待 Sprint I 增量填充]
+### Step 15: §4.8 编译期硬约束（domain 不依赖 Port）— Sprint I 启程战（2026-05-01）
+
+> **状态**：Accepted
+> **实施完成时间**：2026-05-01
+> **commit**：[第二阶段实施 commits 待提交]
+
+#### 性质：Sprint I 启程战 + 工程基础设施升级
+
+Step 15 是 Sprint I 启程战，性质与 Sprint F-H 完全不同——**不构建新业务能力**，而是把 Phase 9 全程通过"纪律"遵守的 §4.8 约束**升级为编译期 / lint 期自动校验机制**。Sprint I 5 个 Step 都不构建新业务功能，本 Step 是 Sprint I 唯一引入工程机制的 Step。
+
+#### 强制开局动作 4 实地核查结果（domain 包违规情况）
+
+实测 grep 三类模式全部零匹配：
+
+| 模式 | 命令 | 结果 |
+|---|---|---|
+| @tianqi/ports 包名 | `grep -rn "from '@tianqi/ports\|from \"@tianqi/ports" packages/domain/src/` | 0 匹配 |
+| 相对路径 ports | `grep -rn "from \"\\.\\./.*ports\\|from '\\.\\./.*ports" packages/domain/src/` | 0 匹配 |
+| port 文件名 | `grep -rn "saga-port\|...\|idempotency-port" packages/domain/src/` | 0 匹配 |
+
+**结论**：domain 包当前**零违规** —— Phase 1-7 + Phase 9 全程通过纪律守住了 §4.8。本 Step 仅"启用约束机制"，不需要修复任何既有违规。
+
+#### 强制开局动作 5 实地核查结果（既有 ESLint + tsconfig 现状）
+
+| 现状项 | 实测 |
+|---|---|
+| ESLint 配置文件 | `eslint.config.mjs`（ESLint flat config 单文件；含 7 条规则 + ignore + parser 配置） |
+| ESLint 已 import 依赖 | @eslint/js / @typescript-eslint/parser / @typescript-eslint/eslint-plugin / eslint-config-prettier（**无需新增第三方依赖**） |
+| domain tsconfig.json references | `[{ "path": "../shared" }, { "path": "../contracts" }]`（**已正确隔离**，不含 ports） |
+| ports tsconfig.json references | `["../shared", "../contracts", "../domain"]`（ports → domain 单向，与 §4.8 一致） |
+
+**关键发现**：domain → ports 的硬约束在 typecheck 层已经通过 project references 形成事实约束（domain 内任何 `import "@tianqi/ports"` 在 typecheck 期解析失败）。本 Step **唯一缺失的是 ESLint 层的"开发时即时反馈"**。
+
+#### 强制开局动作 6 实地核查结果（其他依赖方向）
+
+| 依赖方向 | 命令 | 结果 |
+|---|---|---|
+| domain → policy | `grep -rn "from '@tianqi/policy" packages/domain/src/` | 0 匹配 |
+| policy → application | `grep -rn "from '@tianqi/application" packages/policy/src/` | 0 匹配 |
+| shared → 业务包 | `grep -rn "from '@tianqi/domain\|policy\|application\|ports\|contracts" packages/shared/src/` | 0 匹配 |
+
+**结论**：Phase 1-7 + Phase 9 既有架构纪律 P5 / P6 全部守住。本 Step **仅约束 §4.8 明确要求的 domain → port 禁止**（裁决 4 + 强边界条款），不主动扩展其他依赖方向（克制）。
+
+#### 7 个核心裁决摘要
+
+**裁决 1（工程机制）：C 双重保护**
+
+- TypeScript 端：`packages/domain/tsconfig.json` references 不含 ports → import 解析失败（CI 强制保证；这已是事实，本 Step 仅"显式声明 lock"）
+- ESLint 端：补充 `no-restricted-imports` 规则（IDE 即时红线 / 开发时即时反馈）
+- 单一机制易被绕过（譬如 ESLint 禁用 / tsconfig references 误改）；双重保护让两类破坏路径都被覆盖
+
+**裁决 2（ESLint 规则配置位置）：α 全仓 root `eslint.config.mjs`**
+
+- 仓库使用 ESLint flat config 单文件
+- α 让规则集中管理 + 与既有 7 条规则同位置
+- β packages/domain 包内独立配置违反"扁平 > 嵌套"
+- γ 工具包过度抽象违反"克制"（Tianqi 全仓只有 1 个 domain 包）
+- 实施：在 eslint.config.mjs 添加针对 `packages/domain/**/*.ts` 的 files glob 配置
+
+**裁决 3（TypeScript references 处置）：已正确，仅添加注释 lock**
+
+- 实测 domain tsconfig.json references 仅 `["../shared", "../contracts"]`
+- 不修改 references 数组，仅在 tsconfig.json 添加 `"//"` 注释字段说明 §4.8 约束 + 元规则 B 锁定声明
+- 任何后续 Step 调整 references 数组必须经 ADR-0002 修订流程
+
+**裁决 4（被约束的 import 模式）：三类**
+
+针对 `packages/domain/**/*.ts` 文件 glob：
+1. `@tianqi/ports` 包名（含子路径 `@tianqi/ports/*`）
+2. 任何相对路径含 `ports` 段（`**/ports`, `**/ports/*`, `**/ports/**`）
+3. 任何 `*-port` / `*-port.js` / `*-port.ts` 文件名 import
+
+**错误信息**：`"domain layer must not depend on ports (Phase 9 §4.8 hard compile-time constraint; see docs/decisions/0002-phase-9-saga-orchestration.md Step 15)"`
+
+R1 硬要求满足：错误信息含 "§4.8" + ADR Step 15 路径，让未来违规者一眼看出约束来源 + 修订路径。
+
+**裁决 5（适用范围）：domain 包全部代码（src + tests）**
+
+- ESLint files glob `packages/domain/**/*.ts`
+- 即使 domain 测试代码也不应依赖 port（domain 测试是 domain 内部行为验证，不需要 port mock）
+- 当前 domain 包测试散落在 `src/*.test.ts`，glob 自然覆盖
+
+**裁决 6（错误码新增）：0**
+
+- §4.8 是编译期约束，违反在编译期被发现，不需要运行时错误码
+- TQ-CON-* 命名空间是契约错误码，§4.8 违规属架构错误不属契约错误
+- 惯例 K 第 17 次实战仍按"仅必需"原则
+- 0 新增维持 TQ-* 命名空间整洁
+
+**裁决 7（测试策略）：A 不增加测试**
+
+- ESLint 规则的正确性已被 ESLint 自身机制保证
+- 本 Step 仅"启用规则"，不"实现规则"
+- B fixture 测试（`*.fixture.ts.disabled` 文件）增加 maintenance 负担违反"克制 > 堆砌"
+- **手动验证替代方案**：临时构造违规文件 → 跑 ESLint → 验证规则触发（错误信息含 "§4.8"）→ 删除（手动验证 + commit log 留痕，不持久化 fixture）
+
+#### 关键实现细节
+
+##### 1. ESLint 规则启用（eslint.config.mjs +63 行）
+
+新增模块级常量 `SECTION_4_8_VIOLATION_MESSAGE`（错误信息复用 + R1 满足证据）+ flat config 数组追加针对 `packages/domain/**/*.ts` files glob 的 `no-restricted-imports` 规则配置（三类 patterns 见裁决 4）。
+
+新增 26 行模块头注释含设计裁决摘要 + 元规则 B 锁定声明（自 Step 15 起本规则冻结，任何调整必须经 ADR-0002 修订流程）。
+
+##### 2. domain tsconfig.json 注释（packages/domain/tsconfig.json）
+
+添加 `"//"` 字段（JSON 注释惯例），说明：
+- references 故意不含 ../ports 是 §4.8 编译期硬约束
+- 与 ESLint no-restricted-imports 双重保护
+- 元规则 B 锁定（自 Step 15 起）
+- 修订流程指向 ADR-0002 + docs/phase9/15
+
+##### 3. 手动违规验证（commit log 之外不留痕）
+
+实测过程：
+```
+echo 'import type { SagaId } from "@tianqi/ports"; ...' > packages/domain/src/__step15_violation_test.ts
+pnpm exec eslint packages/domain/src/__step15_violation_test.ts
+# 输出：✖ 2 problems (2 errors, 0 warnings)
+#   '@tianqi/ports' import is restricted from being used by a pattern.
+#   domain layer must not depend on ports (Phase 9 §4.8 hard compile-time
+#   constraint; see docs/decisions/0002-phase-9-saga-orchestration.md
+#   Step 15)
+rm packages/domain/src/__step15_violation_test.ts
+```
+
+R1 验证证据：错误信息确实含 "Phase 9 §4.8 hard compile-time constraint" + ADR Step 15 路径。
+
+##### 4. 测试结果
+
+- **Lint**: 零警告（启用新规则后跑 `pnpm lint`）
+- **Typecheck**: 零错误（`pnpm -r build` 全 25 包通过）
+- **Tests**: 1963（1859 passed + 104 skipped）—— **维持不变**（Step 15 不增加测试，裁决 7 A）
+- **Coverage**: 84.9% lines / 79.5% branches / 91.68% functions / 84.9% statements
+  - vs Step 14 baseline 84.89%/79.43%/91.68%/84.89%：Branches +0.07pp（其他维度持平）
+  - 全部仍超 §9.3 红线（Functions 91.68% > 80% +11.68pp）
+
+##### 5. 元规则 B 锁定形态（自 Step 15 起冻结）
+
+| # | 形态 | 实施位置 |
+|---|---|---|
+| 1 | ESLint no-restricted-imports 规则三类 patterns | eslint.config.mjs |
+| 2 | SECTION_4_8_VIOLATION_MESSAGE 错误信息 | eslint.config.mjs（含 §4.8 引用 + ADR 路径） |
+| 3 | domain tsconfig.json references 数组 `[shared, contracts]` | packages/domain/tsconfig.json |
+| 4 | files glob `packages/domain/**/*.ts` | eslint.config.mjs |
+
+后续 Step / Phase 10+ 任何调整必须经 ADR-0002 修订流程。
+
+#### §4.8 从纪律升级为机制的工程意义
+
+Phase 1-7 + Phase 9（Step 1-14）全程通过**纪律**遵守 §4.8："领域层不得依赖任何 Port 接口"——14 个 Step 跨度 domain 零违规，证明纪律有效。但纪律的弱点是：
+
+- 未来某个 Step 不小心 import port → 直到 PR review 才被发现（甚至更晚）
+- IDE 不提示 → 开发者错觉"这是合法 import"
+- TypeScript references 隔离虽然在 build 时拦截，但日常 IDE 编辑时 TypeScript 服务可能忽略 references 边界
+
+Step 15 把纪律**升级为机制**：
+
+- **lint IDE 即时红线**：开发者在 IDE 内一打字就被红线提示 + 错误信息明示 §4.8
+- **typecheck CI 强制保证**：build 期任何违规导致 CI 失败
+- **错误信息含 §4.8 引用 + ADR 路径**：违规者立即知道约束来源 + 修订路径
+
+这是宪法 P8（接口语义稳定优先于"短期省事"）和 §22.1（AI 严禁省略边界条件）在工程基础设施层的具体落地。读者翻开任何 domain 文件，IDE 立即红线提示"不能 import port"——清晰、可控、可信。
+
+#### 元规则 / 惯例触发
+
+| 规则 / 惯例 | 实战 |
+|---|---|
+| 元规则 B（接口冻结） | 严守 + 引入 4 项新形态锁定（ESLint 规则 + 错误信息 + tsconfig references + files glob） |
+| 元规则 Q（强制开局） | 第 15 次实战（含 4 / 5 / 6 三项专属实地核查） |
+| 惯例 K（错误码"仅必需"） | 第 17 次实战（0 新错误码；§4.8 编译期约束不需要运行时错误码） |
+| 惯例 M（ADR 增量追写） | 第 15 次实战 |
+| 元规则 P（零新依赖） | 严守 —— 复用既有 @eslint/js / @typescript-eslint/parser / eslint-plugin / eslint-config-prettier；no-restricted-imports 是 ESLint 内置规则 |
+| 其他元规则 A / C / D / E / F / G / H / I / J / L / N / O | 全 N/A（本 Step 不构建运行时代码） |
+
+#### 关键拒绝候选
+
+**拒绝 D 工具方案 dependency-cruiser（裁决 1 候选 D）**。理由：no-restricted-imports 是 ESLint 内置规则；引入 dependency-cruiser 增加第三方依赖（违反元规则 P）+ 增加开发者学习成本；ESLint 本身已是 Tianqi 标准 lint 工具。
+
+**拒绝 γ 工具包 `@tianqi/eslint-config`（裁决 2 候选 γ）**。理由：Tianqi 全仓只有 1 个 domain 包；可复用 ESLint 包是过度抽象违反"克制 > 堆砌"。
+
+**拒绝 fixture 测试（裁决 7 候选 B / C）**。理由：增加 `*.fixture.ts.disabled` 文件 + ESLint runner 配置 + 测试 runner 集成；本 Step 仅"启用规则"，规则正确性由 ESLint 自身保证；手动验证 + commit log 留痕已足够。
+
+**拒绝扩展约束到其他依赖方向（强边界声明）**。理由：本 Step 仅约束 §4.8 明确要求的 domain → port 禁止；其他方向（policy → application / shared → 业务包）由 Phase 1-7 既有架构纪律守住（实测零违规），本 Step 不主动扩展（克制）；Phase 10+ 若发现新方向需要约束再通过 ADR 修订流程引入。
+
+**拒绝引入运行时错误码 TQ-ARCH-* 命名空间（裁决 6 候选 1）**。理由：§4.8 是编译期约束，违反在编译期被发现，不需要运行时错误码；新增错误码命名空间引入命名空间膨胀违反"克制"。
+
+### Step 16-19: [待 Sprint I 后续 Step 增量填充]
 
 ## Consequences
 
@@ -2976,7 +3163,7 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 
 **拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
 
-### Step 15-19 拒绝候选
+### Step 16-19 拒绝候选
 
 [由 Sprint I 增量记录]
 

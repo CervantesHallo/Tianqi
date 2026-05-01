@@ -1818,7 +1818,143 @@ $ git diff origin/main -- \
   部分分支未在测试中触发；接受为模板纪律代价的延续）；全部仍超 §9.3
   红线（Functions 91.65% > 80% +11.65pp）
 
-### Step 14-19: [待后续 Step 增量填充]
+### Step 14: 跨 Saga 协调 — Sprint H 收官战 + Phase 9 后期复杂度峰值（2026-05-01，DRAFT）
+
+> **状态**：DRAFT — 等待用户审视（拆两阶段流程第二次实战）
+> **APPROVE 时间**：[待补充]
+> **实施完成时间**：[待补充]
+> **草案文档**：`packages/application/src/saga/cross-saga-coordination.draft.md`（待 APPROVE 后第二阶段实施完成时删除）
+
+#### 性质：拆两阶段的 Phase 9 第二个 Step（首次 Step 6）
+
+Step 14 是 Sprint H 收官战 + Phase 9 后期复杂度峰值。拆两阶段理由：
+
+- 跨 Saga 协调是**全新概念**，无既有接口参考
+- 接口冻结后将影响 Sprint I 收官 5 Step（15-19）
+- 业务现实复杂度可能高于 Step 6（实测倾向轻量，由强制开局动作 4 实地核查决定）
+- **第一阶段（PHASE_DESIGN）**：产出接口草案 + ADR DRAFT 段；本机 commit；**严禁 push**；等待用户 APPROVE
+- **第二阶段（PHASE_IMPLEMENT）**：仅在 APPROVE 后启动；实现 + 单元 + 集成测试 + 文档 + Sprint H 收官小结段 + 整批 push
+
+#### 强制开局动作 4 实地核查结果（业务现实判断 — 关键）
+
+**判断 = 预期 A 轻量场景**（与 prompt 推荐一致）。
+
+实地证据：
+1. Phase 1-7 全部代码 grep `Promise.all` / `concurrent` / `parallel` / `并发` / `isolation` / `race` 均**0 命中并发原语**
+2. domain 层 `risk-case-state-machine.ts` 锁定状态迁移规则 —— 业务流程**禁止**"同 caseId 多 Saga 同时活跃"
+3. 4 业务 Saga 串行触发关系：Liquidation 失败 → ADL → InsuranceFund（状态机推进的产物）
+4. Phase 1-7 既有 IdempotencyPort 在**命令层**已防"requestId 重复"
+5. **Saga 层真正缺失**：runForCase 启动前未做"同 caseId 已活跃 Saga 检查"防御
+6. 资源冲突场景未被 Phase 1-7 表达 —— 不构造重量级跨 Saga 协调器
+
+#### 强制开局动作 5 实地核查结果（Sprint F Adapter 并发支持）
+
+`SagaStateStorePort.listIncomplete()` 已具备核心能力：返回 `overallStatus ∈ {"in_progress", "compensating"}` 的全部 saga。
+
+支撑足够。已知局限性（Phase 10+ 责任）：
+- 跨进程 sagaId 唯一性：单进程 invocationCounter 保证；跨进程需调用方负责
+- listIncomplete 在 postgres READ COMMITTED 下可能看到 in-flight commit（可接受）
+- 高并发下 KI-P8-003 时序 flake：本 Step 集成测试不引入 < 100ms 时序断言
+
+#### 强制开局动作 6 实地核查结果（4 业务 Saga 接口并发语义）
+
+4 业务 Saga sagaId / correlationId 命名约定一致：
+
+| Saga | sagaId 模式 | correlationId 模式 |
+|---|---|---|
+| LiquidationSaga | `liquidation-saga-{caseId}-{stamp}` | `corr-liquidation-{caseId}` |
+| ADLSaga | `adl-saga-{caseId}-{stamp}` | `corr-adl-{caseId}` |
+| InsuranceFundSaga | `insurance-fund-saga-{caseId}-{stamp}` | `corr-insurance-fund-{caseId}` |
+| StateTransitionSaga | `state-transition-saga-{caseId}-{stamp}` | `corr-state-transition-{caseId}` |
+
+协调模块**字符串前缀解析** sagaId → (sagaKind, caseId)。命名约定本身已是事实标准，本 Step 提升为协调模块的契约。
+
+#### 7 个核心裁决摘要（DRAFT 阶段）
+
+**裁决 1（场景轻重判断）：α 轻量场景**
+
+理由（基于业务现实核查）：
+- Tianqi 业务流程语义禁止"同 caseId 多 Saga 同时活跃"
+- IdempotencyPort 已处理"命令层重复"
+- Saga 层真正缺失的是"同 caseId 防重复触发"
+- 重量级会引入"为复杂度而复杂度"，违反"克制 > 堆砌"
+
+**裁决 2（唯一性保证机制）：A SagaStateStore.listIncomplete + caseId 前缀过滤**
+
+- 不引入新 Adapter（克制 > 堆砌）
+- 复用 4 业务 Saga 命名约定
+- 字符串前缀解析作为 sagaId → (sagaKind, caseId) 映射
+
+**裁决 3（协调模块归属位置）：α 与既有 saga 模块同目录平级**
+
+`packages/application/src/saga/cross-saga-coordination.ts` —— 与 saga-orchestrator / saga-manual-intervention / 4 业务 saga 同目录平级。扁平结构（宗旨第 5 条）。
+
+**裁决 4（协调函数形态）：γ 工厂闭包 + 单方法接口**
+
+- 工厂闭包 `createCrossSagaCoordination(ports, options?)` 与既有 saga 模块风格一致
+- 单方法 `checkActiveSagaForCase(input)` 与既有 saga 工厂的 runForCase / processDeadLetter 风格一致
+
+**裁决 5（错误码新增）：0**
+
+- "同 caseId 已有活跃 Saga"不是错误，是返回 `ActiveSagaInfo[]` 让调用方决定
+- 复用 SagaStateStoreError → wrap 为 SagaPortError
+- 惯例 K 第十六次实战仍按"仅必需"原则
+
+**裁决 6（是否引入新 Port）：强守不引入**
+
+Sprint H 模板纪律延续。纯消费 SagaStateStorePort.listIncomplete。
+
+**裁决 7（测试策略）：单元 ≤6 + 集成 ≤4 + 不挂载 defineSagaContractTests**
+
+- 不构造业务 Saga，不适合挂载 SagaContractTests
+- 集成测试覆盖跨 Saga 真实并发场景（G24）
+
+#### 接口草案要点（详见草案文档）
+
+```typescript
+export type BusinessSagaKind = "liquidation" | "adl" | "insurance-fund" | "state-transition";
+export type ActiveSagaInfo = {
+  readonly sagaId: SagaId;
+  readonly caseId: string;
+  readonly sagaKind: BusinessSagaKind;
+  readonly startedAt: string;
+  readonly overallStatus: "in_progress" | "compensating";
+};
+export type CrossSagaCoordinationPorts = { readonly sagaStateStore: SagaStateStorePort };
+export type CrossSagaCoordinationOptions = {
+  readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
+};
+export type CrossSagaCoordination = {
+  checkActiveSagaForCase(input: {
+    readonly caseId: string;
+    readonly sagaKindFilter?: ReadonlyArray<BusinessSagaKind>;
+  }): Promise<Result<ReadonlyArray<ActiveSagaInfo>, SagaPortError>>;
+};
+export const createCrossSagaCoordination: (
+  ports: CrossSagaCoordinationPorts,
+  options?: CrossSagaCoordinationOptions
+) => CrossSagaCoordination;
+```
+
+#### 元规则 / 惯例触发（DRAFT 阶段）
+
+- 元规则 B：严守 —— Step 1-13 任何已锁定签名一字未改；预期跨 6 个 saga 模块 git diff zero
+- 元规则 F：严守 —— 协调模块零 import 既有 saga 模块
+- 元规则 Q：第十四次实战
+- 惯例 K：第十六次实战（0 新错误码）
+- 惯例 L：≤ 6 单元 it
+- 惯例 M：第十四次实战（含 Sprint H 收官小结段）
+- 拆两阶段流程：第二次实战
+- 其他元规则：A / C / D / E / G / H / I / J / N / O / P 全 N/A
+
+#### 实施细节（第二阶段产出 — 待补充）
+
+[第二阶段 PHASE_IMPLEMENT 完成后填充]
+- LOC 实测 vs DRAFT 预估
+- 与 DRAFT 草案的差异（如有）
+- Sprint H 收官小结段
+
+### Step 15-19: [待 Sprint I 增量填充]
 
 ## Consequences
 
@@ -2485,9 +2621,33 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 被调用方注入控制（违反"Saga 是流程编排"边界）；联合类型 3 kind 是
 受控的可序列化设计；新 kind 通过 ADR 修订流程引入。
 
-### Step 14-19 拒绝候选
+### Step 14 拒绝候选（DRAFT 阶段）
 
-[由后续 Step 增量记录]
+**拒绝重量级跨 Saga 协调器（裁决 1 候选 β）**。理由：业务现实核查（强制开局动作 4）实地证据表明 Tianqi 业务流程语义禁止"同 caseId 多 Saga 同时活跃"；资源冲突场景未被 Phase 1-7 表达；构造重量级协调器（资源公平 / 死锁防御 / 优先级调度）违反"克制 > 堆砌"宗旨。真实跨 Saga 资源冲突场景由 Phase 10+ 实地遇到时通过 ADR 修订流程引入。
+
+**拒绝分层（α 必含 + β 接口预留但不实现）（裁决 1 候选 γ）**。理由："接口预留但不实现"违反《§22.1》"严禁 TODO 逃避"和"不写未达项的占位"原则；预留的接口若不被消费会成为死代码；未来需要时通过 ADR 修订流程扩展。
+
+**拒绝引入新 SagaActivityStore Adapter（裁决 2 候选 B）**。理由：违反 Sprint H 模板纪律（不引入新 Port）；重复了 SagaStateStore 的本职（持久化 + 列出未终态 saga）；引入会破坏元规则 B 锁定的 Sprint F 4 Adapter 边界。
+
+**拒绝仅靠 SagaInvocation.sagaId 唯一性保证（裁决 2 候选 C）**。理由：sagaId 唯一性仅防"同 sagaId 重复触发"（已由 invocationCounter 保证），不能告诉调用方"是否有同 caseId 已活跃 Saga"。本 Step 真正解决的是后者。
+
+**拒绝独立目录 `packages/application/src/coordination/cross-saga.ts`（裁决 3 候选 β）**。理由：违反"扁平 > 嵌套"宗旨；协调机制本身是 saga 范畴内的辅助设施，归 saga 子目录合理；与 Step 9-13 5 个 saga 模块同目录平级风格一致。
+
+**拒绝纯函数 helper 形态（裁决 4 候选 α）**。理由：与既有 saga 模块工厂闭包风格不一致；闭包持有 ports + options 便于测试注入与配置；保持风格一致让读者切换语境成本低。
+
+**拒绝引入新错误码"同 caseId 已有活跃 Saga"（裁决 5 候选 1）**。理由：协调模块仅返回 `ActiveSagaInfo[]`，不抛错；调用方决定"拒绝 / 等待 / 强制覆盖"业务策略；引入新错误码违反惯例 K"仅必需"原则；本 Step 0 新增错误码。
+
+**拒绝引入"动态 Saga 编排"或"Saga 跨实例分布式锁"（强边界声明）**。理由：动态编排（运行时编排不同 Saga 的高级能力）是 Phase 10+ 责任；跨实例分布式锁（多机集群协调）是 Phase 11 责任；本 Step 不在 Sprint I 提前布局，由独立指令启动。
+
+**拒绝引入"包裹工厂" `createGuardedLiquidationSaga`（裁决 4 候选 ξ）**。理由：违反 Sprint H 模板纪律（不修改既有业务 Saga）；调用方决定如何使用协调模块是业务策略层职责；ADR + README 留痕推荐使用模式即可；Phase 10+ 若发现调用方分散逻辑成为问题再引入。
+
+**拒绝增加 PersistedSagaState.caseId 字段（裁决 2 替代候选）**。理由：违反元规则 B（PersistedSagaState 在 Step 3 已锁定 10 字段集）；Step 3 拒绝过 initialInput 等业务字段；caseId 编码在 sagaId / correlationId 字符串中已是事实标准，本 Step 提升为协调模块契约即可，不破坏 Step 3 锁定形态。
+
+**拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
+
+### Step 15-19 拒绝候选
+
+[由 Sprint I 增量记录]
 
 ## References
 

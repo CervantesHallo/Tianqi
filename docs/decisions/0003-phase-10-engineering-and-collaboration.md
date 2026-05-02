@@ -2,16 +2,17 @@
 
 ## Status
 
-DRAFT (Phase 10 kickoff PHASE_DESIGN, 2026-05-02; pending user APPROVE before PHASE_IMPLEMENT upgrade to In Progress)
+DRAFT v2 (Phase 10 kickoff PHASE_DESIGN, 2026-05-02; v1 用户审视后 5 项未决判断 K.1-K.5 反馈：K.1 修正补丁 / K.2 锁定策略 / K.3 重新规划 / K.4 重新命名 / K.5 同意保留 + 关键观察 ADR 命名建议；v2 修订完成等待用户 APPROVE)
 
 > **本 ADR 是增量追写**（惯例 M 沿用 Phase 9 模式）。Phase 10 启程指令拆两阶段流程：
 >
-> - **第一阶段（PHASE_DESIGN，本 commit）**：创建 ADR-0003 三段（Status DRAFT / Context / Decision 占位）+ PHASE-10-DESIGN-DRAFT.md 完整草案
-> - **第二阶段（PHASE_IMPLEMENT，APPROVE 后）**：Status DRAFT → In Progress；删除 PHASE-10-DESIGN-DRAFT.md
+> - **第一阶段（PHASE_DESIGN）v1**：创建 ADR-0003 三段（Status DRAFT / Context / Decision 占位）+ PHASE-10-DESIGN-DRAFT.md 完整草案
+> - **第一阶段 v2**（**本 commit**）：用户 REQUEST_CHANGES + 反馈后修订（K.1 KI 字段 + K.2 升级路径 + K.3 方案 B + K.4 Kickoff 独立 + ADR 命名保留）
+> - **第二阶段（PHASE_IMPLEMENT，v2 APPROVE 后）**：Status DRAFT → In Progress；删除 PHASE-10-DESIGN-DRAFT.md；同步更新 KNOWN-ISSUES.md（KI-P8-001 修复责任 Phase → Phase 13+ TBD）
 > - **Phase 10 内部各 Step 完成时**：Decision 段下追加该 Step 的关键裁决摘要
-> - **Phase 10 收官（最终 Step）**：Status In Progress → Accepted；Consequences 段最终撰写
+> - **Phase 10 收官（Step 7）**：Status In Progress → Accepted；Consequences 段最终撰写；CI 门槛 84% → 85% 升级
 >
-> 这是 Phase 10 沿用 Phase 9 增量追写模式的连续性证据（惯例 M 跨 Phase 一致性）。
+> 这是 Phase 10 沿用 Phase 9 增量追写模式的连续性证据（惯例 M 跨 Phase 一致性）。拆两阶段流程**第 3 次实战**——v1 → v2 修订证明 Phase 启程级用户审视的实证价值。
 
 ## Context
 
@@ -91,27 +92,39 @@ Phase 1-9 累计 38 个 Step（Phase 8 19 + Phase 9 19），Tianqi 已是"代码
 >
 > Phase 10 完整 Step 划分（裁决 2）+ 9 个核心裁决摘要（裁决 1-9）详见 `docs/phase10/PHASE-10-DESIGN-DRAFT.md`（PHASE_DESIGN 阶段草案；PHASE_IMPLEMENT 阶段完成后删除，设计沉淀进本 ADR）。
 
-### Phase 10 完整 Step 划分（DRAFT 阶段；待 APPROVE 锁定）
+### Phase 10 完整 Step 划分（v2 修订；K.4 Kickoff 独立 + K.3 方案 B 不合并；7 Step + 1 Kickoff = 8 总数）
 
-| Step | 主题 | 性质 |
+| 编号 | 主题 | 性质 |
 |---|---|---|
-| 1 | 本启程指令（PHASE_DESIGN + PHASE_IMPLEMENT 两阶段；ADR-0003 + 启程标记）| 启程战 |
-| 2 | 协作资产基础三件套（CONTRIBUTING / CODE_OF_CONDUCT / SECURITY）| 协作 |
-| 3 | PR 模板 + Issue 模板 + CODEOWNERS（.github/ 目录建立）| 协作 |
-| 4 | CI 强制门禁（GitHub Actions workflow + lint/typecheck/test/coverage + 85% 门槛）| 工程化 |
-| 5 | 容器化（Dockerfile 多阶段 + 非 root + 健康检查 + docker-compose 开发编排）| 工程化 |
-| 6 | 发布自动化（git tag 触发流水线 + changesets 或等价工具）| 工程化 |
-| 7 | README 可执行性更新 + Runbook 同步 | 文档 |
-| 8 | Phase 10 CLOSED + CHANGELOG 更新 | 收官 |
+| **Phase 10 Kickoff** | **本启程指令**（PHASE_DESIGN v1+v2 + PHASE_IMPLEMENT；ADR-0003 + 启程标记；不算 Step）| **启程战** |
+| Step 1 | 协作资产基础三件套（CONTRIBUTING / CODE_OF_CONDUCT / SECURITY）| 协作 |
+| Step 2 | PR 模板 + Issue 模板 + CODEOWNERS（.github/ 目录建立）| 协作 |
+| Step 3 | CI 强制门禁（GitHub Actions workflow + lint/typecheck/test/coverage + **84% 起步门槛**）| 工程化 |
+| Step 4 | 容器化（Dockerfile 多阶段 + 非 root + 健康检查 + docker-compose 开发编排）| 工程化 |
+| Step 5 | 发布自动化（git tag 触发流水线 + changesets 或等价工具）| 工程化 |
+| Step 6 | README 可执行性更新 + Runbook 同步 | 文档 |
+| Step 7 | Phase 10 CLOSED + CHANGELOG 更新 + **CI 门槛升级 84% → 85%** | 收官 |
 
-### Phase 10 强制开局动作模板（裁决 4 B；自 Step 2 起每 Step 必做）
+### Phase 10 强制开局动作模板（裁决 4 B；自 Step 1 起每 Step 必做）
 
 | # | 动作 | 性质 |
 |---|---|---|
 | 1 | 重读宪法 + 补充文档（关键章节按 Step 主题） | 通用 |
 | 2 | 核查 KNOWN-ISSUES 5 项 KI 状态 | 通用 |
 | 3 | 核查 ADR-0001 + ADR-0002 + ADR-0003 | 通用 |
-| 4 | 工程化主题专属核查（视 Step 主题：协作资产 / CI / 容器化 / 等）| Phase 10 专属 |
+| 4 | 工程化主题专属核查（视 Step 主题）| Phase 10 专属 |
+
+**Step 编号映射（v2 修订）**：
+
+| Step | 工程化主题专属核查（动作 4） |
+|---|---|
+| Step 1 | 既有项目 CONTRIBUTING / CODE_OF_CONDUCT / SECURITY 文档惯例（主流参照：Contributor Covenant 等）|
+| Step 2 | 既有 .github/ 目录 + GitHub 平台 PR/Issue 模板格式 + Tianqi 包 owner 划分 |
+| Step 3 | 既有 .github/workflows/ + pnpm 命令本地一致性 + 当前覆盖率实测 |
+| Step 4 | 既有 Dockerfile / docker-compose / 容器化工具链 |
+| Step 5 | 既有 git tag + changesets / 替代工具 |
+| Step 6 | README 当前内容 + Runbook 既有结构 |
+| Step 7 | ADR-0003 状态 + CHANGELOG / git tag 既有约定 + Step 3-6 累计覆盖率改善实测 |
 
 ### 元规则 / 惯例触发（Phase 10 启程）
 
@@ -125,11 +138,39 @@ Phase 1-9 累计 38 个 Step（Phase 8 19 + Phase 9 19），Tianqi 已是"代码
 | §4.8 编译期硬约束 | 严守 — 本 Phase 不触碰 domain |
 | 拆两阶段流程 | **第 3 次实战**（本启程指令；Phase 内部 Step 视复杂度决定）|
 
+### v2 修订要点（用户 REQUEST_CHANGES + 反馈后落地）
+
+**K.1 修正补丁**（PHASE_IMPLEMENT 阶段执行）：
+KI-P8-001 修复责任 Phase 字段：`Phase 10` → **`Phase 13+ TBD`**。
+理由：Phase 10 工程化 / Phase 11 真实基础设施 / Phase 12 发布就绪都是非业务覆盖率改善 Phase；KI-P8-001 是业务 domain 覆盖率，应留待 Phase 13+ 业务能力延伸 Phase 修复。
+
+**K.2 锁定策略**：CI 覆盖率门槛升级路径
+- **Step 3 起步**：CI 门槛 = **84%**（当前实测 84.92%；84% 起步给 Step 3-6 实施过程缓冲空间，不让 CI 一启用就阻塞主分支推进）
+- **Step 7 收官升级**：CI 门槛 84% → **85%**（补充文档 §9.3 Phase 10 CLOSED 后 85% 强制门禁）
+- **升级路径三选**：
+  - **A 推荐**：Step 3-6 实施过程顺手改善覆盖率（若有自然增量譬如新工程化测试 / Dockerfile lint 测试 / CI workflow 验证测试）
+  - **B 推荐**：Step 7 收官前实测覆盖率，若 ≥85% 直接升级；若略低（≤0.5pp 差距）由 Step 7 内部小幅补充工程化测试改善
+  - **C fallback**：若 Step 7 收官时仍 < 85%（罕见情况），登记新 KI（譬如 KI-P10-001 "覆盖率门槛升级延后"）+ 保持 84% 门槛 + Phase 11 责任改善 + ADR-0003 修订流程明示降级理由
+
+**K.3 方案 B 落地**：不合并 Step 1 / Step 2（vs v1 的合并候选）；保持协作三件套与 PR/Issue/CODEOWNERS 主题独立。
+
+**K.4 Kickoff 独立**：本启程指令命名为 "Phase 10 Kickoff"（不算 Step；与 Phase 8/9 启程模式协调——Phase 8/9 无独立 Kickoff，但 Phase 10 拆两阶段流程让 Kickoff 必然独立）。
+
+**K.5 同意保留**：拆两阶段流程"视具体 Step 复杂度决定"。
+
+**关键观察 — ADR 命名裁决（保留 "Engineering and Collaboration Foundation"）**：
+
+裁决保留原命名而非改 "Engineering and Release Foundation"。理由：
+1. **严格按补充文档 §1.2 直译**："Phase 10：工程化与协作基础"——"协作" = "Collaboration"
+2. **工作分布**：8 总数（7 Step + 1 Kickoff）中"协作"占 3 Step（Step 1+2+6 README+Runbook 也含协作维度）/"工程化"占 2 Step（Step 3+4）/"发布"占 1 Step（Step 5）/"收官"占 1 Step（Step 7）；协作占比最高
+3. **ADR 命名一致性**：ADR-0001 = "Adapter Layer Foundation"（Phase 8 = "基础设施适配器层"）；ADR-0002 = "Saga Orchestration Architecture"（Phase 9 = "分布式补偿完整实现"，标题取 Saga 编排核心）；ADR-0003 沿用补充文档 §1.2 直译模式
+4. **拒绝 "Release Foundation"**：Release（发布自动化）只是 Phase 10 一个 Step（Step 5）；用作 ADR 标题让发布权重过高 / 协作维度被遮蔽
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 2-8 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 1-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 2-8: [待 Phase 10 内部 Step 增量填充]
+### Step 1-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

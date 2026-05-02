@@ -2626,7 +2626,189 @@ DRAFT 内打算用 position-closed precondition；实施时发现 position-close
 
 **拒绝独立 fixture 模块（裁决 7 候选 独立模块）**。理由：过度抽象违反"克制"；本 Step 测试是单一文件（saga-end-to-end.integration.test.ts），共享 builder 函数 in-file 让测试代码可读性最佳；独立 fixture 模块在仅 1 处消费时是不必要的间接层。
 
-### Step 17-19: [待 Sprint I 后续 Step 增量填充]
+### Step 17: 覆盖率核查 + KNOWN-ISSUES 更新 — Sprint I 第三战（2026-05-02）
+
+> **状态**：Accepted
+> **实施完成时间**：2026-05-02
+
+#### 性质：Sprint I 唯一"纯核查"Step
+
+Step 17 是 Phase 9 至今唯一不构建代码、不补测试、不修复 bug 的 Step。本 Step 仅作核查、识别、记录、更新——"看清楚 + 记录 + 留给后续 Phase 修复"。这种 Step 的价值在于"诚实评估 Phase 9 落幕时的真实状态"，让 Step 18-19 收官有可靠数据。
+
+#### 强制开局动作 4 实地核查结果（覆盖率多维度分析）
+
+##### 维度 1：全仓总体覆盖率（Phase 9 / Step 17 实测）
+
+| 指标 | Phase 8 baseline | Phase 9 / Step 16 baseline | Phase 9 / Step 17 实测 | vs Phase 8 |
+|---|---|---|---|---|
+| Lines | 85.97% | 84.92% | **84.92%** | **-1.05pp** |
+| Branches | 79.78% | 79.57% | **79.57%** | **-0.21pp** |
+| Functions | 94.86% | 91.68% | **91.68%** | **-3.18pp** |
+| Statements | 85.97% | 84.92% | **84.92%** | **-1.05pp** |
+
+全部仍超 §9.3 红线（80%/75%/80%/80%）。Phase 9 vs Phase 8 轻微下行原因：Phase 9 引入大量新代码（含 postgres adapter low coverage + ports type-only export 部分）。
+
+##### 维度 2：按 package 覆盖率（关键包）
+
+**Phase 9 新增 saga 模块（application/src/saga/）全部 > 80% lines**：
+
+| 模块 | Lines | Branches | Functions |
+|---|---|---|---|
+| saga-orchestrator.ts | 90.41% | 79.54% | 100% |
+| saga-manual-intervention.ts | 89.51% | 80.76% | 100% |
+| liquidation-saga.ts | 87.25% | 82.92% | 94.73% |
+| adl-saga.ts | 86.44% | 82% | 94.73% |
+| insurance-fund-saga.ts | 85.45% | 75% | 87.5% |
+| state-transition-saga.ts | 85.29% | 80.39% | 83.33% |
+| **cross-saga-coordination.ts** | **97.84%** | **92.5%** | **100%** |
+
+**Phase 9 新增 Sprint F 持久化 Adapter**：
+
+| Adapter | Lines | 备注 |
+|---|---|---|
+| saga-state-store-memory | 94.16% | Sprint F Step 3 |
+| saga-state-store-postgres | 40.7% | CI 默认 skip（KI-P8-002 延续） |
+| dead-letter-store-memory | 93.9% | Sprint F Step 4 |
+| dead-letter-store-postgres | 37.97% | CI 默认 skip（KI-P8-002 延续） |
+
+**Phase 1-7/8 既有包**：
+
+| Package | Lines | 备注 |
+|---|---|---|
+| domain/src | 75.16% | KI-P8-001 未改善（Phase 9 全程未触碰 domain 测试）|
+| ports/src | 11.96% | KI-P8-005 局部改善（Phase 8 baseline 0%；saga-port.ts 100%）|
+| application/src（总体） | 86.5% | Phase 9 新增 saga 模块拉升 |
+| 5 业务 Engine HTTP（Phase 8 Sprint E） | 93-97% | Phase 9 全程未触及 |
+| event-store-memory | 100% | |
+| event-store-postgres | 33.8% | CI 默认 skip |
+| notification-kafka | 47.41% | CI 默认 skip |
+
+##### 维度 3：按 layer
+
+| Layer | 代表性覆盖率 |
+|---|---|
+| domain | 75.16% (KI-P8-001) |
+| ports | 11.96% (KI-P8-005，结构性) |
+| contracts | 高（runtime 错误码工厂被广泛消费） |
+| shared | 高（brand 工厂被广泛消费） |
+| application | 86.5%（含 Phase 9 新增 saga 模块） |
+| adapters（memory）| 94-100% |
+| adapters（postgres / kafka） | 33-48%（KI-P8-002） |
+
+##### 维度 4：按 Sprint 贡献
+
+| Sprint | 贡献覆盖率改善（Phase 9 新增） |
+|---|---|
+| Sprint F（Step 1-5）| 持久化 adapter memory 版 90%+ / postgres 版 30-40%（KI-P8-002 延续） |
+| Sprint G（Step 6-9）| saga-orchestrator 90.41% / saga-manual-intervention 89.51% |
+| Sprint H（Step 10-14）| 4 业务 saga + cross-saga-coordination 全部 > 85%；其中 cross-saga-coordination 97.84% 最高 |
+| Sprint I（Step 15-16）| Step 15 配置变更覆盖率持平 / Step 16 端到端集成测试拉升 saga 模块覆盖率 0.02-0.07pp |
+
+#### 强制开局动作 5 实地核查结果（4 项 open KI 状态最终评估）
+
+| KI | Phase 8 baseline | Phase 9 / Step 17 实测 | 状态变更 | 处置 |
+|---|---|---|---|---|
+| **KI-P8-001** domain 75.16% | 75.16% / 75.79% / 93.06% | **75.16% / 75.79% / 93.05%** | **未改善**（裁决 2 γ） | 状态保持 open + 注脚记录 Phase 9 全程未触碰 domain 测试；修复责任 Phase 转 Phase 10；诚实评估 |
+| **KI-P8-002** external Adapter | event-store 40.71% / notification 47.42% | **event-store 33.8% / notification 47.41% / saga-state-store 40.7% / dead-letter 37.97%** | **延续 + Phase 9 引入 2 新 postgres adapter 一致 low coverage** | 状态保持 open；修复责任 Phase 11；CI 默认 skip 是结构性现象 |
+| **KI-P8-003** 时序 flake | 复现率 ~10-20% | **Phase 9 实战 0 显式 flake**（Step 16 端到端 12ms 单次运行；fast/slow ≥ 1:10 防御） | **Phase 9 实战未触发但状态保持 open**（裁决 3 β） | 状态保持 open + 注脚 "Phase 9 实战 0 flake"；修复责任 Phase 11；KI 关闭应有更强证据 |
+| **KI-P8-005** ports 0% | 0% | **11.96%** | **局部改善**（裁决 4 α） | 状态保持 open + 注脚 Phase 9 局部改善（saga-port.ts 100%）；修复责任 N/A 结构性现象 |
+
+#### 强制开局动作 6 实地核查结果（潜在新 KI 识别）
+
+实地核查 Step 1-16 累计的"风险点 + Phase 10+ 责任承接"事项：
+
+| 候选事项 | 来源 | 升级 KI 判断 |
+|---|---|---|
+| 业务 Saga 真取消能力（编排器层"放弃等待" vs step 层"真取消"） | Step 8 裁决 1 γ 局限性 | **不升级**：ADR 已留痕；不需要持续监控（接受为编排器架构选择） |
+| StateTransition Saga 状态机数据副本与 domain transitionRules 漂移 | Step 13 裁决 4 A 成本 | **升级 KI-P9-001**：需要持续监控（domain 任何修改都要触发 Saga 数据副本同步评估） |
+| 跨进程 sagaId 唯一性 | Step 14 强制开局动作 5 已知局限性 | **不升级**：业务规模未到跨进程部署；ADR 已留痕 |
+| listIncomplete O(n) 扫描扩展性 | Step 14 §I.4 留痕 | **不升级**：已在 ADR 留痕"Phase 10+ Adapter 扩展承接"；性能阈值依赖业务规模 |
+| sagaId 命名约定漂移 | Step 14 v2 修订 | **不升级**：v2 修订已通过 SAGA_ID_NAMING_CONVENTION + parseSagaIdToInfo + onDegradedFailure + 元规则 B 锁定显式化防御 |
+| Postgres 端到端集成测试缺失 | Step 16 风险点 E.3 | **不升级**：已 cover by KI-P8-002 |
+| 真实 Engine 引入时端到端测试时长上升 | Step 16 风险点 E.1 | **不升级**：已 cover by KI-P8-002（Phase 11 责任） |
+
+**结论**：仅升级 1 项 KI（KI-P9-001）。其他事项已在 ADR-0002 留痕"Phase 10+ ADR 修订流程承接"，不需要重复创建 KI（避免 KNOWN-ISSUES 与 ADR 冗余）。
+
+#### 7 个核心裁决摘要
+
+**裁决 1（覆盖率分析维度）：C 多维度交叉**
+
+4 维度全分析：维度 1 全仓总体 + 维度 2 按 package + 维度 3 按 layer + 维度 4 按 Sprint。Phase 9 是 Tianqi 至今最大 Sprint 跨度（16 Step），多维度数据让 Step 18 收官清单有可靠基础。
+
+**裁决 2（KI-P8-001 domain 状态）：γ 未改善**
+
+实测 75.16%（与 Phase 8 baseline 完全一致）。诚实评估：Phase 9 全程未触碰 domain 测试（§4.8 + 元规则 B 接口冻结纪律的代价）。状态保持 open + 修复责任 Phase 转 Phase 10。**不为"关闭 KI"而牵强声明改善**。
+
+**裁决 3（KI-P8-003 状态）：β 保持 open**
+
+Phase 9 实战 0 显式 flake，但 Phase 9 测试套件运行时间短（12ms 量级），未充分压测。真正的 flake 风险在 Phase 11 真实基础设施引入后。"Phase 9 实战 0 flake"作为状态注脚记录即可。
+
+**裁决 4（KI-P8-005 状态）：α 局部改善 + 状态保持 open**
+
+从 0% → 11.96% 是事实改善；但 ports 包整体仍以 type-only export 为主（结构性现象）。"局部改善"是诚实表述。
+
+**裁决 5（新增 Phase 10+ KI）：B 新增 1 项**
+
+仅 KI-P9-001（StateTransition Saga 数据副本漂移监控）需要"持续监控 + 状态跟踪 + 未来 Phase 评估修复"。其他事项已在 ADR-0002 留痕，不重复创建 KI。
+
+**裁决 6（覆盖率盲点 KI）：β 不新增**
+
+KI-P8-002 已 cover 真实基础设施 CI skip 场景。不重复创建 KI。
+
+**裁决 7（测试增量）：0 严守**
+
+Sprint I 性质是"完整性核查"。本 Step 仅识别 + 记录 + 留给后续 Phase 修复。零测试增量。
+
+#### KI 状态最终评估表（Phase 9 落幕时）
+
+| KI | 创建 | 当前状态 | 修复责任 Phase |
+|---|---|---|---|
+| KI-P8-001 | Phase 8 / Step 18 | open（未改善；Phase 9 全程未触碰 domain 测试） | Phase 10 |
+| KI-P8-002 | Phase 8 / Step 18 | open（CI 默认 skip 延续；Phase 9 引入 2 新 postgres adapter 一致行为） | Phase 11 |
+| KI-P8-003 | Phase 8 / Step 18 | open（Phase 9 实战 0 显式 flake，未充分压测） | Phase 11 |
+| KI-P8-005 | Phase 8 / Step 18 | open（Phase 9 局部改善 0% → 11.96%；结构性延续） | N/A |
+| **KI-P9-001（新增）** | Phase 9 / Step 17 | open（StateTransition 数据副本漂移监控） | Phase 10+（持续监控） |
+
+#### Phase 10+ 承接事项汇总
+
+ADR-0002 累计承接给 Phase 10+ 的事项（无需新增 KI 跟踪，已 ADR 留痕）：
+- 业务 Saga 真取消能力（Step 8）
+- 跨进程 sagaId 唯一性（Step 14）
+- listIncomplete O(n) 扫描扩展性（Step 14）
+- BusinessSagaKind 类型扩展（Step 14）
+- Postgres 端到端测试（Step 16）
+- 真实 Engine 引入（Step 16；与 KI-P8-002 同精神）
+
+升级为 KI 跟踪的事项：
+- KI-P9-001 StateTransition 数据副本漂移监控
+
+#### 元规则 / 惯例触发
+
+| 规则 / 惯例 | 实战 |
+|---|---|
+| 元规则 B（接口冻结） | 严守 — 本 Step 仅文档变更，零业务代码 / 锁定签名修改 |
+| 元规则 P（零新依赖） | 严守 — Sprint G+H+I 累计 8 步零新依赖 |
+| 元规则 Q（强制开局） | 第 17 次实战（含 4 / 5 / 6 三项专属实地核查） |
+| 惯例 K（错误码"仅必需"） | 严守 — 0 新错误码；Step 1-16 不变 |
+| 惯例 M（ADR 增量追写） | 第 17 次实战 |
+| §4.8 编译期硬约束（Step 15） | 严守 — 本 Step 不触碰 domain |
+| 元规则 A / C / D / E / F / G / H / I / J / L / N / O | N/A（本 Step 无运行时变更） |
+
+#### 关键拒绝候选
+
+**拒绝 A 仅维度 1（裁决 1 候选 A）**。理由：Phase 9 是 Tianqi 至今最大 Sprint 跨度；A 数据不足以判断 Phase 9 是否真正 deliver 测试覆盖。
+
+**拒绝 α 关闭 KI-P8-001（裁决 2 候选 α）**。理由：实测 domain 包覆盖率 75.16% 与 Phase 8 baseline 完全一致（未改善 0pp）。"Phase 9 没有 deliver KI-P8-001 修复"是诚实评估；不为"关闭 KI"而牵强声明改善。
+
+**拒绝 α 降级 KI-P8-003 为 monitoring（裁决 3 候选 α）**。理由：Phase 9 测试套件运行时间短（12ms 量级），未充分压测时序敏感场景；KI 关闭应有更强证据。
+
+**拒绝 β 关闭 KI-P8-005（裁决 4 候选 β）**。理由：ports 包整体仍以 type-only export 为主（lines 11.96% << 80%）；"局部改善 saga-port.ts 100%"不等于"结构性现象已解决"。
+
+**拒绝 C 新增多项 KI（裁决 5 候选 C）**。理由：会让 KNOWN-ISSUES 与 ADR 冗余；ADR 留痕的事项不重复创建 KI；只升级"需要持续监控"的事项（KI-P9-001 唯一）。
+
+**拒绝 α 新增 saga-state-store-postgres 覆盖率 KI（裁决 6 候选 α）**。理由：KI-P8-002 已 cover 真实基础设施 CI skip 场景；不重复创建 KI。
+
+### Step 18-19: [待 Sprint I 后续 Step 增量填充]
 
 ## Consequences
 
@@ -3317,7 +3499,7 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 
 **拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
 
-### Step 17-19 拒绝候选
+### Step 18-19 拒绝候选
 
 [由 Sprint I 增量记录]
 

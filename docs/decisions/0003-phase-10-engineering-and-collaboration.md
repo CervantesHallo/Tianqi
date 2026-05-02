@@ -240,19 +240,41 @@ KNOWN-ISSUES.md 新增 KI-P10-001 — Phase 9 closure 隐藏的 typecheck 缺陷
 
 ### Phase 10 起工作流模式过渡
 
-Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。
-Phase 10 Kickoff 起过渡为 feature 分支工作 + PR 合并模式（标准协作）。
+Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phase 10 Kickoff 起过渡为 feature 分支工作 + PR 合并模式（标准协作）。
 
-过渡理由：
-1. Phase 10 主题"协作基础"要求工作流自身体现协作纪律
-2. Step 2 PR 模板建立后，Phase 10 Kickoff PR 自身是模板的最佳示范
+**过渡理由**：
+
+1. Phase 10 主题"工程化与协作基础"要求工作流自身体现协作纪律——主题与工作流协调一致
+2. Step 2 PR 模板建立后，Phase 10 Kickoff PR 自身是模板的最佳示范案例
 3. 为 Tianqi 未来多人协作场景预留工作流基础
+4. AI 不直接合并 main 分支符合"AI 提交工作 / 用户审视合并"的协作纪律
 
-工作流过渡不修改 Phase 1-9 任何 commits 历史；仅作为 Phase 10 起的 forward-looking 工作纪律。
+**过渡边界**：
 
-实证：Phase 10 Kickoff PR 是 Tianqi 第一个 PR，
-4 轮迭代历史（v1 → v2 → IMPLEMENT v2 → v3）通过 merge commit 方式完整保留。
-PR URL: [PENDING - 用户提供后回填]
+- 不修改 Phase 1-9 任何 commits 历史
+- 不撤回 phase-9-closed tag
+- 仅作为 Phase 10 起的 forward-looking 工作纪律
+- ADR-0003 本身的工作流元文档修订（譬如本段）允许直接在 main 追加，避免自指循环
+
+**Phase 10 Kickoff PR 实证**：
+
+| 维度 | 数据 |
+|---|---|
+| PR 编号 | #1（Tianqi 第一个 PR）|
+| PR URL | https://github.com/CervantesHallo/Tianqi/pull/1 |
+| feature 分支 | claude/stupefied-lewin-15fd78 |
+| Commits 数 | 6（保留 4 轮迭代历史完整可见）|
+| 合并方式 | merge commit |
+| Merge commit SHA | aea059a |
+| 提交日期 | 2026-05-02 |
+| 含内容 | ADR-0003 创建 + KI-P10-001 + Step 0 + 元规则 Q v3 模板 + KI-P8-001 修复责任 Phase 修正 |
+
+**对未来 Phase 工作流的承诺**：
+
+- Phase 10 / Step 0 起每个 Step 都在独立 feature 分支工作 + PR 合并 + 用户审视
+- Step 2 建立 PR 模板后，所有 Step PR 必须遵守该模板
+- main 分支仅接受 merge commit（不接受 squash / rebase；保留迭代历史是 Tianqi 工程纪律的组成部分）
+- 紧急 hotfix（极少数情况）仍允许直接 push main，但必须在 ADR 修订流程内显式声明
 
 ### 待 Phase 10 内部各 Step 增量追写
 

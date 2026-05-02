@@ -238,6 +238,22 @@ KNOWN-ISSUES.md 新增 KI-P10-001 — Phase 9 closure 隐藏的 typecheck 缺陷
 - 拆两阶段流程的实证价值再次兑现（v1 → v2 → v2 实施 → v3 共 4 轮迭代）
 - 协作 prompt 设计教训显式留痕给未来用户（避免再次类似疏漏）
 
+### Phase 10 起工作流模式过渡
+
+Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。
+Phase 10 Kickoff 起过渡为 feature 分支工作 + PR 合并模式（标准协作）。
+
+过渡理由：
+1. Phase 10 主题"协作基础"要求工作流自身体现协作纪律
+2. Step 2 PR 模板建立后，Phase 10 Kickoff PR 自身是模板的最佳示范
+3. 为 Tianqi 未来多人协作场景预留工作流基础
+
+工作流过渡不修改 Phase 1-9 任何 commits 历史；仅作为 Phase 10 起的 forward-looking 工作纪律。
+
+实证：Phase 10 Kickoff PR 是 Tianqi 第一个 PR，
+4 轮迭代历史（v1 → v2 → IMPLEMENT v2 → v3）通过 merge commit 方式完整保留。
+PR URL: [PENDING - 用户提供后回填]
+
 ### 待 Phase 10 内部各 Step 增量追写
 
 [由 Step 0-7 各自完成时增量填充该 Step 的关键裁决摘要]

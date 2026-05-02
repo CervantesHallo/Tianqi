@@ -127,6 +127,39 @@
 
 ---
 
+## Phase 10 显式登记的观察项
+
+### KI-P10-001：Phase 9 closure 隐藏的 typecheck 缺陷（Phase 10 / Step 0 责任修复）
+
+- **状态**：**open**（Phase 10 Kickoff PHASE_IMPLEMENT v3 修订时正式登记，2026-05-02）
+- **发现于**：Phase 10 Kickoff PHASE_IMPLEMENT 阶段实测 `pnpm typecheck` 失败；双重证据（git stash my docs changes + git checkout origin/main HEAD `c9ebe88`）确认错误**预存在于 Phase 9 / Step 19 final commit**，本 Kickoff 0 引入 0 消除
+- **位置**：`packages/application/src/saga/saga-end-to-end.integration.test.ts`（Phase 9 / Step 16 commit `22f8a21` 创建；620 LOC；4 测试类 8 it）
+- **错误明细**（10+ 处 mock builder 字段与 Engine Port 响应类型不匹配）：
+
+| 行 | 错误 | 应修复 |
+|---|---|---|
+| 146 | `MarkPriceQuote` 不含 `queriedAt` 字段（应只在 `QueryMarkPriceBatchResponse` 顶层）| 移除批量响应中 quote 内的 `queriedAt` |
+| 195-199 | `ClosePositionResponse` 不含 `accountId` / `symbol`；`ClosePositionRequest` 不含 `accountId` / `symbol` | 修复 mock builder 字段 |
+| 312-316 | `QueryMarginBalanceResponse` 应含 `availableMargin` / `lockedMargin` / `totalMargin`（而非 `availableBalance` / `lockedBalance`）| 重写 mock margin balance 字段集 |
+| 330-336 | `QueryFundBalanceResponse` 应含 `totalBalance` / `frozenBalance`（而非 `availableBalance` / `queriedAt`）| 重写 mock fund balance 字段集 |
+| 429 | `DeleveragingTarget` 不含 `reduceQuantity` | 修复字段名（依 port 定义实测）|
+
+- **影响**：
+  - `vitest run` 测试**通过**（vitest 默认不严格 typecheck 测试文件，type-erasure 阶段忽略类型不匹配）
+  - `tsc -b tsconfig.json`（标准 typecheck 命令）**失败**——10+ 处 TS2339 / TS2322 / TS2353 / TS1360 / TS2353
+  - `pnpm lint` / `pnpm test` / `pnpm test:coverage` 全绿：Phase 9 closure baseline 数据完整保留
+- **根因**：Phase 9 / Step 17/18/19 closure 验证执行报告显示 "lint zero / 1971 tests 维持 / coverage 84.92%/79.57%/91.68%/84.92%"——**未明示 `pnpm typecheck` 实测结果**，Phase 9 closure 验证流程实际未含独立 typecheck 步骤；vitest 不严格 typecheck 让缺陷在 Step 16 commit 时未被立即捕获，后续 Step 17/18/19 仅做文档变更未触发 typecheck 重新评估
+- **修复责任 Phase**：**Phase 10**
+- **修复责任 Step**：**Phase 10 / Step 0**（**Phase 9 closure typecheck remediation**——独立 Step；Step 0 在 Step 1 / 2 之前执行；让 Step 1 / 2 在干净 baseline 上工作；单一职责修复 + 撰写"Phase closure typecheck 防御"指引）
+- **防御机制**（Phase 10 / Step 3 完成后生效）：
+  - Phase 10 / Step 3 CI 强制门禁含 typecheck（独立验证；不依赖 vitest 顺带类型擦除）
+  - Phase 10 元规则 Q v3 强制开局动作模板要求**全量验证含 4 项独立命令**（lint / typecheck / test / coverage 各自独立执行），不允许用单一命令的"顺带验证"替代独立 typecheck 验证
+  - 未来 Phase 收官 Step 起草指令必须明示"closure 验证含 4 项独立命令实测输出"硬底（Phase 9 closure 教训的工程化沉淀）
+- **协作教训留痕**：Phase 9 / Step 17/18/19 起草指令在硬底中**未明确要求"独立 typecheck 验证"**；AI 跑 `pnpm test:coverage` 顺带验证类型，让 vitest 宽松类型检查掩盖了缺陷；这是协作 prompt 设计的疏漏，由 Phase 10 元规则 Q 模板更新承接补救
+- **备注**：本 KI 与 Step 0 责任协调而非冗余——KI 提供持续跟踪机制（修复后 KI 关闭由 Step 0 执行报告确认），Step 0 提供具体修复任务定义；防御机制（Step 3 CI + 元规则 Q v3 模板）确保未来不重复
+
+---
+
 ## 历史 Phase 状态
 
 Phase 1-7：本文件由 Phase 8 / Step 18 首次创建，未追溯登记历史 Phase 项。Phase 9+ 起增量维护。

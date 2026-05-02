@@ -2,17 +2,18 @@
 
 ## Status
 
-In Progress (Phase 10 kickoff started 2026-05-02; PHASE_DESIGN v1 → v2 → user APPROVE → PHASE_IMPLEMENT 完成；附加 §E.2 工作分布诚实修正；ADR-0003 自此进入 Phase 10 内部 Step 增量追写阶段)
+In Progress (Phase 10 kickoff started 2026-05-02; PHASE_DESIGN v1 → v2 → user APPROVE → PHASE_IMPLEMENT v2 → user REQUEST_CHANGES + 4 项 v3 修订要求 → PHASE_IMPLEMENT v3 完成；ADR-0003 进入 Phase 10 内部 Step 0-7 增量追写阶段)
 
 > **本 ADR 是增量追写**（惯例 M 沿用 Phase 9 模式）。Phase 10 启程指令拆两阶段流程：
 >
 > - **第一阶段（PHASE_DESIGN）v1**：创建 ADR-0003 三段（Status DRAFT / Context / Decision 占位）+ PHASE-10-DESIGN-DRAFT.md 完整草案
 > - **第一阶段 v2**：用户 REQUEST_CHANGES + 反馈后修订（K.1 KI 字段 + K.2 升级路径 + K.3 方案 B + K.4 Kickoff 独立 + ADR 命名保留）
-> - **第二阶段（PHASE_IMPLEMENT，v2 APPROVE 后）**（**本 commit**）：Status DRAFT v2 → **In Progress**；§E.2 工作分布诚实修正（用户附加要求）；删除 PHASE-10-DESIGN-DRAFT.md；同步更新 KNOWN-ISSUES.md（KI-P8-001 修复责任 Phase → Phase 13+ TBD）；创建 docs/phase10/00-phase-10-kickoff.md 启程记录；同步 docs/00-phase1-mapping.md Phase 10 启程段
+> - **第二阶段（PHASE_IMPLEMENT v2，v2 APPROVE 后）**：Status DRAFT v2 → In Progress；§E.2 工作分布诚实修正；删除 PHASE-10-DESIGN-DRAFT.md；同步 KNOWN-ISSUES.md KI-P8-001 字段；创建 00-phase-10-kickoff.md；同步 00-phase1-mapping.md Phase 10 启程段；**实测发现 Phase 9 closure 隐藏 typecheck 缺陷**
+> - **第二阶段 v3 修订（PHASE_IMPLEMENT v2 后用户 REQUEST_CHANGES + 4 项 v3 要求）**（**本 commit**）：(1) 创建 KI-P10-001 跟踪 typecheck 缺陷；(2) **新增 Phase 10 / Step 0 — Phase 9 closure typecheck remediation**（独立 Step；在 Step 1 之前执行；总数从 7 Step + 1 Kickoff = 8 项 调整为 **8 Step + 1 Kickoff = 9 项**）；(3) ADR-0003 v3 同步含 Step 0 + 防御机制 + 元规则 Q 模板更新；(4) 元规则 Q 强制开局动作模板 v3 明示**全量验证含 4 项独立命令**（lint / typecheck / test / coverage 各自独立执行）
 > - **Phase 10 内部各 Step 完成时**：Decision 段下追加该 Step 的关键裁决摘要
 > - **Phase 10 收官（Step 7）**：Status In Progress → Accepted；Consequences 段最终撰写；CI 门槛 84% → 85% 升级
 >
-> 这是 Phase 10 沿用 Phase 9 增量追写模式的连续性证据（惯例 M 跨 Phase 一致性）。拆两阶段流程**第 3 次实战**——v1 → v2 修订证明 Phase 启程级用户审视的实证价值。
+> 这是 Phase 10 沿用 Phase 9 增量追写模式的连续性证据（惯例 M 跨 Phase 一致性）。拆两阶段流程**第 3 次实战 + Phase 启程级首次实战**——v1 → v2 → PHASE_IMPLEMENT v2 → v3 修订共 4 轮迭代证明 Phase 启程级用户审视的实证价值（v3 修订特别证明用户在实施暴露问题后及时反馈调整的工程价值——Phase 9 closure typecheck 缺陷的工程教训沉淀进 Phase 10 流程，让"事后诚实留痕"层面工程纪律升级到"事前防御机制"层面工程纪律）。
 
 ## Context
 
@@ -92,51 +93,68 @@ Phase 1-9 累计 38 个 Step（Phase 8 19 + Phase 9 19），Tianqi 已是"代码
 >
 > Phase 10 完整 Step 划分（裁决 2）+ 9 个核心裁决摘要（裁决 1-9）详见 `docs/phase10/PHASE-10-DESIGN-DRAFT.md`（PHASE_DESIGN 阶段草案；PHASE_IMPLEMENT 阶段完成后删除，设计沉淀进本 ADR）。
 
-### Phase 10 完整 Step 划分（v2 修订；K.4 Kickoff 独立 + K.3 方案 B 不合并；7 Step + 1 Kickoff = 8 总数）
+### Phase 10 完整 Step 划分（v3 修订；新增 Step 0；8 Step + 1 Kickoff = 9 总数）
 
 | 编号 | 主题 | 性质 |
 |---|---|---|
-| **Phase 10 Kickoff** | **本启程指令**（PHASE_DESIGN v1+v2 + PHASE_IMPLEMENT；ADR-0003 + 启程标记；不算 Step）| **启程战** |
+| **Phase 10 Kickoff** | **本启程指令**（PHASE_DESIGN v1+v2 + PHASE_IMPLEMENT v2+v3；ADR-0003 + 启程标记；不算 Step）| **启程战** |
+| **Step 0** | **Phase 9 closure typecheck remediation**（修复 saga-end-to-end.integration.test.ts 10+ 处 mock builder 字段不匹配；KI-P10-001 修复责任；撰写"Phase closure typecheck 防御"指引；让 Step 1+ 在干净 baseline 上工作；**v3 新增**）| **修复 + 防御** |
 | Step 1 | 协作资产基础三件套（CONTRIBUTING / CODE_OF_CONDUCT / SECURITY）| 协作 |
 | Step 2 | PR 模板 + Issue 模板 + CODEOWNERS（.github/ 目录建立）| 协作 |
-| Step 3 | CI 强制门禁（GitHub Actions workflow + lint/typecheck/test/coverage + **84% 起步门槛**）| 工程化 |
+| Step 3 | CI 强制门禁（GitHub Actions workflow + **4 项独立命令** lint / typecheck / test / coverage + **84% 起步门槛**）| 工程化 |
 | Step 4 | 容器化（Dockerfile 多阶段 + 非 root + 健康检查 + docker-compose 开发编排）| 工程化 |
 | Step 5 | 发布自动化（git tag 触发流水线 + changesets 或等价工具）| 工程化 |
 | Step 6 | README 可执行性更新 + Runbook 同步 | 文档 |
 | Step 7 | Phase 10 CLOSED + CHANGELOG 更新 + **CI 门槛升级 84% → 85%** | 收官 |
 
-### Phase 10 强制开局动作模板（裁决 4 B；自 Step 1 起每 Step 必做）
+**Step 0 单一职责**：(1) 修复 `packages/application/src/saga/saga-end-to-end.integration.test.ts` 10+ 处 mock builder 字段（KI-P10-001 修复）；(2) 实测验证 4 项独立命令全绿（lint / typecheck / test / coverage）；(3) 撰写"Phase closure typecheck 防御"指引文档（譬如 `docs/phase10/00-typecheck-defense-guidelines.md` 或附在执行记录内）；(4) KI-P10-001 状态升级 open → resolved；(5) 不引入新业务代码 / 新错误码 / 新 Port / 新 Adapter（与 Phase 10 其他 Step 同精神）。
+
+**Step 0 必要性论证**：
+- **不放在 Step 3 修复**——Step 3 主题"CI 强制门禁"应假设 baseline 是干净的；混合"修复历史缺陷 + 启用 CI"违反 Step 单一职责
+- **不放在 Step 1/2 后修复**——Step 1/2 协作资产工作不应消耗 typecheck 失败的 baseline；让 Step 1/2 在干净 baseline 上工作（专注协作主题）
+- **Step 0 编号必要**——传达"Phase 10 实施前的修复任务"语义；编号 0 显式标识"前置修复"性质（与 Step 1+ 实施任务区分）
+
+### Phase 10 强制开局动作模板（裁决 4 B + v3 元规则 Q 模板更新；自 Step 0 起每 Step 必做）
+
+**v3 修订**：模板新增"动作 5 全量验证 4 项独立命令"硬底（Phase 9 closure typecheck 教训的工程化沉淀）。
 
 | # | 动作 | 性质 |
 |---|---|---|
 | 1 | 重读宪法 + 补充文档（关键章节按 Step 主题） | 通用 |
-| 2 | 核查 KNOWN-ISSUES 5 项 KI 状态 | 通用 |
-| 3 | 核查 ADR-0001 + ADR-0002 + ADR-0003 | 通用 |
+| 2 | 核查 KNOWN-ISSUES 6 项 KI 状态（Phase 8/9 5 项 + KI-P10-001；以及 Step 0 完成后 KI-P10-001 resolved 状态确认） | 通用 |
+| 3 | 核查 ADR-0001 + ADR-0002 + ADR-0003（含 Phase 10 内部 Step 增量追写）| 通用 |
 | 4 | 工程化主题专属核查（视 Step 主题）| Phase 10 专属 |
+| 5 | **全量验证含 4 项独立命令**：`pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm test:coverage` 各自独立执行**并各自记录实测输出**；不允许用单一命令（譬如 `pnpm test:coverage`）的"顺带验证"替代独立 typecheck 验证（**v3 新增 — Phase 9 closure 教训工程化沉淀**）| **Phase 10 v3 强制** |
 
-**Step 编号映射（v2 修订）**：
+**Step 编号映射（v3 修订）**：
 
 | Step | 工程化主题专属核查（动作 4） |
 |---|---|
+| **Step 0** | **既有 saga-end-to-end.integration.test.ts 错误明细 + Engine Port 响应类型实测**（KI-P10-001 详情）+ vitest type-erasure 边界研究 + Phase 9 closure 验证流程历史（v3 新增）|
 | Step 1 | 既有项目 CONTRIBUTING / CODE_OF_CONDUCT / SECURITY 文档惯例（主流参照：Contributor Covenant 等）|
 | Step 2 | 既有 .github/ 目录 + GitHub 平台 PR/Issue 模板格式 + Tianqi 包 owner 划分 |
-| Step 3 | 既有 .github/workflows/ + pnpm 命令本地一致性 + 当前覆盖率实测 |
+| Step 3 | 既有 .github/workflows/ + pnpm 命令本地一致性（**4 项独立命令**）+ 当前覆盖率实测 + KI-P10-001 已 resolved 状态确认 |
 | Step 4 | 既有 Dockerfile / docker-compose / 容器化工具链 |
 | Step 5 | 既有 git tag + changesets / 替代工具 |
 | Step 6 | README 当前内容 + Runbook 既有结构 |
-| Step 7 | ADR-0003 状态 + CHANGELOG / git tag 既有约定 + Step 3-6 累计覆盖率改善实测 |
+| Step 7 | ADR-0003 状态 + CHANGELOG / git tag 既有约定 + Step 0/3-6 累计覆盖率改善实测 + **Phase 10 收官验证含 4 项独立命令实测输出**（v3 强制）|
 
-### 元规则 / 惯例触发（Phase 10 启程）
+**动作 5 v3 设计理由**（Phase 9 closure 教训工程化沉淀）：
+- **教训**：Phase 9 / Step 17/18/19 closure 报告显示 "lint zero / 1971 tests 维持 / coverage 84.92%/79.57%/91.68%/84.92%"——未明示 typecheck 实测；vitest 默认不严格 typecheck 测试文件，让 Step 16 引入的 saga-end-to-end.integration.test.ts mock builder 字段不匹配缺陷绕过 closure 验证
+- **工程化沉淀**：Phase 10 元规则 Q 模板要求每 Step 强制开局动作含 4 项独立验证命令；**closure 验证含 4 项命令各自实测输出**（不是声称"全绿"）
+- **协作 prompt 设计教训**：未来 Phase 起草指令时硬底必须明示"全量验证含 4 项独立命令实测输出"——Phase 10 / Step 7 收官 Step 起草指令将沿用此硬底为 Phase 10 closure 模板
+
+### 元规则 / 惯例触发（Phase 10 启程；v3 修订）
 
 | 规则 / 惯例 | 触发 |
 |---|---|
-| 元规则 B | 严守 — 不修改 Step 1-19（Phase 9）任何已锁定签名 |
+| 元规则 B | 严守 — 不修改 Step 1-19（Phase 9）任何已锁定签名；Step 0 修复 saga-end-to-end.integration.test.ts mock builder 字段**不属于已锁定签名**（mock builder 是测试 fixture 而非接口契约；修复让 mock 对齐既有 Engine Port 锁定签名而非修改签名本身——这是 Step 0 在元规则 B 边界内的合法工作）|
 | 元规则 P | 严守 — Phase 10 不主动引入第三方依赖（CI / 容器化工具是基础设施而非业务依赖；具体由各 Step 独立判断）|
-| 元规则 Q | Phase 10 沿用强制开局动作模板（裁决 4 B）|
+| 元规则 Q | **Phase 10 v3 强制开局动作模板升级 — 5 项动作含动作 5 全量验证 4 项独立命令**（lint / typecheck / test / coverage 各自独立执行）；这是 Phase 9 closure 教训的工程化沉淀；不允许用单一命令的"顺带验证"替代 |
 | 惯例 K | 严守 — Phase 10 0 新错误码 |
-| 惯例 M | 沿用 Phase 9 模式 — ADR-0003 增量追写 |
+| 惯例 M | 沿用 Phase 9 模式 — ADR-0003 增量追写（含 Step 0-7 各自完成时追写）|
 | §4.8 编译期硬约束 | 严守 — 本 Phase 不触碰 domain |
-| 拆两阶段流程 | **第 3 次实战**（本启程指令；Phase 内部 Step 视复杂度决定）|
+| 拆两阶段流程 | **第 3 次实战 + Phase 启程级首次实战 + 4 轮迭代**（v1 → v2 → PHASE_IMPLEMENT v2 → v3；Phase 内部 Step 视复杂度决定）|
 
 ### v2 修订要点（用户 REQUEST_CHANGES + 反馈后落地）
 
@@ -174,11 +192,57 @@ KI-P8-001 修复责任 Phase 字段：`Phase 10` → **`Phase 13+ TBD`**。
 3. **ADR 命名一致性**：ADR-0001 = "Adapter Layer Foundation"（Phase 8 = "基础设施适配器层"）；ADR-0002 = "Saga Orchestration Architecture"（Phase 9 = "分布式补偿完整实现"，标题取 Saga 编排核心）；ADR-0003 沿用补充文档 §1.2 直译模式
 4. **拒绝 "Release Foundation"**：Release（发布自动化）只是 Phase 10 一个 Step（Step 5）；用作 ADR 标题让发布权重过高 / 协作维度被遮蔽——尽管诚实修正后承认工程化 Step 数 ≥ 协作 Step 数，但"Release"作为单个 Step 主题不应升级为整 Phase 命名锚点
 
+### v3 修订要点（PHASE_IMPLEMENT v2 后用户 REQUEST_CHANGES + 4 项要求落地）
+
+用户 PHASE_IMPLEMENT v2 完成后回执：实测发现 Phase 9 closure 隐藏 typecheck 缺陷；要求 4 项 v3 修订让 Phase 10 流程在"事前防御机制"层面强化。
+
+**v3 要求 1：创建 KI-P10-001（持续跟踪机制）**
+
+KNOWN-ISSUES.md 新增 KI-P10-001 — Phase 9 closure 隐藏的 typecheck 缺陷：
+- 状态 open；发现于 Phase 10 Kickoff PHASE_IMPLEMENT 实测；位置 `packages/application/src/saga/saga-end-to-end.integration.test.ts`（10+ 处 mock builder 字段不匹配）
+- 影响：vitest 通过 / tsc -b 失败；根因：Phase 9 closure 验证流程未含独立 typecheck
+- 修复责任 Phase 10 / Step 0；防御机制由 Step 3 CI + 元规则 Q v3 模板承接
+- 协作教训留痕：Phase 9 / Step 17/18/19 起草指令硬底未明确"独立 typecheck"
+
+**v3 要求 2：创建 Phase 10 / Step 0 — Phase 9 closure typecheck remediation**
+
+不放在 Step 3 修复 — 独立 Step 0；Step 0 在 Step 1 之前执行；让 Step 1+ 在干净 baseline 上工作；Step 0 单一职责（修复 + 防御指引撰写）。
+
+**Step 划分调整**：
+- v2：7 Step + 1 Kickoff = 8 总数
+- **v3：8 Step + 1 Kickoff = 9 总数**（含 Step 0）
+
+**v3 要求 3：ADR-0003 同步修订（含 Step 0 + 防御机制 + 元规则 Q 模板）**
+
+本段 v3 修订要点 + Step 划分含 Step 0 + 元规则 Q v3 模板更新 + Step 0 必要性论证全部落地。
+
+**v3 要求 4：元规则 Q 强制开局动作模板更新（明示独立验证 4 项命令）**
+
+元规则 Q v3 模板新增动作 5：`pnpm lint` / `pnpm typecheck` / `pnpm test` / `pnpm test:coverage` 4 项独立命令各自独立执行**并各自记录实测输出**；不允许用单一命令的"顺带验证"替代独立 typecheck 验证。**这是 Phase 9 closure 教训的工程化沉淀**——让 Tianqi 工程纪律不仅在"事后诚实留痕"层面有效，更在"事前防御机制"层面强化。
+
+### Phase 9 closure typecheck 工程教训沉淀
+
+**教训本质**：Phase 9 / Step 17/18/19 closure 验证执行报告含"lint zero / 1971 tests 维持 / coverage 84.92%/79.57%/91.68%/84.92%"——但**未明示 typecheck 实测**。vitest 默认不严格 typecheck 测试文件（type-erasure 阶段忽略类型不匹配），让 Step 16 引入的 saga-end-to-end.integration.test.ts 中 10+ 处 mock builder 字段不匹配绕过 closure 验证。
+
+**协作 prompt 设计教训**：起草指令硬底未明确"独立 typecheck 验证"；AI 跑 `pnpm test:coverage` 顺带验证类型，让 vitest 宽松类型检查掩盖了缺陷。
+
+**工程教训沉淀路径**：
+1. **KI-P10-001**：持续跟踪机制（修复后 Step 0 关闭）
+2. **Step 0 独立修复**：让 Phase 10 后续 Step 在干净 baseline 上工作
+3. **Step 3 CI 强制门禁**：含独立 typecheck 步骤；让未来再次发生"vitest 通过但 typecheck 失败"自动被 CI 拦截
+4. **元规则 Q v3 模板**：每 Step 强制开局动作含 4 项独立验证命令；不允许"顺带验证"
+5. **未来 Phase 起草指令硬底沿用**：Phase 10 / Step 7 收官 Step 起草指令含"closure 验证 4 项命令各自实测输出"硬底；Phase 11+ 起草指令模板沿用
+
+**工程价值**：
+- "诚实评估"原则在工程层面升级 — 不仅"事后发现问题诚实留痕"，更"事前防御机制"
+- 拆两阶段流程的实证价值再次兑现（v1 → v2 → v2 实施 → v3 共 4 轮迭代）
+- 协作 prompt 设计教训显式留痕给未来用户（避免再次类似疏漏）
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 1-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 0-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 1-7: [待 Phase 10 内部 Step 增量填充]
+### Step 0-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 
@@ -194,6 +258,6 @@ KI-P8-001 修复责任 Phase 字段：`Phase 10` → **`Phase 13+ TBD`**。
 - 《Tianqi Phase 8–12 架构与代码规范补充文档》§7 CI/CD 与协作约束、§9.3 覆盖率门槛、§9.4 测试数量底线、§12 文档同步约束、§13 编程 AI 执行规范追加、§14 最终裁决追加、§15 Phase 8-12 最终硬性指令
 - `docs/decisions/0001-phase-8-adapter-layer.md`（Phase 8 ADR；Accepted）
 - `docs/decisions/0002-phase-9-saga-orchestration.md`（Phase 9 ADR；Accepted Phase 9 CLOSED 2026-05-02）
-- `docs/KNOWN-ISSUES.md`（5 项 open KI）
-- `CHANGELOG.md`（Phase 8 + Phase 9 段）
-- `docs/phase10/PHASE-10-DESIGN-DRAFT.md`（PHASE_DESIGN 阶段草案；APPROVE 后删除）
+- `docs/KNOWN-ISSUES.md`（**6 项 KI**：4 carried over from Phase 8 + KI-P9-001 + **KI-P10-001 新增 v3**）
+- `CHANGELOG.md`（Phase 8 + Phase 9 段；Phase 10 段由 Step 7 收官撰写）
+- `docs/phase10/00-phase-10-kickoff.md`（启程记录；含 v3 调整说明）

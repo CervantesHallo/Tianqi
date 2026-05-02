@@ -2,13 +2,13 @@
 
 ## Status
 
-DRAFT v2 (Phase 10 kickoff PHASE_DESIGN, 2026-05-02; v1 用户审视后 5 项未决判断 K.1-K.5 反馈：K.1 修正补丁 / K.2 锁定策略 / K.3 重新规划 / K.4 重新命名 / K.5 同意保留 + 关键观察 ADR 命名建议；v2 修订完成等待用户 APPROVE)
+In Progress (Phase 10 kickoff started 2026-05-02; PHASE_DESIGN v1 → v2 → user APPROVE → PHASE_IMPLEMENT 完成；附加 §E.2 工作分布诚实修正；ADR-0003 自此进入 Phase 10 内部 Step 增量追写阶段)
 
 > **本 ADR 是增量追写**（惯例 M 沿用 Phase 9 模式）。Phase 10 启程指令拆两阶段流程：
 >
 > - **第一阶段（PHASE_DESIGN）v1**：创建 ADR-0003 三段（Status DRAFT / Context / Decision 占位）+ PHASE-10-DESIGN-DRAFT.md 完整草案
-> - **第一阶段 v2**（**本 commit**）：用户 REQUEST_CHANGES + 反馈后修订（K.1 KI 字段 + K.2 升级路径 + K.3 方案 B + K.4 Kickoff 独立 + ADR 命名保留）
-> - **第二阶段（PHASE_IMPLEMENT，v2 APPROVE 后）**：Status DRAFT → In Progress；删除 PHASE-10-DESIGN-DRAFT.md；同步更新 KNOWN-ISSUES.md（KI-P8-001 修复责任 Phase → Phase 13+ TBD）
+> - **第一阶段 v2**：用户 REQUEST_CHANGES + 反馈后修订（K.1 KI 字段 + K.2 升级路径 + K.3 方案 B + K.4 Kickoff 独立 + ADR 命名保留）
+> - **第二阶段（PHASE_IMPLEMENT，v2 APPROVE 后）**（**本 commit**）：Status DRAFT v2 → **In Progress**；§E.2 工作分布诚实修正（用户附加要求）；删除 PHASE-10-DESIGN-DRAFT.md；同步更新 KNOWN-ISSUES.md（KI-P8-001 修复责任 Phase → Phase 13+ TBD）；创建 docs/phase10/00-phase-10-kickoff.md 启程记录；同步 docs/00-phase1-mapping.md Phase 10 启程段
 > - **Phase 10 内部各 Step 完成时**：Decision 段下追加该 Step 的关键裁决摘要
 > - **Phase 10 收官（Step 7）**：Status In Progress → Accepted；Consequences 段最终撰写；CI 门槛 84% → 85% 升级
 >
@@ -161,10 +161,18 @@ KI-P8-001 修复责任 Phase 字段：`Phase 10` → **`Phase 13+ TBD`**。
 **关键观察 — ADR 命名裁决（保留 "Engineering and Collaboration Foundation"）**：
 
 裁决保留原命名而非改 "Engineering and Release Foundation"。理由：
-1. **严格按补充文档 §1.2 直译**："Phase 10：工程化与协作基础"——"协作" = "Collaboration"
-2. **工作分布**：8 总数（7 Step + 1 Kickoff）中"协作"占 3 Step（Step 1+2+6 README+Runbook 也含协作维度）/"工程化"占 2 Step（Step 3+4）/"发布"占 1 Step（Step 5）/"收官"占 1 Step（Step 7）；协作占比最高
+
+1. **严格按补充文档 §1.2 直译**（**首要理由**）："Phase 10：工程化与协作基础"——"协作" = "Collaboration"
+2. **工作分布（PHASE_IMPLEMENT 阶段诚实修正）**：8 总数（7 Step + 1 Kickoff）按 Step 主题分布——
+   - **纯协作占 2 Step**：Step 1（CONTRIBUTING / CODE_OF_CONDUCT / SECURITY）+ Step 2（PR/Issue 模板 + CODEOWNERS）
+   - **工程化占 3 Step**：Step 3（CI 强制门禁）+ Step 4（容器化）+ Step 5（发布自动化）
+   - **文档占 1 Step**：Step 6（README 可执行性 + Runbook；含面向社区的协作维度但本质是文档）
+   - **收官占 1 Step**：Step 7
+   - **启程战占 1**：Phase 10 Kickoff（本启程指令；不算 Step）
+
+   **诚实表述：工程化 Step 数（3）≥ 协作 Step 数（2）**。v1 草案"协作占比最高"基于把 Step 6 计入协作维度的论证不严谨；用户 PHASE_IMPLEMENT 阶段附加要求引导本次诚实修正——按 Step 主题严格归类，工程化 Step 数主导。命名仍保留 "Collaboration" 是因下列理由 1（直译§1.2 / 首要理由）+ 理由 3（ADR 命名一致性）+ 理由 4（拒绝 "Release Foundation"）的合力，而非因协作 Step 数最多。
 3. **ADR 命名一致性**：ADR-0001 = "Adapter Layer Foundation"（Phase 8 = "基础设施适配器层"）；ADR-0002 = "Saga Orchestration Architecture"（Phase 9 = "分布式补偿完整实现"，标题取 Saga 编排核心）；ADR-0003 沿用补充文档 §1.2 直译模式
-4. **拒绝 "Release Foundation"**：Release（发布自动化）只是 Phase 10 一个 Step（Step 5）；用作 ADR 标题让发布权重过高 / 协作维度被遮蔽
+4. **拒绝 "Release Foundation"**：Release（发布自动化）只是 Phase 10 一个 Step（Step 5）；用作 ADR 标题让发布权重过高 / 协作维度被遮蔽——尽管诚实修正后承认工程化 Step 数 ≥ 协作 Step 数，但"Release"作为单个 Step 主题不应升级为整 Phase 命名锚点
 
 ### 待 Phase 10 内部各 Step 增量追写
 

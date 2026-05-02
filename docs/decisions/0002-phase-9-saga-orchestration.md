@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Phase 9 finalized in Step 18, 2026-05-02; pending Phase 9 CLOSED in Step 19)
+Accepted (Phase 9 CLOSED, 2026-05-02)
 
 > **本 ADR 是增量追写**（惯例 M 首次实战）。每个 Phase 9 Step 完成时，向
 > §Decision 段下的对应小节追加该 Step 的关键裁决摘要；其他段落（Context /
@@ -2927,7 +2927,147 @@ Step 18 已实施完成；占位仅留 Step 19。
 
 **拒绝 B 在 ADR 内添加 Table of Contents 段（裁决 5 候选 B）**。理由：Markdown 渲染器自带 outline；ADR 不是手册；B 让 ADR 与渲染器自带功能冗余违反"克制"。
 
-### Step 19: [待 Sprint I 收官 Step 19 增量填充]
+### Step 19: Phase 9 CLOSED + CHANGELOG 更新 — Sprint I 收官战 + Phase 9 终战（2026-05-02）
+
+> **状态**：Accepted (Phase 9 CLOSED, 2026-05-02)
+> **实施完成时间**：2026-05-02
+
+#### 性质：Phase 9 终战 + 时间戳化 + tag 化 + 用户可见化
+
+Step 19 是 Phase 9 真正的终点——Step 18 已完成 ADR 内容决议化，Step 19 完成时间戳化（Status CLOSED 后缀）+ tag 化（git tag）+ 用户可见的 changelog 化（CHANGELOG.md Phase 9 段）+ Phase 9 CLOSED 显式声明（≥3 处）。完成后 Phase 9 19/19 全部完成，Tianqi 进入 Phase 10 准备阶段（独立 Phase 启动指令承接）。
+
+#### 强制开局动作 4 实地核查结果（Phase 8 既有 CHANGELOG 处置）
+
+实测：
+- 仓库根目录 `CHANGELOG.md` **存在**（α 模式 — 标准开源项目位置）
+- `docs/CHANGELOG.md` 不存在
+- Phase 8 段格式：Keep a Changelog 精神 + Phase 标识；7 个 `###` 子段（Added / Architecture / Quality / Engineering Discipline / Known Issues / References / Compatibility）
+- Phase 1-7 不回填到 CHANGELOG（仅指向 docs/ 历史）
+
+**裁决 1 决定**：α 仓库根目录（沿用 Phase 8 既有约定）。
+**裁决 2 决定**：D 沿用 Phase 8 既有格式（Keep a Changelog 精神 + Phase 标识 + 7 个 `###` 子段）。
+
+#### 强制开局动作 5 实地核查结果（git tag 命名约定）
+
+实测 `git tag --list` 输出 **空**——Phase 8 收官时**未打 tag**。
+
+**裁决 3 决定**：选 `phase-9-closed` 命名。理由：
+- 没有既有约定可沿用
+- Tianqi CHANGELOG 注明 "Phase-based release cycles"（不是 semver）
+- `phase-9-closed` 含 CLOSED 语义，与 ADR Status `Accepted (Phase 9 CLOSED, 2026-05-02)` 协调
+- 为未来 Phase 10+ 建立 `phase-N-closed` 命名约定
+
+本 Step 创建的 `phase-9-closed` 是 Tianqi 第一个 git tag——工程历史标记从 Phase 9 开始系统化。
+
+#### 强制开局动作 6 实地核查结果（ADR-0002 Status 当前值）
+
+实测：`Accepted (Phase 9 finalized in Step 18, 2026-05-02; pending Phase 9 CLOSED in Step 19)`
+
+**Step 19 升级为**：`Accepted (Phase 9 CLOSED, 2026-05-02)`（与 ADR-0001 `Accepted (Phase 8 CLOSED, 2026-04-26)` 格式严格对齐）。
+
+#### 8 个核心裁决摘要
+
+| # | 裁决 | 选择 | 理由 |
+|---|---|---|---|
+| 1 | CHANGELOG 位置 | **α 仓库根目录**（沿用 Phase 8 既有约定）| 与 Phase 8 一致；标准开源项目模式 |
+| 2 | CHANGELOG 格式 | **D 沿用 Phase 8 既有格式** | Keep a Changelog 精神 + Phase 标识 + 7 个 `###` 子段；工程一致性优先于业界标准 |
+| 3 | git tag 命名 | **`phase-9-closed`**（Phase 8 无既有约定；本 Step 建立 `phase-N-closed` 模式） | 含 CLOSED 语义；与 ADR Status 协调；为未来 Phase 10+ 建立约定 |
+| 4 | 内容范围 | **A 仅 Phase 9 增量** | Phase 8 段已存在；本 Step 在 Phase 8 段之前插入 Phase 9 段（最新 Phase 在最上方） |
+| 5 | 详细程度 | **中等** | 含 Sprint 划分 + 关键工程纪律证据；不重复 ADR Consequences 段技术细节 |
+| 6 | CLOSED 显式声明位置 | **B 多处** | ADR Status + CHANGELOG + docs/phase9/19 + mapping + 执行报告 = 5 处冗余可见性 |
+| 7 | 测试增量与代码变更 | **0 严守** | 沿用 Step 17/18 纪律 |
+| 8 | Phase 10 预告 | **不预告** | Phase 9 终战聚焦 Phase 9 收官；Phase 10 主题尚未确定 |
+
+#### 关键实现细节
+
+##### 1. ADR-0002 Status CLOSED 后缀
+
+`Accepted (Phase 9 finalized in Step 18, 2026-05-02; pending Phase 9 CLOSED in Step 19)` → **`Accepted (Phase 9 CLOSED, 2026-05-02)`**
+
+格式严格对齐 ADR-0001 `Accepted (Phase 8 CLOSED, 2026-04-26)`。
+
+##### 2. CHANGELOG Phase 9 段撰写
+
+在 Phase 8 段之前插入 Phase 9 段（约 +180 行；与 Phase 8 段同 7 个 `###` 子段结构）：
+
+- **Added**: 7 saga 模块 / 4 持久化 Adapter 包 / 3 新 Port / 11 新错误码 / 9 新审计事件类型 / §4.8 编译期硬约束 / 端到端集成测试套件
+- **Changed**: 测试数 / 包数 / 覆盖率 / saga 模块覆盖率 / 错误码总数
+- **Architecture**: 4 层架构 / Sprint H 模板纪律双向验证 / 元规则 F 6 次实战 / §4.8 双重保护 / 拆两阶段流程 2 次实证
+- **Quality**: 5 contract test families / 端到端运行时 12ms / 生产层零变更
+- **Engineering Discipline**: 元规则 B 跨 Step 兑现 / 元规则 F 6 次实战 / 元规则 Q 19 次实战 / 惯例 K 18 次 / 惯例 M 19 次（含本 Step）/ 拆两阶段流程 2 次
+- **Known Issues**: 5 项 KI 表（4 open + 1 新增 KI-P9-001）
+- **References**: ADR / closure 记录 / per-step records / mapping / saga module index / KNOWN-ISSUES
+- **Compatibility**: zero breaking changes for Phase 1-7/Phase 8 consumers + §4.8 ESLint 规则注脚
+
+##### 3. ADR-0002 Step 19 段（**最后一次"增量追写"实战**）
+
+含性质 + 强制开局动作 4-6 实地核查 + 8 个核心裁决摘要 + 关键实现细节 + Phase 9 CLOSED 显式声明位置（5 处）+ 元规则 / 惯例触发表 + 5 项拒绝候选 + Phase 9 工程旅程总结。
+
+##### 4. Phase 9 CLOSED 显式声明 5 处可见性
+
+| 位置 | 形式 |
+|---|---|
+| 1. ADR-0002 Status 字段 | `Accepted (Phase 9 CLOSED, 2026-05-02)` |
+| 2. CHANGELOG.md | `## [Phase 9] — 2026-05-02 — Saga Orchestration Architecture` |
+| 3. docs/phase9/19-phase-9-closure.md | §A "Phase 9 CLOSED 显式声明" |
+| 4. docs/00-phase1-mapping.md | "Phase 9 CLOSED 段" + "Phase 9 进度 19/19 ✅" |
+| 5. git tag | `phase-9-closed` |
+
+加上 Step 19 执行报告（用户可见输出），共 6 处显式声明。
+
+##### 5. git tag 创建
+
+```bash
+git tag -a phase-9-closed -m "Phase 9 CLOSED: Saga orchestration architecture delivered (4 business sagas + cross-saga coordination + compile-time §4.8 enforcement)"
+git push origin phase-9-closed
+```
+
+是 Tianqi 第一个 git tag（Phase 8 未打 tag）。建立 `phase-N-closed` 命名约定供 Phase 10+ 沿用。
+
+#### 元规则 / 惯例触发（最后一次实战）
+
+| 规则 / 惯例 | 实战 |
+|---|---|
+| 元规则 B（接口冻结）| 严守 — Status 升级 CLOSED 后缀；Consequences 段（Step 18 已冻结）不变 |
+| 元规则 P（零新依赖）| 严守 — Sprint G+H+I 累计 10 步零新依赖（含本 Step）|
+| 元规则 Q（强制开局）| **第 19 次 + 最后一次实战** |
+| 惯例 K（错误码"仅必需"）| 严守 — 0 新错误码 |
+| 惯例 M（ADR 增量追写）| **第 19 次 + 最后一次"增量追写"实战**——ADR-0002 自此不再增量追写；未来调整必须经 ADR 修订流程 |
+| §4.8 编译期硬约束（Step 15）| 严守 — 不触碰 domain |
+| 元规则 A / C / D / E / F / G / H / I / J / L / N / O | N/A |
+
+#### Phase 9 工程旅程总结
+
+从 Phase 8 收官（2026-04-26）到 Phase 9 CLOSED（2026-05-02），Tianqi 在 6 天内完成 19 个 Step 的工程交付：
+
+- **Sprint F**（Step 1-5）：从 SagaPort 类型契约 → 5 类 17 it 契约测试 → 4 个持久化 Adapter，把《§4》Saga 协议层 8 条强约束翻译为运行时可消费的契约
+- **Sprint G**（Step 6-9）：从 SagaOrchestrator 拆两阶段实战 → 5 不变量补偿引擎 → 单 step + 整体超时 → §15.1 双重审计人工介入，Phase 9 进入"完整应对正向 / 失败 / 超时 / 人工"的生产级形态
+- **Sprint H**（Step 10-14）：从 LiquidationSaga 启程战 → 4 业务 Saga 模板纪律三步全部守住 → 跨 Saga 协调拆两阶段二次实战，Phase 9 真正"为业务而做"的阶段完成
+- **Sprint I**（Step 15-19）：从 §4.8 编译期硬约束 → 端到端集成测试 → 覆盖率核查 + KI 评估 → ADR finalize → Phase 9 CLOSED（**本 Step**），Phase 9 完整性核查 + 收官完成
+
+**Tianqi 工程纪律连续性的标志性阶段**：
+- 元规则 B 跨 19 个 Step 兑现（Step 1 锁定签名一字未改至 Step 19）
+- 惯例 M 19 次实战（ADR-0002 增量追写完整保留中间裁决细节；ADR-0001 一次性撰写的反思被 Phase 9 修正）
+- 拆两阶段流程 2 次实战的实证价值兑现（Step 6 + Step 14 两次用户审视都产生关键修订）
+- §4.8 编译期硬约束让纪律升级为机制（Step 15 把 14 Step 的纪律遵守升级为不可绕过的工程约束）
+
+读者翻开 ADR-0002，看到 Status `Accepted (Phase 9 CLOSED, 2026-05-02)`；翻开 CHANGELOG，看到 Phase 9 段；翻开 git log，看到 `phase-9-closed` tag；翻开 docs/phase9/19，看到"Phase 9 CLOSED"显式声明——清晰、可控、可信的工程历史。
+
+#### 关键拒绝候选
+
+**拒绝 β `docs/CHANGELOG.md`（裁决 1 候选 β）**。理由：仓库根目录 CHANGELOG 是开源项目标准位置；Phase 8 已建立约定；β 引入新位置违反"沿用既有约定"。
+
+**拒绝 A Keep a Changelog 标准格式（裁决 2 候选 A）**。理由：Phase 8 段已经使用"Keep a Changelog 精神 + Phase 标识"的混合格式；本 Step 沿用 Phase 8 格式（D）让 Tianqi CHANGELOG 风格一致；纯 Keep a Changelog 标准格式（Added/Changed/Deprecated/Removed/Fixed/Security）会破坏既有 Phase 8 段结构。
+
+**拒绝 β `v0.9.0` semver tag（裁决 3 候选 β）**。理由：Tianqi CHANGELOG 已注明 "Phase-based release cycles"（不是 semver）；引入 semver tag 违反工程一致性。
+
+**拒绝 B 含 Phase 8（裁决 4 候选 B）**。理由：Phase 8 段已存在；本 Step 仅 Phase 9 增量。
+
+**拒绝 C 添加专属 docs/phase9/PHASE-9-CLOSED.md（裁决 6 候选 C）**。理由：docs/phase9/19-phase-9-closure.md 已承担 Phase 9 CLOSED 文档职责；C 引入新文档冗余违反"克制"。
+
+### Step 19 拒绝候选
+
+详见上方"关键拒绝候选"段。本 Step 是 Phase 9 终战，无更多 Step 占位需要预留。
 
 ## Consequences
 
@@ -3841,10 +3981,6 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 **拒绝增加 PersistedSagaState.caseId 字段（裁决 2 替代候选）**。理由：违反元规则 B（PersistedSagaState 在 Step 3 已锁定 10 字段集）；Step 3 拒绝过 initialInput 等业务字段；caseId 编码在 sagaId / correlationId 字符串中已是事实标准，本 Step 提升为协调模块契约即可，不破坏 Step 3 锁定形态。
 
 **拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
-
-### Step 19 拒绝候选
-
-[由 Sprint I 收官 Step 19 增量记录]
 
 ## References
 

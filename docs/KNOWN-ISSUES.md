@@ -44,9 +44,9 @@
   - `liquidation-case.ts` (lines 73.45%) — 同上
   - `adl-case.ts` (lines 72.72%) — 同上
   - `case-audit-record.ts` (lines 53.70%) — 多处构造路径未覆盖
-- **修复责任 Phase**：Phase 10
-- **修复责任 Step**：未确定（Phase 10 早期 Step 增补 domain 边界测试；Phase 9 全程未触碰 domain 测试是 §4.8 编译期硬约束 + 接口冻结纪律的代价）
-- **备注**：domain 层是 Phase 1-7 冻结代码；Phase 8 + Phase 9 全程仅添加 Adapter / Engine Port / Saga 业务，未触碰 domain 测试。Phase 10 引入新业务流时应同步补 domain 边界覆盖。诚实评估：Phase 9 没有 deliver KI-P8-001 修复；不为"关闭 KI"而牵强声明改善。
+- **修复责任 Phase**：**Phase 13+ TBD**（**Phase 10 Kickoff 修正补丁，2026-05-02**——原标记 `Phase 10` 是 Phase 9 / Step 17 评估时的预期，但 Phase 10 主题专属"工程化与协作基础"（CI/CD + 协作资产 + 容器化 + 文档可执行 + 覆盖率门槛升级），与业务 domain 覆盖率改善无关。Phase 10 / Phase 11（真实基础设施）/ Phase 12（发布就绪）三阶段都不修业务覆盖率；KI-P8-001 应留待 Phase 13+ 业务能力延伸 Phase 修复——具体 Phase 待相关 Phase 起步指令承接。详见 ADR-0003 K.1 修正补丁段。）
+- **修复责任 Step**：未确定（待 Phase 13+ 相关 Phase 起步指令承接）
+- **备注**：domain 层是 Phase 1-7 冻结代码；Phase 8 + Phase 9 全程仅添加 Adapter / Engine Port / Saga 业务，未触碰 domain 测试；Phase 10 主题工程化非业务覆盖率改善（§1.2 直译边界）。诚实评估：Phase 9 没有 deliver KI-P8-001 修复；Phase 10 不在主题边界内；不为"关闭 KI"而牵强声明改善。
 
 ### KI-P8-002：external Adapter 包覆盖率受真实基础设施依赖限制
 

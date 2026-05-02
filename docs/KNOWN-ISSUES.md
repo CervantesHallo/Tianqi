@@ -35,7 +35,8 @@
 
 ### KI-P8-001：domain 包行覆盖率 75.16%（低于单包 80% 期望，但整体达标）
 
-- **当前**：`packages/domain/src/` lines 75.16% / branches 75.79% / functions 93.06%
+- **当前**：`packages/domain/src/` lines 75.16% / branches 75.79% / functions 93.05%
+- **Phase 9 / Step 17 实测复核（2026-05-02）**：**未改善**——Phase 9 后 domain 包覆盖率仍为 75.16% / 75.79% / 93.05%（与 Phase 8 baseline 完全一致）。原因：Phase 9 全程通过 §4.8 编译期硬约束（Step 15）严守 domain 不依赖 Port 原则；新增 16 个 Step 全部在 application / ports / adapters 层落地，**未触碰 domain 测试**。Phase 9 端到端集成测试（Step 16）位于 application/src/saga/，仅消费 domain enum 类型而非 domain class 算法，未通过运行时覆盖触发 domain 行覆盖率改善。**状态保持 open**。
 - **缺口**：约 5 个百分点
 - **主要缺口集中在**：
   - `risk-case-state-machine.ts` (lines 89.10%) — 部分未触发的失败转移路径
@@ -43,19 +44,23 @@
   - `liquidation-case.ts` (lines 73.45%) — 同上
   - `adl-case.ts` (lines 72.72%) — 同上
   - `case-audit-record.ts` (lines 53.70%) — 多处构造路径未覆盖
-- **修复责任 Phase**：Phase 9
-- **修复责任 Step**：未确定（建议 Phase 9 早期 Step 增补 domain 边界测试）
-- **备注**：domain 层是 Phase 1-7 冻结代码；Phase 8 仅添加 Adapter / Engine Port，未触碰 domain 测试。Phase 9 引入新业务流时应同步补 domain 边界覆盖。
+- **修复责任 Phase**：Phase 10
+- **修复责任 Step**：未确定（Phase 10 早期 Step 增补 domain 边界测试；Phase 9 全程未触碰 domain 测试是 §4.8 编译期硬约束 + 接口冻结纪律的代价）
+- **备注**：domain 层是 Phase 1-7 冻结代码；Phase 8 + Phase 9 全程仅添加 Adapter / Engine Port / Saga 业务，未触碰 domain 测试。Phase 10 引入新业务流时应同步补 domain 边界覆盖。诚实评估：Phase 9 没有 deliver KI-P8-001 修复；不为"关闭 KI"而牵强声明改善。
 
 ### KI-P8-002：external Adapter 包覆盖率受真实基础设施依赖限制
 
-- **当前**：
-  - `packages/adapters/event-store-postgres/src/` lines 40.71% — 21 contract it + 12 persistent it 在缺失 `TIANQI_TEST_POSTGRES_URL` 时全部 skipped
-  - `packages/adapters/notification-kafka/src/` lines 47.42% — 18 contract it 在缺失 `TIANQI_TEST_KAFKA_BROKERS` 时全部 skipped
-- **缺口**：单包看 ≥ 30 个百分点；整体覆盖率仍达标
+- **当前**（Phase 9 / Step 17 实测复核）：
+  - `packages/adapters/event-store-postgres/src/` lines 33.8% — 21 contract it + 12 persistent it 在缺失 `TIANQI_TEST_POSTGRES_URL` 时全部 skipped
+  - `packages/adapters/notification-kafka/src/` lines 47.41% — 18 contract it 在缺失 `TIANQI_TEST_KAFKA_BROKERS` 时全部 skipped
+  - `packages/adapters/saga-state-store-postgres/src/` lines 40.7% — 13 contract + 8 persistent it skipped（Sprint F Step 3 引入）
+  - `packages/adapters/dead-letter-store-postgres/src/` lines 37.97% — 14 contract + 8 persistent it skipped（Sprint F Step 4 引入）
+- **Phase 9 引入的 2 个新 postgres adapter（saga-state-store / dead-letter-store）覆盖率分布与既有 event-store-postgres 一致**——CI 默认 skip 是结构性现象；本 Phase 9 阶段允许的状态延续（与 Phase 8 同精神）
+- **缺口**：单包看 ≥ 30 个百分点；整体覆盖率仍达标（84.92% > 80%）
 - **修复责任 Phase**：Phase 11（《§8.1 Mock 使用边界》明确 Phase 8 阶段允许 mock；Phase 11 起禁止 mock 必须使用真实基础设施）
 - **修复责任 Step**：未确定（Phase 11 整体规划）
-- **备注**：本 Phase 8 阶段允许的状态。在 CI 中提供 `TIANQI_TEST_POSTGRES_URL` / `TIANQI_TEST_KAFKA_BROKERS` 环境变量后，这两个 Adapter 的覆盖率立刻提升至 90%+。
+- **状态保持 open**（Phase 9 全程未触及；Step 16 端到端集成测试 A 仅 memory adapter 同精神）
+- **备注**：本 Phase 8/9 阶段允许的状态。在 CI 中提供 `TIANQI_TEST_POSTGRES_URL` / `TIANQI_TEST_KAFKA_BROKERS` 环境变量后，这 4 个 Adapter（event-store-postgres / saga-state-store-postgres / dead-letter-store-postgres / notification-kafka）的覆盖率立刻提升至 90%+。
 
 ### KI-P8-003：契约测试套件 + 集成测试在高并发下偶发 flake
 
@@ -66,9 +71,10 @@
   - `notification-kafka.test.ts > test_connect_to_unreachable_brokers_rejects_with_tq_inf_kafka_broker_unreachable`（依赖 ECONNREFUSED 时序）
 - **触发条件**：高并发执行（`pnpm test` 默认并行），CPU 抖动时偶发；隔离运行（单个文件）100% 通过
 - **复现率**：~10-20%
-- **修复责任 Phase**：Phase 9 或 Phase 11（与 KI-P8-002 同期，因为真实 Kafka 接入会同步重写时序断言）
+- **Phase 9 / Step 17 实测复核（2026-05-02）**：Phase 9 累计 16 Step 实战中**未显式触发 flake**（Step 8 / Step 16 引入时序敏感测试时严格遵守 fast/slow ≥ 1:10 比例：50ms 自然耗时 vs 5ms 超时；Step 16 端到端集成测试套件单次运行 12ms，远小于 KI-P8-003 100ms 风险窗口）。**Phase 9 实战 0 显式 flake**——但**状态保持 open** 因为：(1) Phase 9 测试套件运行时间短（业务 saga 集成 12ms 量级），未充分压测时序敏感场景；(2) 真正的 flake 风险在 Phase 11 真实基础设施引入后；(3) KI 关闭应有更强证据。"Phase 9 实战 0 flake"作为状态注脚记录即可。
+- **修复责任 Phase**：Phase 11（与 KI-P8-002 同期，因为真实 Kafka 接入会同步重写时序断言）
 - **修复责任 Step**：未确定
-- **备注**：本 flake 在 Step 18 之前已存在（基线 Step 17 也偶发），不是 Step 18 集成测试引入。Step 18 添加的 5 个并发 mock HTTP server 提高了暴露概率，但根因是契约测试本身对 100ms 级别时序的敏感度。Phase 9+ 当 application 层使用 fake-timers 接入这些 Adapter 时可一并加固。
+- **备注**：本 flake 在 Phase 8 Step 18 之前已存在（基线 Step 17 也偶发），不是 Step 18 集成测试引入。Phase 9 全程通过 fast/slow ≥ 1:10 比例防御（Step 8 单 step 超时 + Step 16 端到端集成测试 it 3.1）。Phase 11 当 application 层使用 fake-timers 接入这些 Adapter 时可一并加固。
 
 ### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）— ✅ 已修复（Step 19）
 
@@ -83,12 +89,41 @@
 - **修复后实测**：1668 tests 全绿（数量不变）；覆盖率 85.97% lines / 79.78% branches（与 Step 18 基线持平）
 - **修复责任 Phase / Step**：Phase 8 / Step 19（按计划闭合）
 
-### KI-P8-005：ports/src 行覆盖率 0%（结构性原因）
+### KI-P8-005：ports/src 行覆盖率局部改善（结构性现象延续）
 
-- **当前**：`packages/ports/src/` lines 0% / branches 100% / functions 100%
-- **原因**：ports 包大部分是 TypeScript `interface` / `type` 声明，编译产物完全擦除（zero-runtime types），coverage 工具看到的是几行 brand constructor 函数体；这些函数体由 ports 包消费方的测试间接覆盖
+- **当前**（Phase 9 / Step 17 实测复核）：`packages/ports/src/` lines **11.96%** / branches 100% / functions 100%（Phase 8 baseline 0%；Phase 9 实测 11.96%——**局部改善 +11.96pp**）
+- **改善来源**：Phase 9 引入 3 个新 Port（saga-port / saga-state-store-port / dead-letter-store-port），其中 `saga-port.ts` lines **100%**（Sprint F Step 1 锁定的 brand 工厂 createSagaId / createCorrelationId 等被 saga-port.test.ts + 4 业务 saga 单元测试 + 端到端集成测试间接覆盖）
+- **原因**：ports 包大部分仍是 TypeScript `interface` / `type` 声明，编译产物完全擦除（zero-runtime types），coverage 工具看到的是几行 brand constructor 函数体；这些函数体由 ports 包消费方的测试间接覆盖。Phase 9 引入的 3 个新 Port 中只有 saga-port.ts 完整覆盖；其他 2 个 port 文件 brand 工厂被部分覆盖。
 - **修复责任 Phase**：N/A（结构性现象，无需修复）
-- **备注**：ports 行覆盖 0% 不影响整体行覆盖率达标（85.97%）。如未来 Phase 9+ 在 ports 内放更多 runtime 函数（不推荐），届时再评估。本项登记仅为澄清 Step 18 报告中 0% 数字的语义。
+- **状态保持 open + 注脚 Phase 9 局部改善**（α 选项；α 既诚实表述局部改善，又不为"关闭 KI"而牵强声明结构性现象已解决）
+- **备注**：ports 行覆盖 11.96% 不影响整体行覆盖率达标（84.92%）。如未来 Phase 10+ 在 ports 内放更多 runtime 函数（不推荐），届时再评估。本项登记仅为澄清覆盖率报告中 11.96% 数字的语义——大部分 ports 文件仍是 type-only export，brand 工厂被消费方间接覆盖。
+
+---
+
+## Phase 9 状态总览（Step 17 实测，2026-05-02）
+
+**Phase 9 累计 16 Step 后总覆盖率**（vs Phase 8 baseline 85.97%/79.78%/94.86%/85.97%）：
+
+- Lines: 84.92% (-1.05pp)
+- Branches: 79.57% (-0.21pp)
+- Functions: 91.68% (-3.18pp)
+- Statements: 84.92% (-1.05pp)
+
+**全部仍超 §9.3 红线**（80%/75%/80%/80%）。Phase 8 → Phase 9 覆盖率轻微下行的根因：Phase 9 引入 2 个新 postgres adapter（saga-state-store-postgres / dead-letter-store-postgres）+ 3 个新 Port（saga-port / saga-state-store-port / dead-letter-store-port）+ 大量 application 层 saga 业务代码。其中 postgres adapter 在 CI 默认 skip（KI-P8-002 延续），ports 部分仍以 type-only export 为主（KI-P8-005 结构性现象），是覆盖率下行的主因。**Phase 9 业务 saga 模块全部 > 80% lines 覆盖**（saga-orchestrator 90.41% / saga-manual-intervention 89.51% / liquidation-saga 87.25% / adl-saga 86.44% / insurance-fund-saga 85.45% / state-transition-saga 85.29% / **cross-saga-coordination 97.84%**）。
+
+### KI-P9-001：StateTransition Saga 状态机数据副本与 domain transitionRules 漂移监控
+
+- **当前状态**：Phase 9 / Step 13 引入 `packages/application/src/saga/state-transition-saga.ts` 内部维护 `stateTransitionRules` 数据副本（从 domain 层 `risk-case-state-machine.ts` 的 `transitionRules` 派生）；Saga 侧独立维护副本是**裁决 4 A 的成本**（避免修改 domain export 表面 + §4.8 编译期硬约束严守 + 元规则 B 严守）
+- **风险**：未来某个 Phase 修改 domain 层 `transitionRules`（譬如新增状态或转换路径）但忘记同步 Saga 侧副本，会导致：
+  - Saga 内部状态机校验逻辑与 domain 实际状态机不一致
+  - 业务流程在合法转换上失败（false negative）或在非法转换上通过（false positive）
+- **监控建议**：
+  - Phase 10+ 任何修改 `packages/domain/src/risk-case-state-machine.ts` 的 PR 必须在 PR description 明示是否同步更新了 `state-transition-saga.ts` 的数据副本
+  - Phase 10+ 引入 ESLint 自定义规则或 CI 检查（譬如 grep 比对两个文件的状态/动作字面量集合）
+  - 长期：考虑把 transitionRules 提取到 shared 包让 domain + saga 共享同一数据源（违反元规则 B 的代价 vs 漂移风险的代价权衡）
+- **修复责任 Phase**：Phase 10+（持续监控）；具体修复路径由 Phase 10 引入第 5 个业务 Saga 或修改 domain transitionRules 时触发评估
+- **修复责任 Step**：未确定
+- **备注**：这不是 Phase 9 的 bug——是裁决 4 A 的明示成本（详见 ADR-0002 Step 13 段）。本 KI 仅为持续监控目的登记；ADR-0002 已留痕"未来 domain 变化由 ADR 修订流程同步"。Phase 9 实测：domain transitionRules 与 Saga 副本完全一致（基于 grep 实测）。
 
 ---
 

@@ -129,9 +129,13 @@
 
 ## Phase 10 显式登记的观察项
 
-### KI-P10-001：Phase 9 closure 隐藏的 typecheck 缺陷（Phase 10 / Step 0 责任修复）
+### KI-P10-001：Phase 9 closure 隐藏的 typecheck 缺陷（Phase 10 / Step 0 责任修复）— ✅ 已修复（Step 0）
 
-- **状态**：**open**（Phase 10 Kickoff PHASE_IMPLEMENT v3 修订时正式登记，2026-05-02）
+- **状态**：**RESOLVED**（Phase 10 / Step 0 完成修复，2026-05-02）
+- **关闭日期**：2026-05-02
+- **关闭依据**：Phase 10 / Step 0 修复 saga-end-to-end.integration.test.ts mock fixture 5 处字段不匹配；4 项独立命令实测全 PASS（lint zero / typecheck zero / 1971 tests / coverage 84.92%/79.57%/91.68%/84.92%）—— 双重证据（修复 commit + 4 项命令 PASS）
+- **关闭 commit**：[Step 0 fix commit；详见 docs/phase10/01-step-0-typecheck-remediation.md §G]
+- **历史登记**（保留供未来参考）：
 - **发现于**：Phase 10 Kickoff PHASE_IMPLEMENT 阶段实测 `pnpm typecheck` 失败；双重证据（git stash my docs changes + git checkout origin/main HEAD `c9ebe88`）确认错误**预存在于 Phase 9 / Step 19 final commit**，本 Kickoff 0 引入 0 消除
 - **位置**：`packages/application/src/saga/saga-end-to-end.integration.test.ts`（Phase 9 / Step 16 commit `22f8a21` 创建；620 LOC；4 测试类 8 it）
 - **错误明细**（10+ 处 mock builder 字段与 Engine Port 响应类型不匹配）：

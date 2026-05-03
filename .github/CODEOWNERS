@@ -1,0 +1,11 @@
+# Tianqi CODEOWNERS
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Phase 10 / Step 2: single-maintainer fallback. All PRs auto-request review
+# from @CervantesHallo so the collaboration workflow renders consistently
+# (per ADR-0003 Step 2 §裁决 3 A).
+#
+# Future multi-maintainer phases may add layered ownership (e.g. per-package
+# owners). When that happens, the catch-all rule below stays as a fallback.
+
+* @CervantesHallo

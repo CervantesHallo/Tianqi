@@ -276,11 +276,27 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 - main 分支仅接受 merge commit（不接受 squash / rebase；保留迭代历史是 Tianqi 工程纪律的组成部分）
 - 紧急 hotfix（极少数情况）仍允许直接 push main，但必须在 ADR 修订流程内显式声明
 
+### Step 0: Phase 9 closure typecheck remediation + 防御指引
+
+**裁决摘要**：
+
+- **裁决 1（修复方向）**：α 测试 fixture 对齐 Engine Port 类型（Engine Port 已锁定，元规则 B 严守）
+- **裁决 2（修复范围）**：C 全仓 typecheck 验证完整性 — 实测确认 baseline 全部 10 errors 仅在 saga-end-to-end.integration.test.ts；无隐藏类似缺陷
+- **裁决 3（不增 it）**：既有 8 it 已使用 fixture；修复后既有 it PASS 即是修复正确性证明；新增 it 引入冗余违反"克制"
+- **裁决 4（防御指引归属）**：β 独立 `docs/closure-checklist.md`（forward-looking 可独立引用；ADR 不越界承担 checklist 功能）
+- **裁决 5（KI-P10-001 关闭时机）**：B 4 项独立命令全 PASS 后关闭（修复完成的真实证据）
+- **裁决 6（0 新增）**：0 新错误码 / 0 新 Port / 0 新 Adapter / 0 新 workspace 包（惯例 K 第 19 次实战）
+- **裁决 7（本段）**：B 增加 ADR Step 0 段（沿用 Phase 9 惯例 M 增量追写模式；惯例 M 第 20 次实战 + 跨 Phase 第 1 次）
+
+**修复细节**：5 处 mock fixture 字段对齐（line 144 `MarkPriceQuote.queriedAt` 移除 / line 197-200 `ClosePositionResponse` 移除 `accountId`+`symbol` 加 `closedSize` / line 314-318 `QueryMarginBalanceResponse` 字段重命名 + 加 `totalMargin` / line 332-336 `QueryFundBalanceResponse` 加 `totalBalance`+`frozenBalance` / line 428-432 `DeleveragingTarget` 字段重命名 + 移除 `settlementCurrency` 加 `expectedDeleveragingPrice`）。
+
+**Step 0 工程意义**：Phase 9 closure 教训沉淀完成。`docs/closure-checklist.md`（63 行）自 Step 0 起永久生效；未来 Phase closure 起草指令必须引用此 checklist 含 4 项独立命令实测输出硬底。元规则 Q v3 模板首次完整实战兑现（动作 5 baseline + post-fix 双向验证）。KI-P10-001 自 open → closed（修复 commit + 4 项命令 PASS 双重证据）。Tianqi 工程纪律从"事后诚实留痕"层面正式升级到"事前防御机制"层面。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 0-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 1-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 0-7: [待 Phase 10 内部 Step 增量填充]
+### Step 1-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

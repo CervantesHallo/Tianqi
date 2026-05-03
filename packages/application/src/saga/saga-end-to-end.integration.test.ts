@@ -142,8 +142,7 @@ const buildMockMarkPrice = (slowMs?: number): MarkPriceEnginePort => ({
       prices: [
         {
           symbol: "BTC-USDT",
-          markPrice: createMarkPriceValue(50_000),
-          queriedAt: new Date().toISOString()
+          markPrice: createMarkPriceValue(50_000)
         }
       ],
       queriedAt: new Date().toISOString()
@@ -195,8 +194,7 @@ const buildMockPosition = (): PositionEnginePort => ({
   async closePosition(req) {
     return ok({
       positionId: req.positionId,
-      accountId: req.accountId,
-      symbol: req.symbol ?? "BTC-USDT",
+      closedSize: createPositionSize(0.5),
       closedAt: new Date().toISOString()
     } satisfies ClosePositionResponse);
   },
@@ -313,8 +311,9 @@ const buildMockMargin = (
       return ok({
         accountId: _req.accountId,
         currency: _req.currency,
-        availableBalance: createMarginAmount(0),
-        lockedBalance: createMarginAmount(0),
+        availableMargin: createMarginAmount(0),
+        lockedMargin: createMarginAmount(0),
+        totalMargin: createMarginAmount(0),
         queriedAt: new Date().toISOString()
       } satisfies QueryMarginBalanceResponse);
     }
@@ -331,7 +330,9 @@ const buildMockFund = (
       return ok({
         accountId: req.accountId,
         currency: req.currency,
+        totalBalance: createFundAmount(1_000_000),
         availableBalance: createFundAmount(1_000_000),
+        frozenBalance: createFundAmount(0),
         queriedAt: new Date().toISOString()
       } satisfies QueryFundBalanceResponse);
     },
@@ -426,10 +427,10 @@ const buildADLInput = (
       matchAccountId: createMatchAccountId("acct-target-match-" + caseSuffix),
       positionId: createPositionId("pos-target-" + caseSuffix),
       symbol: "BTC-USDT",
-      reduceQuantity: 0.5,
-      reduceSide: "sell",
-      settlementAmount: createFundAmount(500),
-      settlementCurrency: createFundCurrency("USDT")
+      deleveragingSide: "sell",
+      deleveragingQuantity: createPositionSize(0.5),
+      expectedDeleveragingPrice: createMarkPriceValue(50_000),
+      accountSettleAmount: createFundAmount(500)
     }
   ],
   deleveragingStrategy: "fair_share",

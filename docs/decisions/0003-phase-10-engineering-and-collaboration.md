@@ -292,11 +292,28 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 
 **Step 0 工程意义**：Phase 9 closure 教训沉淀完成。`docs/closure-checklist.md`（63 行）自 Step 0 起永久生效；未来 Phase closure 起草指令必须引用此 checklist 含 4 项独立命令实测输出硬底。元规则 Q v3 模板首次完整实战兑现（动作 5 baseline + post-fix 双向验证）。KI-P10-001 自 open → closed（修复 commit + 4 项命令 PASS 双重证据）。Tianqi 工程纪律从"事后诚实留痕"层面正式升级到"事前防御机制"层面。
 
+### Step 1: 协作资产基础三件套（CONTRIBUTING + CODE_OF_CONDUCT + SECURITY）
+
+**裁决摘要**：
+
+- **裁决 1（文件归属）**：α 仓库根目录（业界最广泛 + GitHub 自动识别）
+- **裁决 2（内容深度）**：B 标准（每文件 ≤ 100 行；含 Tianqi 项目特定上下文）
+- **裁决 3（CONTRIBUTING 内容）**：引用《宪法》§24 + 元规则 Q v3 + Phase 10 工作流过渡 + KI-P10-001 教训；**不复制**宪法内容
+- **裁决 4（CODE_OF_CONDUCT 标准）**：α Contributor Covenant 2.1 — 但**采用链接版而非全文复制**（避免双重维护 + 让标准维护者作为单一权威源；与裁决 3 引用而非复制原则一致）
+- **裁决 5（SECURITY 报告渠道）**：α GitHub Private Vulnerability Reporting + 7/14/30 天 best-effort 响应承诺（单维护者可履行）
+- **裁决 6（PR 模板预告）**：α 不预告（Step 1 独立完整；Step 2 PR 模板上线后通过独立小修订追加 CONTRIBUTING 段，沿用 Kickoff ADR 工作流过渡段模式）
+- **裁决 7（0 新增）**：0 新错误码 / 0 新 Port / 0 新 Adapter / 0 新 workspace 包（惯例 K 第 20 次实战）
+- **裁决 8（本段）**：B 增加 ADR Step 1 段（沿用 Phase 9 惯例 M 增量追写；惯例 M 第 21 次 + 跨 Phase 第 2 次实战）
+
+**实施细节**：CONTRIBUTING.md 既有 84 行（先前 session 残留；内容质量符合裁决 3 全部要求 — 项目使命 / 引用宪法 §24 七项 / 元规则 Q v3 4 项独立命令 / KI-P10-001 教训引用 / Conventional Commits / AI 协作纪律 / closure-checklist 引用 / docs 导航；克制 > 堆砌 — 保留既有不重写）。CODE_OF_CONDUCT.md 22 行（链接 + scope + reporting + attribution；不复制 Contributor Covenant 全文）。SECURITY.md 68 行 ≤ 80（supported versions / private vulnerability reporting / response timeline 7-14-30 天 best-effort / disclosure policy / out of scope / 高敏感面 5 项 — saga 编排 / 人工介入 / 审计 / 幂等键 / 持久化 adapter）。
+
+**Step 1 工程意义**：Tianqi 协作生态从此可见 — 仓库根目录 3 文件让贡献者 / 社区 / 安全研究者各有入口。CONTRIBUTING 引用而非复制《宪法》是"双重维护避免"的工程纪律。CODE_OF_CONDUCT 链接而非复制是同精神延伸（让标准维护者作为单一权威源）。Step 2 PR 模板 + Issue 模板 + CODEOWNERS 在干净 baseline 上承接（Step 1 不预占 .github/ 目录工作）。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 1-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 2-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 1-7: [待 Phase 10 内部 Step 增量填充]
+### Step 2-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

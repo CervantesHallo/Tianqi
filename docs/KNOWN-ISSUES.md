@@ -162,6 +162,45 @@
 - **协作教训留痕**：Phase 9 / Step 17/18/19 起草指令在硬底中**未明确要求"独立 typecheck 验证"**；AI 跑 `pnpm test:coverage` 顺带验证类型，让 vitest 宽松类型检查掩盖了缺陷；这是协作 prompt 设计的疏漏，由 Phase 10 元规则 Q 模板更新承接补救
 - **备注**：本 KI 与 Step 0 责任协调而非冗余——KI 提供持续跟踪机制（修复后 KI 关闭由 Step 0 执行报告确认），Step 0 提供具体修复任务定义；防御机制（Step 3 CI + 元规则 Q v3 模板）确保未来不重复
 
+### KI-P10-002：monorepo dist-based workspace test 依赖 build 而 test script 不显式调用（Phase 10 / Step 3.5 责任修复）
+
+- **状态**：open（Phase 10 / Step 3.5 修复中）
+- **发现于**：Phase 10 / Step 3 PR #5 CI 第一次运行（2026-05-02）；Run #1（pull_request 触发）+ Run #2（push to main 触发）均失败
+- **位置**：root `package.json` scripts + `.github/workflows/ci.yml` test/coverage job
+- **错误明细**：fresh checkout 下 `pnpm test` 失败 144/182 test files；vite import-analysis 错误（找不到 `@tianqi/<pkg>` 的 dist 入口）
+- **根因**：
+  - workspace 包 `package.json` `main: dist/index.js`（dist-based publish 模式）
+  - root `package.json` 无 `build` script；ci.yml test/coverage job 不含 build 步
+  - `tsc -b` 增量构建依赖 `.tsbuildinfo`；删 dist 不删 .tsbuildinfo 时 tsc 判 "up to date" 跳过 emit
+  - CI fresh checkout 无 dist 残留 → vite import-analysis 失败
+  - 本地长期有 dist 残留 → contributors 几乎不会主动删它 → 从未触发"找不到 dist"路径
+
+**关键工程纪律边界**（用户 v3 补充 3 措辞校正）：
+
+Phase 1-9 测试不是伪绿色——是真过的，但只在"恰好有 dist/"的环境过。这不是 Phase 1-9 work 的污名，而是**"未在干净环境验证过的真绿色"**。CI 第一次启用揭露这个未覆盖路径，是 Phase 10 工程化基础设施的合理价值。
+
+- **修复责任 Phase**：Phase 10
+- **修复责任 Step**：Phase 10 / Step 3.5（修复方案 C；用户 v3 锁定）
+- **防御机制**：
+  - ci.yml test + coverage 两 job 显式 `pnpm build` 步骤（裁决 3 A）
+  - root `package.json` 添加 `build` script（封装 `tsc -b tsconfig.json`）
+  - **`pnpm test` / `pnpm test:coverage` 依赖 `pnpm build`**（裁决 2 β；防御补强；实测 fresh build 增量 0.28s ≤ 2s 阈值）
+  - CONTRIBUTING.md `## Mandatory Validation` 段前置 `pnpm install + pnpm build`
+  - docs/closure-checklist.md 同步追加 fresh checkout 验证防御段
+- **长期监控**（触发任一阈值时启动方案 D 升级评估）：
+  - fresh build 时长 > 5 秒 → 触发升级评估（当前实测 5.02s 已逼近）
+  - dev cycle 增量 build 时长 > 2 秒 → 触发评估（当前实测 0.28s）
+  - monorepo workspace 包数 > 50 → 触发评估（当前 25 包）
+  - contributors 数 > 5 → 触发评估
+  - 升级路径：方案 D（src-based dev/test；conditional exports）在 Phase 13+ 评估
+- **关联教训（双层缺陷链）**：
+  - KI-P10-001（typecheck 层；Step 0 RESOLVED）+ KI-P10-002（packaging 层；Step 3.5 修复）共属"Phase 9 closure 工程教训"双层缺陷链
+  - Step 0 修复 vitest type-erasure 绕过的 typecheck 缺陷
+  - Step 3.5 修复 dist-based workspace 在 fresh checkout 下不工作的 packaging 缺陷
+  - 两者共同价值：Tianqi 从"未在干净环境验证过的真绿色"升级到"干净环境真绿色"成熟度
+- **Step 3 工程价值确认（forward-looking）**：
+  Step 3 自身工程价值远高于"协作工作流自动化"——CI 第一次启用作为干净环境的强制验证，揭露了 Phase 1-9 全程从未触发的未覆盖路径。Step 3.5 修复完成 + main 真正绿后，Tianqi 进入"干净环境真绿色"成熟度。
+
 ---
 
 ## 历史 Phase 状态

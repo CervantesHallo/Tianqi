@@ -56,6 +56,10 @@ pnpm test:coverage   # coverage thresholds (currently 84% lines starting Step 3)
 
 Do not substitute a single command (e.g. `pnpm test:coverage`) for independent typecheck verification. This rule exists because of KI-P10-001: a Phase 9 closure defect where vitest's lenient type-checking masked 10 typecheck errors that escaped review. See `docs/closure-checklist.md` for the broader rationale.
 
+### CI Verification
+
+When you open a PR, GitHub Actions will automatically run the four validation commands listed above as parallel jobs (see `.github/workflows/ci.yml`). Your PR cannot be merged until all four jobs pass. Local pre-PR validation remains your responsibility (per Meta-rule Q v3); CI is a safety net, not a substitute.
+
 ## Commit Convention
 
 Tianqi uses [Conventional Commits](https://www.conventionalcommits.org/). Examples from project history:

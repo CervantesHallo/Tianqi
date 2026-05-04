@@ -4,10 +4,11 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
+    "build": "tsc -b tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b tsconfig.json",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test": "pnpm build && vitest run",
+    "test:coverage": "pnpm build && vitest run --coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

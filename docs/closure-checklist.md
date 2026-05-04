@@ -2,6 +2,19 @@
 
 任何 Phase 收官 Step 起草指令必须明示以下 checklist。本文档自 **Phase 10 / Step 0** 起永久生效（KI-P10-001 修复完成时建立）。
 
+## fresh checkout 验证防御（Phase 10 / Step 3.5 教训）
+
+任何 closure Step 验证 4 项独立命令前必须**先在 fresh checkout 模拟环境**跑一遍（删 `.tsbuildinfo` + `dist/`），并附前置命令：
+
+```bash
+find packages -name "*.tsbuildinfo" -delete
+rm -rf packages/*/dist/
+pnpm install --frozen-lockfile
+pnpm build  # required for dist-based workspace tests
+```
+
+**根因**：Tianqi monorepo 使用 dist-based workspace（`main: dist/index.js`）；contributors 几乎不会主动删 dist/，导致本地 4 项命令 PASS 但 fresh CI 环境 test 144 文件 FAIL。这是 §7.2 严重违规——不在 fresh 环境验证 = 没有真正验证。详见 KI-P10-002。
+
 ## 4 项独立命令实测输出（元规则 Q v3 模板核心）
 
 每个 Phase closure Step 必须独立执行以下 4 项命令并各自记录实测输出：

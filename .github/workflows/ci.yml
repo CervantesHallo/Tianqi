@@ -1,0 +1,72 @@
+# Tianqi CI — Phase 10 / Step 3 (元规则 Q v3 模板 4 项独立命令并行验证)
+#
+# Triggered on PR (any branch → any branch) and push to main (per ADR-0003
+# Step 3 裁决 5 B). Each of the four mandatory validations runs as an
+# independent job so that GitHub UI shows individual pass/fail status (per
+# ADR-0003 Step 3 裁决 1 B).
+#
+# Node version: '22' (major-only; setup-node auto-resolves to Node 22.x
+# latest patch — per v2 修订 §C 裁决 2 + §K K.1).
+# pnpm version: read from package.json `packageManager` field (per 裁决 3 α).
+# Cache: pnpm store via setup-node `cache: 'pnpm'` (per 裁决 4 B).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint (eslint --max-warnings=0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  typecheck:
+    name: Typecheck (tsc -b)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  test:
+    name: Test (vitest run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  coverage:
+    name: Coverage (vitest run --coverage; thresholds 84/75/84/84)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage

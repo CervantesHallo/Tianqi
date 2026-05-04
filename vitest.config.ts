@@ -42,15 +42,18 @@ export default defineConfig({
         // Re-export-only barrels carry no logic to cover.
         "**/index.ts"
       ],
-      // Phase 8 CLOSED gate per §9.3: 80% lines / functions / statements; branches
-      // typically lag by ~5pp due to defensive validation paths so 75% is the
-      // realistic floor. Numbers can be revisited at Step 19 ADR if Phase 8 ends
-      // up significantly higher than 80% across the board.
+      // Phase 10 / Step 3 升级 per ADR-0003 K.2 锁定 84% 起步路径.
+      // lines / functions / statements 升至 84 (current 84.92% / 91.68% /
+      // 84.92% all safely above; functions 91.68% remains safely above 84).
+      // branches keep 75 因 KI-P8-005 结构性现象 (current 79.5%-79.58% 距
+      // 75% 仅 4.5pp; v8 statistical noise 可能让 branches 偶发跌破 84%
+      // 即便实际测试覆盖未变). Step 7 收官升级 85% 时再次审视 branches
+      // 是否可同步升级.
       thresholds: {
-        lines: 80,
-        functions: 80,
+        lines: 84,
+        functions: 84,
         branches: 75,
-        statements: 80
+        statements: 84
       }
     }
   }

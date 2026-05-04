@@ -326,11 +326,51 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 
 **Step 2 工程意义**：协作资产 7 件套达 7/7 完整（CHANGELOG + CONTRIBUTING + CODE_OF_CONDUCT + SECURITY + PR 模板 + Issue 模板 + CODEOWNERS）。.github/ 协作生态从无到有；GitHub UI 创建 PR / Issue 自动加载本 Step 模板；CODEOWNERS 让所有 PR 自动 request review；config.yml 重定向安全报告 + 讨论 + 行为准则。Phase 10 协作基础主题（Step 1 + Step 2）落地完成；Step 3-7 进入工程化建设主题（CI / 容器化 / 发布 / 文档 / 收官）。
 
+### Step 3: CI 强制门禁（GitHub Actions Workflow）
+
+**性质**：Phase 10 第一个"工程化建设"性质 Step；拆两阶段流程第 4 次实战 + **普通 Step 级别首次**（前 3 次：Phase 9 / Step 6 + Step 14 + Phase 10 Kickoff 均 Phase 启程级或复杂 Step 级）；4 轮迭代 v1 → v2 → IMPLEMENT。
+
+**10 项核心裁决摘要**：
+
+| # | 裁决 | 选择 |
+|---|---|---|
+| 1 | workflow 数量 / job 拆分 | **B 单 workflow + 4 jobs 并行**（lint / typecheck / test / coverage）|
+| 2 | Node 版本 | **α 单版本 Node 22.x**（major-only `'22'`；不 pin patch；与 @types/node 协调）|
+| 3 | pnpm 版本 | **α 沿用 packageManager 字段** pnpm@10.0.0 |
+| 4 | cache | **B cache pnpm store**（pnpm/action-setup 内置）|
+| 5 | 触发条件 | **B PR + push to main** |
+| 6 | 覆盖率门槛实施 | **A vitest config thresholds 84/75/84/84**（branches 维持 75；KI-P8-005 结构性现象延续）|
+| 7 | branch protection | **α + β 必须 PR + status checks + review**（GitHub UI 配置；本 Step 仅建议；**v2 时序：PR 合并到 main 后配置**避免鸡生蛋问题）|
+| 8 | CONTRIBUTING 同步 | **α 本 Step 追加 CI Verification 段**（4 行；CONTRIBUTING 90 → 94 ≤ 100）|
+| 9 | 0 新增 | 错误码 / Port / Adapter / 包；惯例 K 第 22 次实战 |
+| 10 | ADR Step 3 段 | **B ≤ 40 行**；惯例 M 第 23 次 + 跨 Phase 第 4 次实战 |
+
+**v1 → v2 草案与最终的差异**：
+
+- v1 → v2 修订 1：§G branch protection 时序明示"PR 合并到 main 后"（避免鸡生蛋问题——Require status checks 下拉列表只在 workflow 至少在 main 跑过一次后才有 status check 名称可选）
+- v1 → v2 修订 2：§C 裁决 2 + §D yml 显式声明 node-version `'22'` major-only（不 pin patch）
+- v2 → IMPLEMENT 0 修订（v2 接口冻结后实施完整对齐）
+
+**实施细节**：
+- `.github/workflows/ci.yml` 创建（70 行；4 jobs 并行；GitHub 官方 actions only：actions/checkout@v4 + pnpm/action-setup@v4 + actions/setup-node@v4）
+- `vitest.config.ts` thresholds 升级 80 → 84（lines / functions / statements；branches 维持 75）+ 含 K.2 锁定路径注释 + branches 不升级理由 + Step 7 进一步升级承诺
+- `CONTRIBUTING.md` 追加 ### CI Verification 子段（90 → 94 行）
+- branch protection 建议在 docs/phase10/04 §G + 本 ADR 段供用户 PR 合并后 GitHub UI 配置
+
+**3 次 coverage 实测留痕**（附加要求 B；v8 噪声评估）：
+- 3 次 branches 全部 79.57%（max-min 0.00pp；零波动；远大于 75% 门槛 4.57pp 安全裕度）
+- v8 统计噪声在本 baseline 表现极稳定；前次 Step 1/2 观察到的 79.5%-79.58% 范围未在本 Step 重现
+
+**CI 第一次运行实证结果**（附加要求 A；CI Iteration 诚实记录）：
+- [由 PHASE_IMPLEMENT 阶段 push 后实测填入；如失败追加 fix commit + 留痕]
+
+**Step 3 工程意义**：CI 强制门禁建立——元规则 Q v3 模板 4 项独立命令从"贡献者自觉"升级为"CI 强制不可绕过"；让"提交 CI 绿但本地跑不起来"不可能（《补充文档》§13.1 严禁兑现）。Phase 10 工程化建设主题首战完成；Step 4-7（容器化 / 发布 / 文档 / 收官）在 CI 门禁保护下推进。拆两阶段流程在普通 Step 级别首次实证——v1 → v2 用户审视让 branch protection 时序裁决从"AI 草率建议"升级为"避免鸡生蛋的工程裁决"。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 3-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 4-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 3-7: [待 Phase 10 内部 Step 增量填充]
+### Step 4-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

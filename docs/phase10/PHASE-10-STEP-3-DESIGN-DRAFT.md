@@ -1,11 +1,34 @@
-# Phase 10 / Step 3 — CI 强制门禁（GitHub Actions Workflow）— PHASE_DESIGN 草案
+# Phase 10 / Step 3 — CI 强制门禁（GitHub Actions Workflow）— PHASE_DESIGN 草案 v2
 
-> **状态**：DRAFT — 等待用户 APPROVE
+> **状态**：DRAFT v2 — 用户 v1 REQUEST_CHANGES + 反馈后修订；等待 v2 APPROVE
 > **类型**：拆两阶段流程第 4 次实战（普通 Step 级别首次）
+> **版本**：v2（v1 用户审视后第 1 轮修订）
 > **草案时间**：2026-05-04
 > **作废时点**：第二阶段 PHASE_IMPLEMENT 完成后本文件立即删除（设计沉淀进 ADR-0003 + .github/workflows/ci.yml）
 
 本草案是 Phase 10 / Step 3 拆两阶段流程的产物——CI workflow 设计影响 Phase 10 全程 + Phase 11+ 持续；用户审视 10 项裁决（Node 版本 / pnpm 版本 / cache / 触发 / 覆盖率门槛 / branch protection 等）让设计稳健。
+
+## v2 修订说明（用户审视后落地）
+
+用户 v1 回执：REQUEST_CHANGES + 2 项小修订要求 + 2 项附加要求（不阻塞 v2）。
+
+**v2 已落地的 2 项小修订**：
+
+1. **§G + §K K.3 branch protection 时序调整** — 从"PR 合并前 / 后均可"改为明示"**PR 合并到 main 后**配置"。理由：避免鸡生蛋问题（GitHub UI Require status checks 需要从下拉列表选择 status check 名称；status check 名称只有在 workflow 至少在 main 跑过一次后才出现在下拉列表）。详见 §G + §K K.3
+2. **§C 裁决 2 + §D yml + §K K.1 Node version 写法精确化** — `node-version: '22'`（major-only；不 pin patch 如 `'22.20.0'`）显式声明为 v2 有意决议。v1 草案已使用 `'22'` 但未显式说明；v2 在 §C 裁决 2 + §K K.1 明示
+
+**v2 不修订的部分**（用户 v1 回执 APPROVE）：
+- K.1 Node 22.x 选择（保留）
+- K.2 functions: 84 阈值（保留；Step 7 再审视）
+- 裁决 1-10 全部其他选择（保留）
+- §H 风险点（保留）
+
+**附加要求**（不阻塞 v2 APPROVE；由 AI 在 PHASE_IMPLEMENT 阶段执行）：
+
+A. **K.4 CI iteration 诚实记录纪律** — force-push 不抹掉失败历史；追加 fix commit + PR 描述追加 "CI Iteration" 段。这让 CI 第一次运行失败的诚实留痕显式可见（沿用 Tianqi "诚实评估" 工程纪律）。
+B. **§F 测试计划增强** — PHASE_IMPLEMENT 阶段跑 3 次 coverage 看 branches 波动范围；docs/phase10/04 §F 留痕。这是因 branches 79.5%-79.58% 距 75% 门槛仅 4.5pp，需要确认 v8 噪声下限是稳定的。
+
+**v2 修订完成；等待 v2 APPROVE 进入 PHASE_IMPLEMENT 阶段**。
 
 ---
 
@@ -110,7 +133,7 @@
 - β 多版本 matrix 在 Tianqi 单部署目标场景过度（不是公共 npm package）；Phase 11+ 真实部署再考虑
 - γ 沿用 .nvmrc / engines 字段不可行（仓库均无）；本 Step 不主动添加 .nvmrc 避免双重维护源
 
-CI yml 中固定 `node-version: '22'` 让 setup-node 自动取 Node 22 latest 系列；不 pin 到具体 patch 版本（`22.20.0`）避免 patch 释出后 CI 卡住。
+**v2 修订显式声明**：CI yml 中固定 `node-version: '22'`（**仅 major 版本**；不 pin 到具体 patch 版本如 `'22.20.0'`）。理由：让 setup-node 自动取 Node 22.x latest patch；避免 patch 释出后 CI 卡在过期 patch / 安全更新滞后。本机实测 Node 22.20.0 仅作 baseline 留痕参考（§B.2），不等于 CI 锁定 patch。
 
 ### 裁决 3：pnpm 版本策略
 
@@ -353,7 +376,17 @@ CONTRIBUTING.md 90 → 约 96 行（仍 ≤ 100 硬底）。
 
 ---
 
-## §G branch protection 建议（GitHub UI 操作；本 Step 不在代码层面落地）
+## §G branch protection 建议（GitHub UI 操作；本 Step 不在代码层面落地；时序：PR 合并到 main 后配置）
+
+**关键时序裁决（v2 修订）**：**本 Step PR 合并前不配置 branch protection；合并到 main 后用户在 GitHub UI 配置**。
+
+**理由**（避免鸡生蛋问题）：
+- GitHub 的 "Require status checks" 配置需要从下拉列表中选择具体 status check 名称
+- status check 名称只有在该 workflow 至少在 main 分支上跑过一次后才会出现在下拉列表
+- 如果在本 Step PR 合并前先配置 branch protection，配置时下拉列表为空（CI 还未在 main 跑过），无法选择 4 个 CI checks
+- 因此**正确顺序**：本 Step PR 合并 → CI 在 main 第一次运行 → status check 名称出现在 GitHub UI 下拉列表 → 用户配置 branch protection 选择 4 个 checks
+
+**等价后果**：本 Step PR 自身合并时 branch protection 不强制（CODEOWNERS auto-request review 仍生效），但合并后 status check 名称落地 main，用户 UI 配置后 Step 4+ PR 起 CI 强制门禁完全生效。
 
 合并本 Step PR 后，建议在 GitHub UI **Settings → Branches → Branch protection rules → Add rule** 配置 `main` 分支：
 
@@ -364,7 +397,7 @@ CONTRIBUTING.md 90 → 约 96 行（仍 ≤ 100 硬底）。
 - ❌ Require branches to be up to date before merging（单维护者负担过重；不勾选）
 - ✅ **Do not allow bypassing the above settings**（让纪律对所有人一致；含维护者）
 
-**注意**：上述配置 in GitHub UI 不在本 Step 代码层面落地。本 Step PR 合并后用户自行 UI 配置；docs/phase10/04 含本指引便于未来其他维护者参考。
+**注意**：上述配置 in GitHub UI 不在本 Step 代码层面落地。本 Step PR **合并到 main 后**用户自行 UI 配置（合并前配置无法选择 status checks）；docs/phase10/04 含本指引便于未来其他维护者参考。
 
 ---
 
@@ -425,13 +458,15 @@ git commit -m "docs(decisions): draft Phase 10 Step 3 CI workflow design"
 
 以下 4 项是 PHASE_DESIGN 阶段的关键审视点，请用户重点回执：
 
-### K.1 Node.js 版本（裁决 2 α Node 22.x）
+### K.1 Node.js 版本（裁决 2 α Node 22.x；v2 修订显式 major-only）
 
-**决议**：CI yml 固定 `node-version: '22'`（Node 22 latest 系列；不 pin patch）。
+**决议**：CI yml 固定 `node-version: '22'`（**仅 major 版本；不 pin patch 如 '22.20.0'**；让 setup-node 自动取 Node 22.x latest patch）。
 
 **审视点**：是否同意 Node 22 而非 Node 20 LTS？是否需要主动添加 `.nvmrc` 让本地与 CI 显式一致？
 
-**AI 建议**：保留 Node 22；不添加 .nvmrc（避免双重维护源；@types/node 已隐式约定）。
+**AI 建议**：保留 Node 22 major-only；不添加 .nvmrc（避免双重维护源；@types/node 已隐式约定）；本机实测 Node 22.20.0 仅作 baseline 留痕。
+
+**v2 修订要点**：用户审视 v1 后明示要求 node-version 写法精确化为 `'22'`（major-only）；v1 草案已使用 `'22'` 但未显式声明此为有意决议；v2 在 §C 裁决 2 + 本节明示这是 v2 决议。
 
 ### K.2 vitest thresholds 升级值（裁决 6）
 
@@ -441,13 +476,13 @@ git commit -m "docs(decisions): draft Phase 10 Step 3 CI workflow design"
 
 **AI 建议**：保留 functions: 84 与 lines/statements 一致；K.2 锁定路径是统一升级而非分维度激进；Step 7 收官时再次审视。
 
-### K.3 branch protection 由用户 UI 配置（裁决 7 + §G）
+### K.3 branch protection 由用户 UI 配置（裁决 7 + §G；v2 修订时序）
 
-**决议**：本 Step 仅提供建议；用户在 GitHub UI 配置。
+**决议**：本 Step 仅提供建议；用户在 GitHub UI 配置；**时序：PR 合并到 main 后配置**（v2 修订）。
 
-**审视点**：是否同意"代码层面不落地 branch protection"？是否需要本 Step PR 合并后立即 UI 配置（防止后续 Step PR 绕过 CI）？
+**审视点**：是否同意"代码层面不落地 branch protection"？时序"合并前 vs 合并后"如何裁决？
 
-**AI 建议**：本 Step PR 合并前用户先在 GitHub UI 配置 branch protection（让本 Step 自身的 PR 合并就被强制走 CI）；或本 Step PR 合并后立即配置。
+**AI 建议（v2 修订）**：**PR 合并到 main 后配置**（避免鸡生蛋问题：GitHub UI Require status checks 需要从下拉列表选择 status check 名称；status check 名称只有在 workflow 至少在 main 跑过一次后才出现在下拉列表；合并前配置 → 下拉列表为空 → 无法选择 4 个 CI checks）。等价后果：本 Step PR 自身合并时 branch protection 不强制（CODEOWNERS auto-request review 仍生效），但合并后 status check 名称落地 main，用户 UI 配置后 Step 4+ PR 起 CI 强制门禁完全生效。详见 §G。
 
 ### K.4 CI 第一次运行的失败处置策略（§H.1）
 

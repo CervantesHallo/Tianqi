@@ -48,13 +48,19 @@ Issue templates (`.github/ISSUE_TEMPLATE/`) are similarly auto-loaded. Security 
 Before opening a PR, run all four commands **independently** and record each output:
 
 ```bash
-pnpm lint            # zero warnings, zero errors
-pnpm typecheck       # zero errors
-pnpm test            # all tests green
-pnpm test:coverage   # coverage thresholds (currently 84% lines starting Step 3)
+# Prerequisites (fresh checkout; per KI-P10-002):
+pnpm install --frozen-lockfile   # install workspace deps
+pnpm build                        # build dist for workspace packages (required for tests)
+# Four mandatory validation commands (Meta-rule Q v3):
+pnpm lint                         # zero warnings, zero errors
+pnpm typecheck                    # zero errors
+pnpm test                         # all tests green (auto-runs `pnpm build` per package.json)
+pnpm test:coverage                # coverage thresholds 84/75/84/84
 ```
 
-Do not substitute a single command (e.g. `pnpm test:coverage`) for independent typecheck verification. This rule exists because of KI-P10-001: a Phase 9 closure defect where vitest's lenient type-checking masked 10 typecheck errors that escaped review. See `docs/closure-checklist.md` for the broader rationale.
+Do not substitute a single command (e.g. `pnpm test:coverage`) for independent typecheck verification. This rule exists because of KI-P10-001: a Phase 9 closure defect where vitest's lenient type-checking masked 10 typecheck errors that escaped review. Build is a prerequisite (per KI-P10-002), not a substitute for any of the four. See `docs/closure-checklist.md` for the broader rationale.
+
+> **Note** — `pnpm typecheck` and `pnpm build` both run `tsc -b tsconfig.json` (semantically overlapping). They stay separate because CI jobs run in isolation (ADR-0003 Step 3 裁决 1 B); separate scripts make PR check status unambiguous.
 
 ### CI Verification
 

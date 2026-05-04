@@ -1,0 +1,16 @@
+# Tianqi Issue Template Configuration
+# Disables blank Issues to ensure all reports use a structured template;
+# redirects security vulnerabilities to GitHub Private Vulnerability Reporting
+# (per SECURITY.md) and general questions to GitHub Discussions.
+
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/CervantesHallo/Tianqi/security/advisories/new
+    about: Report security vulnerabilities through GitHub Private Vulnerability Reporting (see SECURITY.md). Do not file public Issues for security concerns.
+  - name: Question or Discussion
+    url: https://github.com/CervantesHallo/Tianqi/discussions
+    about: Use GitHub Discussions for questions, ideas, and general discussion that aren't bug reports or feature proposals.
+  - name: Code of Conduct Concern
+    url: https://github.com/CervantesHallo/Tianqi/security/advisories/new
+    about: Report Code of Conduct concerns through the same private channel as security reports (mark the report as Code of Conduct). See CODE_OF_CONDUCT.md.

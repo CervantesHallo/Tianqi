@@ -309,11 +309,28 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 
 **Step 1 工程意义**：Tianqi 协作生态从此可见 — 仓库根目录 3 文件让贡献者 / 社区 / 安全研究者各有入口。CONTRIBUTING 引用而非复制《宪法》是"双重维护避免"的工程纪律。CODE_OF_CONDUCT 链接而非复制是同精神延伸（让标准维护者作为单一权威源）。Step 2 PR 模板 + Issue 模板 + CODEOWNERS 在干净 baseline 上承接（Step 1 不预占 .github/ 目录工作）。
 
+### Step 2: .github/ 协作生态（PR 模板 + Issue 模板 + CODEOWNERS）
+
+**裁决摘要**：
+
+- **裁决 1（PR 模板深度）**：B 标准 30-60 行（七项标题 + 简短引导 + 4 项独立命令 checkbox + Phase/Step Mapping + Checklist）
+- **裁决 2（Issue 模板）**：标准 3 模板（bug-report / feature-request / documentation-issue）+ config.yml（blank_issues_enabled: false + 安全 / 讨论 / 行为准则 3 个 contact_links 重定向）
+- **裁决 3（CODEOWNERS）**：A 全仓 fallback（`* @CervantesHallo`；含未来多维护者升级路径注释）
+- **裁决 4（CONTRIBUTING 同步）**：α 本 Step 追加 PR 模板段（4 行；CONTRIBUTING 84 → 90 行）
+- **裁决 5（dependabot）**：α 不创建（Phase 10 主题不含依赖管理；Phase 11+ 或 Phase 12 引入）
+- **裁决 6（0 新增）**：0 新错误码 / 0 新 Port / 0 新 Adapter / 0 新 workspace 包（惯例 K 第 21 次实战）
+- **裁决 7（本段）**：B 增加 ADR Step 2 段（沿用 Phase 9 惯例 M 增量追写；惯例 M 第 22 次 + 跨 Phase 第 3 次实战）
+- **裁决 8（既有资产核查教训沉淀）**：β 追加到 `docs/closure-checklist.md`（Step 1 教训：先前 session 残留 `CONTRIBUTING.md` 未追踪；双重命令防御 `git status --untracked-files=all` + `git ls-files <path>`；checklist 总长 63 → 72 行 ≤ 100）
+
+**实施细节**：.github/ 目录从无到有；6 个新文件（PULL_REQUEST_TEMPLATE.md 57 行 / ISSUE_TEMPLATE/bug-report.md 48 行 / feature-request.md 38 行 / documentation-issue.md 40 行 / config.yml 16 行 / CODEOWNERS 11 行）；3 个修改文件（CONTRIBUTING.md PR 模板段追加 + closure-checklist.md 既有资产核查防御段追加 + ADR-0003 本段追加）。全部硬底满足（PR 模板 ≤ 60 / Issue 模板各 ≤ 50 / CODEOWNERS ≤ 15 / CONTRIBUTING ≤ 100 / closure-checklist ≤ 100）。
+
+**Step 2 工程意义**：协作资产 7 件套达 7/7 完整（CHANGELOG + CONTRIBUTING + CODE_OF_CONDUCT + SECURITY + PR 模板 + Issue 模板 + CODEOWNERS）。.github/ 协作生态从无到有；GitHub UI 创建 PR / Issue 自动加载本 Step 模板；CODEOWNERS 让所有 PR 自动 request review；config.yml 重定向安全报告 + 讨论 + 行为准则。Phase 10 协作基础主题（Step 1 + Step 2）落地完成；Step 3-7 进入工程化建设主题（CI / 容器化 / 发布 / 文档 / 收官）。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 2-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 3-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 2-7: [待 Phase 10 内部 Step 增量填充]
+### Step 3-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

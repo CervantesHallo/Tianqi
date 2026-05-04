@@ -37,6 +37,12 @@ Phase 10 onwards uses **feature branch + PR + reviewer approval** workflow (see 
 
 Merge method: **merge commit** (preserve iteration history). Squash and rebase merges are not used; commit history is part of the engineering record.
 
+### PR Template
+
+When you open a PR, GitHub auto-loads `.github/PULL_REQUEST_TEMPLATE.md` containing the seven sections plus the four-command validation checklist. Fill all sections; do not delete the template structure.
+
+Issue templates (`.github/ISSUE_TEMPLATE/`) are similarly auto-loaded. Security vulnerabilities are redirected to GitHub Private Vulnerability Reporting per `.github/ISSUE_TEMPLATE/config.yml`.
+
 ## Mandatory Validation (Meta-rule Q v3)
 
 Before opening a PR, run all four commands **independently** and record each output:

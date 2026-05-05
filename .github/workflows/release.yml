@@ -1,0 +1,81 @@
+# Tianqi Release Automation — Phase 10 / Step 5
+#
+# Triggered by pushing a tag matching `phase-*-closed` (e.g. `phase-10-closed`).
+# The historical `1.0.0` tag (initial upload artifact) is intentionally NOT
+# matched — only Phase milestone tags trigger release automation.
+#
+# This workflow:
+#   1. Builds the workspace (with the same root build script as CI; §7.2 一致性)
+#   2. Extracts the matching CHANGELOG.md phase section as release notes
+#   3. Creates a GitHub Release as DRAFT (per ADR-0003 Step 5 裁决 4 A;
+#      maintainer reviews + publishes manually)
+#
+# Phase 11+ may add: docker push to ghcr.io, npm publish, etc.
+# (See ADR-0003 Step 5 § Phase 11+ 承接事项.)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'phase-*-closed'
+
+permissions:
+  contents: write  # required to create GitHub Release
+
+jobs:
+  release:
+    name: Create GitHub Release (draft)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for CHANGELOG context
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      # Verify the tagged commit can build (§7.2 一致性 + Step 3.5 build chain)
+      - run: pnpm build
+
+      # Extract CHANGELOG section matching this tag's phase number
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          PHASE_NUM=$(echo "$TAG_NAME" | sed -E 's/phase-([0-9]+)-closed/\1/')
+          echo "Extracting CHANGELOG section for Phase $PHASE_NUM..."
+
+          awk -v phase="Phase $PHASE_NUM" '
+            /^## \[/ {
+              if (printing) exit
+              if ($0 ~ phase) printing = 1
+            }
+            printing
+          ' CHANGELOG.md > release-notes.md
+
+          echo "--- Extracted release notes ---"
+          cat release-notes.md
+          echo "---"
+
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No CHANGELOG section found for Phase $PHASE_NUM; release will have empty notes"
+          fi
+
+      # Create GitHub Release as draft (per 裁决 4 A; v2 修订 K.1 gh CLI).
+      # gh CLI is preinstalled on ubuntu-latest runners (GitHub 官方); no
+      # third-party action required. 元规则 P 在"有 GitHub 官方等价物"
+      # 场景严守 — 详见 ADR-0003 Step 5 § 第三方 action 严格度判断段.
+      - name: Create GitHub Release (draft)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md

@@ -366,6 +366,55 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 
 **Step 3 工程意义**：CI 强制门禁建立——元规则 Q v3 模板 4 项独立命令从"贡献者自觉"升级为"CI 强制不可绕过"；让"提交 CI 绿但本地跑不起来"不可能（《补充文档》§13.1 严禁兑现）。Phase 10 工程化建设主题首战完成；Step 4-7（容器化 / 发布 / 文档 / 收官）在 CI 门禁保护下推进。拆两阶段流程在普通 Step 级别首次实证——v1 → v2 用户审视让 branch protection 时序裁决从"AI 草率建议"升级为"避免鸡生蛋的工程裁决"。
 
+### Step 3.5: Phase 1-9 dist-based workspace 测试链修复 + 防御机制建立
+
+**双层缺陷链留痕**：本 Step 是 Step 3 揭露的同源问题修复，与 Step 0（KI-P10-001）共属"Phase 9 closure 工程教训"双层缺陷链；Step 0 修复了 typecheck 层（vitest type-erasure 绕过），Step 3.5 修复 packaging 层（dist-based workspace 在 fresh checkout 下不工作）。
+
+**§E.1 fallback 兑现**：ADR-0003 Step 3 §E.1 fallback 已预言"CI failure 时核查 GitHub Actions log；区分配置错误 vs 基础设施问题；前者修 yml + 追加 fix commit（不 force-push 抹掉失败历史）"。Step 3.5 是该 fallback 的具体兑现——虽然没预言到具体根因是 dist 暴露问题，但兜底机制兑现了。这证明 Step 3 设计阶段已留好出口。
+
+**关键工程纪律边界**：Phase 1-9 测试不是伪绿色——是真过的，但只在"恰好有 dist/"的环境过。这不是 Phase 1-9 work 的污名，而是**"未在干净环境验证过的真绿色"**。CI 第一次启用揭露这个未覆盖路径，是 Phase 10 工程化基础设施的合理价值。
+
+**裁决摘要**：
+
+- **裁决 1（修复方案）**：C（用户 v3 锁定；root build script + workflow build 步 + 文档同步）
+- **裁决 2（α/β 防御补强）**：**β**（实测 fresh build 增量 0.28s ≤ 2s 阈值；§7.2 一致性优先；test scripts 依赖 build）
+- **裁决 3（CI build 步插入）**：A（仅 test + coverage 两 job；lint/typecheck job 不需要）
+- **裁决 4（CONTRIBUTING 更新）**：α（install + build 两步前置；4 项独立验证保留）
+- **裁决 5（closure-checklist 更新）**：α（顶部加段；总长 72 → 85 ≤ 100）
+- **裁决 6（KI-P10-002 内容）**：含双层缺陷链 + 长期监控阈值（fresh build 5s / 增量 2s / 25 包 / 5 contributors）
+- **裁决 7（本段）**：含双层缺陷链留痕 + §E.1 fallback 兑现（惯例 M 第 24 次 + 跨 Phase 第 5 次实战）
+- **裁决 8（0 新增）**：错误码 / Port / Adapter / 包；惯例 K 第 22 次实战
+- **裁决 9（PR 序号）**：#6 + merge commit 合并方式
+- **裁决 10（main 转绿验证）**：PR #6 合并 → push to main 触发 CI → 4 jobs PASS → 用户回执 main CI URL
+
+**typecheck 与 build 的语义重叠留痕**（补强 1）：
+
+`pnpm typecheck` 与 `pnpm build` 都是 `tsc -b tsconfig.json`，语义上重叠。它们仍作为独立 scripts 保留，理由是 CI 各 job 隔离纪律（ADR-0003 Step 3 裁决 1 B：4 jobs 并行让 GitHub UI PR check 状态显示独立 pass/fail）：
+
+- `typecheck` job 的语义是"验证类型契约"——纯类型检查；失败时贡献者明确知道是类型问题
+- `test` / `coverage` job 的语义是"验证运行时行为 + 覆盖率"——build 是 prerequisite；失败时贡献者明确知道是测试或覆盖率问题
+- 如果合并为单一 `build` 命令，failure mode 不再清晰；PR check 状态从"哪一维度失败"退化为"build 失败"——违反"清晰、可控、可信"
+
+实施层面：root `package.json` 同时保留 `"build"` 和 `"typecheck"` script（两者都是 `tsc -b tsconfig.json`）；CI yml 的 `typecheck` job 仅跑 `pnpm typecheck`（不重复 build）；`test`/`coverage` job 跑 `pnpm install → pnpm build → pnpm test`（防御深度；显式 log）。
+
+这是"语义重叠但纪律分离"的工程裁决——重叠是 tsc -b 单一命令的副作用（无法避免；除非引入第二个命令如 `tsc --noEmit`，违反元规则 P 的克制）；纪律分离是 CI job 隔离纪律的兑现（裁决 1 B 严守）。
+
+**实施细节**：
+
+- root `package.json`：添加 `"build": "tsc -b tsconfig.json"` script + 修改 `"test": "pnpm build && vitest run"` + `"test:coverage": "pnpm build && vitest run --coverage"`（裁决 2 β）
+- `.github/workflows/ci.yml`：test + coverage 两 job 在 `pnpm install --frozen-lockfile` 后插入 `- run: pnpm build` 步骤（裁决 3 A；防御深度）
+- `CONTRIBUTING.md`：`## Mandatory Validation` 段含 Prerequisites（install + build）+ Four mandatory validation commands 注释分块（裁决 4 α）+ typecheck/build 语义重叠 Note 段（补强 2）
+- `docs/closure-checklist.md`：顶部加 "## fresh checkout 验证防御（Phase 10 / Step 3.5 教训）" 段（裁决 5 α；85 行 ≤ 100）
+- `docs/KNOWN-ISSUES.md`：落地 KI-P10-002（裁决 6；含双层缺陷链 + 长期监控阈值 + Step 3 工程价值确认）
+
+**修复完整性证据**：双重 baseline 实测——
+
+- baseline A（local 残留 dist + .tsbuildinfo）：4 项命令全 PASS（与 Step 3 final 一致；1971 tests / 84.92% coverage）
+- baseline B（fresh checkout 模拟；删 .tsbuildinfo + dist）：修复后 4 项命令全 PASS（与 baseline A 一致；§7.2 严守）
+- 双重 baseline 一致是修复完整性的硬证据；fresh CI 环境与本机模拟基本等价
+
+**Step 3.5 工程意义**：Phase 10 工程化基础设施的"双层缺陷链"修复完成。Tianqi 进入"干净环境真绿色"成熟度。Step 4 起承接容器化主题在干净 baseline 上工作。CI 第一次启用揭露 Phase 1-9 全程未触发的未覆盖路径——这是 Phase 10 工程化基础设施的合理价值兑现，不是 Phase 1-9 工程纪律的污名。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
 [由 Step 4-7 各自完成时增量填充该 Step 的关键裁决摘要]

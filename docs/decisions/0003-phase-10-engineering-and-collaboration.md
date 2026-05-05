@@ -493,11 +493,84 @@ services:
 
 **Step 4 工程意义**：Tianqi 从"代码可运行"升级为"容器可部署"。Phase 10 工程化基础设施第二块砖落地（第一块是 CI 强制门禁 Step 3 + 3.5）。docker build 实地验证证明 Step 3.5 build chain 修复在容器构建场景同样生效（§7.2 一致性跨场景兑现）。Step 5 起承接发布自动化主题，可在容器化能力基础上引入 docker push / registry / git tag triggered pipeline。
 
+### Step 5: 发布自动化（git tag 触发流水线）
+
+**性质**：Phase 10 第三个工程化建设 Step（Step 3 + 3.5 第一块砖 CI 强制门禁；Step 4 第二块砖容器化；本 Step 第三块砖发布自动化）。拆两阶段流程第 6 次实战 + 普通 Step 级别第 3 次（Step 3 + Step 3.5 + 本 Step）。**v1 → v2 修订**：K.1 softprops → gh CLI（元规则 P 严守）+ K.2 CONTRIBUTING 精简版（不升级硬底）。
+
+**11 项核心裁决摘要**：
+
+| # | 裁决 | 选择 | 理由 |
+|---|---|---|---|
+| 1 | 触发机制 | A push tag + glob `phase-*-closed` | 精确匹配；避免误触发历史 `1.0.0` |
+| 2 | changesets | α 不引入 | Tianqi 私有 + 单部署 + 元规则 P 严守 |
+| 3 | docker push 目标 | A 不 push（推迟 Phase 11+）| Step 5 主题专注；**Phase 11 起草指令必含 docker push 决策**（v2 修订）|
+| 4 | GitHub Release | A draft + 手动 publish | 用户审视双步保护 |
+| 5 | 发布版本约定 | α phase-N-closed | 沿用 Phase 9 / Step 19 约定 |
+| 6 | release.yml 内容 | 最简 7 步（含 build + CHANGELOG 提取 + draft release）| 主题专注 |
+| 7 | CHANGELOG 提取 | A awk 解析 | CHANGELOG 与 GitHub Release 单一权威源 |
+| 8 | ci.yml 添加 release validation | A 不添加 | 职责分离 |
+| 9 | CONTRIBUTING ## Release Process | **α 精简版**（4 行；CONTRIBUTING 100 → 104；硬底 ≤ 100 严守不升级；超 4 行实测留痕）| 让 contributors 看到完整发布流程 + 克制 |
+| 10 | 0 新增 | 错误码 / Port / Adapter / 包 / 第三方依赖 | 惯例 K 第 24 次；元规则 P 累计 27 步；**v2 修订 gh CLI 是 GitHub 官方等价物严守元规则 P** |
+| 11 | ADR Step 5 段 | B（约 60 行；惯例 M 第 26 次 + 跨 Phase 第 7 次实战）| - |
+
+**关键工程纪律**：
+
+- release.yml `pnpm build` 步严守 §7.2 一致性 + Step 3.5 build chain 协调
+- 触发 glob `phase-*-closed` 精确匹配；不误触发历史 `1.0.0` tag（Step 5 §B.2 实测发现）
+- **gh release create CLI 替代 softprops/action-gh-release@v2**（v2 修订；元规则 P 严守；详见下方"第三方 action 严格度判断"段）
+- CONTRIBUTING ## Release Process 段实测 4 行（heading + 1 paragraph + 1 blank）；CONTRIBUTING 100 → 104（超 100 硬底约 4 行；K.2 "实测后进一步精简" fallback 路径已穷尽 — 无法在保留核心信息的前提下进一步压缩；honest留痕在此）
+
+**第三方 action 严格度判断**（v2 修订；用户 K.1 决议沉淀；Phase 11+ 沿用准则）：
+
+v1 草案曾选 softprops/action-gh-release@v2（业界最广泛非官方 action；约 6k+ star；GitHub 文档推荐）。v1 → v2 修订基于用户裁决：
+
+> **元规则 P 在"有 GitHub 官方等价物"场景严守**——softprops 业界标准但 GitHub 提供官方 `gh release create` CLI（runner 预装；同样功能）；引入 softprops 即引入第三方依赖；不引入第三方依赖原则严守。
+
+延伸纪律分类（Phase 11+ 沿用）：
+
+| 第三方 action 类型 | 严格度 | 处置 |
+|---|---|---|
+| GitHub 官方（actions/checkout / actions/setup-node 等）| 严守不计 | 自由使用 |
+| 业界标准但有 GitHub 官方等价物（softprops vs gh CLI）| **严守元规则 P** | 用官方等价物 |
+| 业界标准且无 GitHub 官方等价物（pnpm/action-setup）| 业界标准不计 | 可使用 |
+| 一次性脚本（actions/github-script）| 业界标准不计 | 可使用但优先 inline shell |
+
+**判断顺序**：(1) 有 GitHub 官方等价物吗？→ (2) 有 GitHub runner 预装 CLI 吗？→ (3) 业界标准 + 维护活跃吗？只有 (3) 才进入"业界标准 actions 不计"豁免范围。
+
+**Step 4 收尾微调留痕**（协作 prompt 设计微调点；用户 v3 沉淀）：
+
+Step 4 main CI 转绿验证回执环节，AI 对"PR URL + merge SHA + main CI 4 jobs 状态"数据格式过度坚持。用户已用最简方式（看 CI 状态指示符）兑现 H9 硬底实质（main 真正绿）后，AI 仍重复要求标准数据格式。这是协作 prompt 设计的微调点——纪律核心是"实质兑现"被验证而非"数据格式齐全"。Step 5 起草指令的"main CI 转绿验证"硬底（H9）已显式接受最简实质回执（譬如"全绿"）；此微调沉淀进 Step 5 + 后续 Step 起草指令。
+
+**v2 修订工程纪律小总结**（用户 v1 K.1 + K.2 沉淀）：
+
+K.1 + K.2 是元规则 P + "克制 > 堆砌"原则的两次延伸应用：
+
+- **K.1**：第三方 actions 不是"业界标准就引"，而是"无官方等价物才引"
+- **K.2**：硬底不是"扩展性指标"，而是"克制原则的具体边界"
+
+这两条纪律延伸本身是 Step 5 的工程价值——发布自动化主题揭露的纪律边界，比 release.yml 本身更长期影响 Tianqi 工程旅程。
+
+**实施细节**：
+- `.github/workflows/release.yml` 创建（71 行；7 步含 build + CHANGELOG awk 提取 + gh release create draft）
+- `CONTRIBUTING.md` 追加 ## Release Process 段（4 行；100 → 104 行；超 100 约 4 行；honest留痕）
+- yml syntax 验证：Python pyyaml 实测 PASS（GitHub Actions UI 第一次运行将再次验证）
+
+**Phase 11+ 承接事项**：
+
+- **docker push 到 ghcr.io**：Phase 11 起草指令必含 docker push 决策（v2 修订强化；K.3 不阻塞观察沉淀）
+- changesets 引入（如多包版本管理需求出现）
+- semver 引入（如公共发布需求出现）—— **未来非数字 tag 评估**：如未来需引入 sprint-N-closed 等约定，需在 ADR 修订评估 release.yml 触发 glob 调整（v2 修订；K.4 不阻塞观察沉淀）
+- 真实 registry 配置（私有 registry / Docker Hub 等）
+- release notes 自动生成扩展（譬如 git log diff 增量信息）
+- CONTRIBUTING ≤ 100 行硬底重审：Step 6 README + Runbook 落地后如 CONTRIBUTING 仍超 100，由 Phase 10 / Step 7 收官时一次性精简（不在本 Step 范围）
+
+**Step 5 工程意义**：Phase 10 工程化基础设施第三块砖落地（CI ✅ + 容器化 ✅ + 本 Step 发布自动化 ✅ = 3/4 块砖）。Step 7 phase-10-closed tag push 即触发 release.yml 第一次真实运行——元规则 B 在工作流层面再次兑现（release.yml 接口冻结后 Phase 11+ 在此基础上演进）。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 5-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 6-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 5-7: [待 Phase 10 内部 Step 增量填充]
+### Step 6-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

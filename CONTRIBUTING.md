@@ -95,6 +95,10 @@ By contributing, you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.m
 
 To report a security vulnerability, follow the process in [SECURITY.md](./SECURITY.md). **Do not file public issues for security concerns.**
 
+## Release Process
+
+Pushing a `phase-*-closed` tag triggers `.github/workflows/release.yml` to create a draft GitHub Release with notes auto-extracted from `CHANGELOG.md`. The maintainer reviews and publishes the draft. See ADR-0003 Step 5 for the full design rationale.
+
 ## Questions
 
 For questions not covered here, open a GitHub Discussion (preferred) or Issue.

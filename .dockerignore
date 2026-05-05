@@ -1,0 +1,52 @@
+# Tianqi .dockerignore — Phase 10 / Step 4 (per ADR-0003 Step 4 裁决 7 B 标准)
+
+# Dependencies — installed fresh in builder stage
+node_modules
+**/node_modules
+
+# Build outputs — recreated by `pnpm build` in builder stage
+**/dist
+**/*.tsbuildinfo
+coverage
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation — not needed in runtime image
+docs/
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+
+# CI / IDE config
+.github/
+.vscode/
+.idea/
+
+# Tests — production runtime doesn't need them.
+# (Note: src/helpers/ subdirs ARE source code — adapter-testkit and
+# external-engine-http-base both export from ./helpers/. Don't exclude
+# them. Vitest's coverage config excludes helpers/ from coverage but they
+# still need to compile.)
+**/*.test.ts
+**/*.integration.test.ts
+**/*.contract.test.ts
+**/*.persistent.test.ts
+**/test-fixtures/
+
+# Environment files (keep .env.example so contributors can see the template)
+.env
+.env.*
+!.env.example
+
+# Build / dev tooling
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+vitest.config.ts
+eslint.config.mjs

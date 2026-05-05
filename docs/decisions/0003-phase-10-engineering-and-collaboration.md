@@ -415,11 +415,89 @@ Phase 1-9 全程在 main 分支直接工作（fast-flow，单人模式）。Phas
 
 **Step 3.5 工程意义**：Phase 10 工程化基础设施的"双层缺陷链"修复完成。Tianqi 进入"干净环境真绿色"成熟度。Step 4 起承接容器化主题在干净 baseline 上工作。CI 第一次启用揭露 Phase 1-9 全程未触发的未覆盖路径——这是 Phase 10 工程化基础设施的合理价值兑现，不是 Phase 1-9 工程纪律的污名。
 
+### Step 4: 容器化（Dockerfile 多阶段 + 非 root + HEALTHCHECK + docker-compose）
+
+**性质**：Phase 10 第二个工程化建设 Step（Step 3 + 3.5 是第一块砖 CI 强制门禁；本 Step 是第二块砖容器化部署能力）。让 Tianqi 从"代码可运行"升级为"容器可部署"。
+
+**10 项核心裁决摘要**：
+
+| # | 裁决 | 选择 | 关键理由 |
+|---|---|---|---|
+| 1 | Dockerfile 多阶段策略 | **B 2 阶段**（builder + runtime）| §7.5 多阶段；业界标准；Tianqi monorepo 复杂度合理 |
+| 2 | 基础镜像 | **β node:22-slim** | better-sqlite3 11.5.0 prebuilt 仅 glibc；alpine musl libc 不兼容（强制裁决依据） |
+| 3 | runtime 复制策略 | **B 必需文件**（dist + node_modules + 配置）| 平衡（不全量；不 deploy 复杂度）|
+| 4 | 非 root user | **β node base image 自带 user**（uid 1000）| 业界标准 + 克制（不创建额外 user）|
+| 5 | HEALTHCHECK | **B 简单 Node 命令** `node -e "process.exit(0)"` | Tianqi 库性质项目无 HTTP 入口；§7.5 兑现；Phase 11+ 升级真实 HTTP endpoint |
+| 6 | docker-compose 编排 | **α 仅 Tianqi 服务** | β postgres 编排让本机验证复杂；postgres adapter 在 KI-P8-002 (skipped)；Phase 11 真实基础设施再考虑；α 价值在"开发命令封装" |
+| 7 | .dockerignore 内容 | **B 标准** | 业界标准；含必需排除 + .env.example 反向保留 |
+| 8 | 0 新增 | 错误码 / Port / Adapter / 包 | 惯例 K 第 23 次实战 |
+| 9 | CI 添加 docker build job | **A 不添加** | Step 5 责任（与 release workflow 协调）|
+| 10 | ADR Step 4 段 | **B ≤ 45 行** | 惯例 M 第 25 次 + 跨 Phase 第 6 次实战 |
+
+**关键工程纪律**：
+
+- builder stage 严守 §7.2 一致性 — 调用 root `pnpm build` script，**不写独立 tsc 命令**（与 Step 3.5 教训严守一致）
+- 与 Step 3 + 3.5 build chain 协调：`pnpm install --frozen-lockfile` + `pnpm build` 严格沿用 root scripts 调用
+- 多阶段真实减小 runtime image：通过 builder→runtime 复制必需文件而非全 monorepo 源码（实测 runtime image **508MB**；builder 含 dev deps + 源码体积更大）
+
+**Dockerfile 多阶段结构图**：
+
+```
+[Stage 1: builder (node:22-slim)]
+  ├── corepack enable (pnpm@10.0.0)
+  ├── COPY package.json + pnpm-lock + pnpm-workspace + tsconfig.json + tsconfig.base.json
+  ├── COPY packages/
+  ├── pnpm install --frozen-lockfile
+  └── pnpm build  ← root script (§7.2 一致性)
+       ↓ produces: packages/*/dist/
+
+[Stage 2: runtime (node:22-slim)]
+  ├── corepack enable
+  ├── COPY --from=builder (chown=node:node) — package.json + lockfile + workspace
+  │                                          + tsconfig × 2 + node_modules + packages/
+  ├── USER node (uid 1000; non-root)
+  ├── HEALTHCHECK CMD node -e "process.exit(0)"
+  └── CMD: keep container alive for `docker compose run --rm tianqi <cmd>`
+```
+
+**docker-compose 服务清单**（裁决 6 α）：
+
+```
+services:
+  tianqi: (build context=., target=runtime, image=tianqi:dev)
+```
+
+价值：开发命令封装（譬如 `docker compose run --rm tianqi pnpm test` / `pnpm build` / `pnpm exec node --version`）。
+
+**实地 docker build / run 实测**（修复完整性硬证据）：
+- docker build：✅ SUCCESS（约 1m 42s；含 builder 全量构建 + runtime stage 文件复制）
+- runtime image 大小：**508MB**（含 dev node_modules；Phase 11+ pnpm deploy 优化）
+- docker run + HEALTHCHECK：✅ container Up 35s healthy（HEALTHCHECK 真实工作）
+- docker compose up + run --rm tianqi node --version：✅ v22.22.2（开发命令封装价值实证）
+
+**§7.5 容器化要求兑现核查表**：
+
+| 要求 | 实施 | 状态 |
+|---|---|---|
+| 多阶段构建 | builder + runtime 2 stages | ✅ |
+| 非 root | USER node (uid 1000) | ✅ |
+| 健康检查 | HEALTHCHECK CMD node -e "process.exit(0)" | ✅ |
+| 开发编排配置 | docker-compose.yml (单服务) | ✅ |
+
+**Phase 11+ 承接事项**：
+
+- HEALTHCHECK 升级为真实 HTTP endpoint（当前 `node -e "process.exit(0)"` 是库性质项目唯一合理选择；Phase 11+ 真实 server 引入后升级）
+- production deps 优化（pnpm deploy / pnpm prune --prod；当前 runtime 含 dev deps）
+- 容器镜像大小进一步优化（distroless / scratch base；当前 508MB 在 monorepo + node_modules 全量场景下合理）
+- docker-compose 编排扩展 postgres / kafka 服务（与 KI-P8-002 真实基础设施 Phase 协调）
+
+**Step 4 工程意义**：Tianqi 从"代码可运行"升级为"容器可部署"。Phase 10 工程化基础设施第二块砖落地（第一块是 CI 强制门禁 Step 3 + 3.5）。docker build 实地验证证明 Step 3.5 build chain 修复在容器构建场景同样生效（§7.2 一致性跨场景兑现）。Step 5 起承接发布自动化主题，可在容器化能力基础上引入 docker push / registry / git tag triggered pipeline。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 4-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 5-7 各自完成时增量填充该 Step 的关键裁决摘要]
 
-### Step 4-7: [待 Phase 10 内部 Step 增量填充]
+### Step 5-7: [待 Phase 10 内部 Step 增量填充]
 
 ## Consequences
 

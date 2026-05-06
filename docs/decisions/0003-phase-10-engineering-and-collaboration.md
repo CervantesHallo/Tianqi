@@ -566,11 +566,42 @@ K.1 + K.2 是元规则 P + "克制 > 堆砌"原则的两次延伸应用：
 
 **Step 5 工程意义**：Phase 10 工程化基础设施第三块砖落地（CI ✅ + 容器化 ✅ + 本 Step 发布自动化 ✅ = 3/4 块砖）。Step 7 phase-10-closed tag push 即触发 release.yml 第一次真实运行——元规则 B 在工作流层面再次兑现（release.yml 接口冻结后 Phase 11+ 在此基础上演进）。
 
+### Step 6: README 更新 + Runbook 创建
+
+**性质**：Phase 10 工程化基础设施第四块砖（最后一块；CI ✅ Step 3+3.5 + 容器化 ✅ Step 4 + 发布自动化 ✅ Step 5 + 本 Step 文档 ✅）。Step 7 收官前最后一战；让 Step 0-5 累计的工程价值"可读取"。**单阶段流程**（README + Runbook 主题相对成熟）。
+
+**9 项核心裁决摘要**：
+
+| # | 裁决 | 选择 | 理由 |
+|---|---|---|---|
+| 1 | README 更新策略 | **C 重构** | 既有 274 行停留 Phase 1-7（"1106 passed" + "Node 20+" 过时；无 Phase 10 工程基础设施反映）；保留项目愿景核心精神 + 重组 §12.3 结构 + 现代化内容 |
+| 2 | README 长度 | **β 标准（实测 94 行 ≤ 200 上限）** | 必含 7 项 + Engineering Infrastructure 段 + 简短而非膨胀 |
+| 3 | Runbook 长度 | **β 标准（实测 125 行 ≤ 150 上限）** | 必含 5 项 + 命令示例 + 不预言 Phase 11+ incident 沉淀 |
+| 4 | Runbook 归属 | **α `docs/runbook.md`** | 与 docs/closure-checklist + docs/00-phase1-mapping + docs/decisions 同层级一致；不让仓库根目录 markdown 文件膨胀 |
+| 5 | README 引用 ADR | **β 引用关键** | Engineering Infrastructure 段简短阐述 4 块砖 + 链接 ADR-0003 详细设计；不复制 |
+| 6 | Runbook mock incident | **α 不含** | mock 让 Runbook 缺乏真实性（Tianqi 工程诚实纪律严守）；Phase 11+ 真实 incident 沉淀承接 |
+| 7 | CONTRIBUTING 不修改 | **α 严守** | Step 7 收官精简承接（已规划）；本 Step 主题专注 |
+| 8 | 0 新增 | 错误码 / Port / Adapter / 包 / 第三方依赖 | 惯例 K 第 25 次实战；元规则 P 累计 28 步零依赖 |
+| 9 | ADR Step 6 段 | B（约 30 行；惯例 M 第 27 次 + 跨 Phase 第 8 次实战）| 纯文档 Step 不需要复杂裁决论证 |
+
+**关键工程纪律**：
+
+- README Quick Start 一键命令 fresh checkout 模拟实地验证 6/6 PASS（install + build + lint + typecheck + test 1971 + coverage 84.92%/79.56%/91.68%/84.92%）— Step 3.5 + Step 5 教训严守延伸到文档层（不允许"看起来对但跑不通"）
+- "引用而不复制"纪律延伸到 README + Runbook（README 引用 CONTRIBUTING / ADR / 等不复制；Runbook 引用 ADR-0003 不复制）
+- Runbook 不含 mock incident（裁决 6 α；让真实 incident 由 Phase 11+ 实战沉淀）
+
+**实施细节**：
+- README.md 重写（274 → 94 行；§12.3 必含 7 项：项目愿景 / Quick Start / 文档导航 / Phase 状态 / 项目使命 / Code of Conduct / License + Contact）
+- docs/runbook.md 创建（125 行；§12.4 必含 5 项：Deployment / Configuration / Health Check / Troubleshooting / Rollback）
+- Quick Start fresh checkout 模拟实地验证 6/6 PASS（findpackages -name *.tsbuildinfo -delete + rm -rf packages/*/dist/ + 6 命令序列全 PASS）
+
+**Step 6 工程意义**：Phase 10 工程化基础设施 4/4 块砖完整闭环。Step 0-5 累计的工程价值（CI + 容器 + 发布自动化）通过 README + Runbook 让贡献者 / 运维者"可读取"。Step 7 收官前最后一战完成；Phase 10 进度 8/9 → 待 Step 7 收官（phase-10-closed tag push 触发 release.yml 第一次真实运行；CHANGELOG Phase 10 段创建；覆盖率门槛 84% → 85% 升级；CONTRIBUTING ≤ 100 行精简；ADR-0003 Status In Progress → Accepted）。
+
 ### 待 Phase 10 内部各 Step 增量追写
 
-[由 Step 6-7 各自完成时增量填充该 Step 的关键裁决摘要]
+[由 Step 7 收官完成时增量填充关键裁决摘要]
 
-### Step 6-7: [待 Phase 10 内部 Step 增量填充]
+### Step 7: [待 Phase 10 收官 Step 增量填充]
 
 ## Consequences
 

@@ -1,274 +1,94 @@
-<p align="center">
-  <img src="./assets/tianqi-logo.png" alt="Tianqi logo" width="220" />
-</p>
+# Tianqi（天启）
 
-<h1 align="center">Tianqi</h1>
+> 让风控算法第一次变成工程师愿意读的代码
 
-<p align="center">
-  <strong>An elegant TypeScript engine for risk-case orchestration, replayable auditing, observability, and production release guardrails.</strong>
-</p>
+Tianqi is a TypeScript monorepo for **risk-control algorithm processing**. It is built phase by phase, with explicit contracts, replayable audit trails, pluggable policies, orchestrated saga execution, and a complete engineering infrastructure for production releases.
 
-<p align="center">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
-  <img alt="Node" src="https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white">
-  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-1106%20passed-brightgreen">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg">
-</p>
+The project mission and engineering norms are documented in two top-level documents (kept locally, not in this public repository): the **Project Constitution** and the **Phase 8–12 Supplement**. New contributors should request access before opening their first PR.
 
 ---
 
-## What is Tianqi?
+## Quick Start
 
-Tianqi is a modular TypeScript system for **risk-case processing in trading scenarios**. It is designed around a strict architecture with explicit contracts, replayable audit trails, pluggable policies, orchestrated execution paths, observability primitives, and production release guardrails.
+**Prerequisites**: Node.js `22.x` and pnpm `10.0.0` (managed via the `packageManager` field in `package.json` — `corepack enable` will pick it up automatically).
 
-The project was built phase by phase, with each phase ending in freeze checks, regression tests, and acceptance gates.
+```bash
+# Clone the repository
+git clone https://github.com/CervantesHallo/Tianqi.git
+cd Tianqi
 
----
+# Install dependencies (frozen lockfile)
+pnpm install --frozen-lockfile
 
-## Highlights
+# Build workspace dist outputs (required by tests; see KI-P10-002)
+pnpm build
 
-### Core case system
-- `RiskCase`, `LiquidationCase`, and `ADLCase` domain flows
-- explicit state transitions and transition guards
-- structured audit records for creation, transition, coordination, and resolution
+# Validate locally — four independent commands per Meta-rule Q v3
+pnpm lint            # zero warnings
+pnpm typecheck       # zero errors
+pnpm test            # 1971 tests
+pnpm test:coverage   # thresholds 84% lines / 75% branches / 84% functions / 84% statements
+```
 
-### Pluggable policy engine
-- `RankingPolicy`
-- `FundWaterfallPolicy`
-- `CandidateSelectionPolicy`
-- policy descriptors with `type / name / version`
-- policy bundle resolution, prevalidation, and dry-run
-- configuration version activation and rollback
+If any of the four commands fails on a fresh clone, that is a **bug** — please open an issue. CI runs the same four commands as parallel jobs (`.github/workflows/ci.yml`); local validation is your responsibility, CI is the safety net (per `CONTRIBUTING.md`).
 
-### Application orchestration
-- RiskCase orchestration path
-- LiquidationCase orchestration path
-- saga skeleton with compensation semantics
-- idempotency guards and replayed-result handling
-- audit-event publishing through explicit ports
+## Engineering Infrastructure
 
-### Audit and replay
-- append-only audit event store boundary
-- single-case replay and batch replay
-- case reconstruction skeleton
-- replay baseline snapshots and replay consistency checks
+Phase 10 delivered four interlocking pieces of engineering infrastructure:
 
-### Observability and fault drills
-- trace context propagation
-- structured metrics contract
-- benchmark harness for key paths
-- fault-injection scenarios for timeout, duplicate, out-of-order, and partial-write cases
-
-### Production guardrails
-- publish preflight checks
-- contract freeze baseline
-- rollback plan skeleton
-- runbook and incident-manual readiness
-- acceptance gate, final acceptance, and close-decision flow
-
----
-
-## Project status
-
-**Tianqi Phase 1–7: CLOSED**
-
-All seven planned phases are complete and frozen.
-
-| Phase | Theme | Status |
+| Layer | Status | Reference |
 |---|---|---|
-| Phase 1 | Skeleton | CLOSED |
-| Phase 2 | Core case flows | CLOSED |
-| Phase 3 | Pluggable policies | CLOSED |
-| Phase 4 | Execution orchestration | CLOSED |
-| Phase 5 | Audit and replay | CLOSED |
-| Phase 6 | Observability and fault drills | CLOSED |
-| Phase 7 | Production release guardrails | CLOSED |
+| CI strict gate (4 parallel jobs + 84% coverage) | ✅ | `.github/workflows/ci.yml` (Step 3 + 3.5) |
+| Containerization (Dockerfile multi-stage + docker-compose) | ✅ | `Dockerfile` + `docker-compose.yml` (Step 4) |
+| Release automation (`phase-*-closed` tag → draft GitHub Release) | ✅ | `.github/workflows/release.yml` (Step 5) |
+| Documentation (this README + operations runbook) | ✅ | `docs/runbook.md` (Step 6) |
 
-### Final verification snapshot
-- **Test files:** 106
-- **Tests passed:** 1106
-- **All phases:** closed
+Full design rationale lives in [ADR-0003](./docs/decisions/0003-phase-10-engineering-and-collaboration.md). Phase 11+ will build real-infrastructure binding (PostgreSQL / Kafka adapters) on this foundation.
 
----
+## Documentation Navigation
 
-## Architecture
+| Audience | Document |
+|---|---|
+| Contributors (PR process, validation, AI discipline) | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| Operators / SREs (deployment, health, troubleshooting, rollback) | [`docs/runbook.md`](./docs/runbook.md) |
+| Security researchers (private vulnerability reporting) | [`SECURITY.md`](./SECURITY.md) |
+| Architecture decisions | [`docs/decisions/`](./docs/decisions/) |
+| Phase progress index | [`docs/00-phase1-mapping.md`](./docs/00-phase1-mapping.md) |
+| Open known issues | [`docs/KNOWN-ISSUES.md`](./docs/KNOWN-ISSUES.md) |
+| Phase closure validation checklist | [`docs/closure-checklist.md`](./docs/closure-checklist.md) |
+| Release history | [`CHANGELOG.md`](./CHANGELOG.md) |
 
-Tianqi follows a layered monorepo structure.
+## Phase Status
 
-```text
-Tianqi/
-├─ assets/                 # logo and static assets
-├─ docs/                   # phase documents and project mapping
-├─ packages/
-│  ├─ contracts/           # shared error codes and published contract boundaries
-│  ├─ shared/              # identifiers and common primitives
-│  ├─ domain/              # domain models, state machines, invariants
-│  ├─ ports/               # repository and infrastructure-facing interfaces
-│  ├─ policy/              # pluggable strategies and config versioning
-│  └─ application/         # orchestration, replay, observability, release guards
-├─ package.json
-├─ pnpm-workspace.yaml
-└─ vitest.config.ts
+| Phase | Theme | Status | Tag |
+|---|---|---|---|
+| Phase 1–7 | Architecture skeleton (domain / application / policy / ports) | Closed | (no tags) |
+| Phase 8 | Adapter layer foundation (13 Adapter packages + 5 Engine Ports) | Closed (ADR-0001 Accepted) | (no tag) |
+| Phase 9 | Saga orchestration (4 business sagas + cross-saga coordination + §4.8 enforcement) | Closed (ADR-0002 Accepted) | `phase-9-closed` |
+| Phase 10 | Engineering and collaboration foundation (CI / containerization / release / docs) | In Progress (ADR-0003) | (pending `phase-10-closed`) |
+| Phase 11+ | Real infrastructure binding | Not started | — |
 
-Layering rules
-	•	Domain owns business states, invariants, and transition rules.
-	•	Policy owns strategies, descriptors, bundles, and config versioning.
-	•	Application owns orchestration, replay, observability, and release readiness.
-	•	Ports define external collaboration boundaries.
-	•	Adapters are intentionally thin and can be attached later.
+## Project Mission
 
-⸻
+Tianqi follows six design priorities, applied in order whenever they conflict:
 
-Design goals
+1. **Readability > engineering tricks**
+2. **Short paths > generic abstractions**
+3. **Semantic clarity > performance micro-tuning**
+4. **Comments explaining "why" > saving characters**
+5. **Flat file structure > nested directories**
+6. **Restraint > accumulation**
 
-1. Strong contracts
+These priorities are enforced through phase-gated development, mandatory ADRs for architectural decisions, and a four-command validation discipline (`pnpm lint` / `typecheck` / `test` / `test:coverage` independently verified). See `CONTRIBUTING.md` and the local Constitution for the full set of rules.
 
-Everything important is explicit:
-	•	identifiers
-	•	command models
-	•	result models
-	•	policy descriptors
-	•	error codes
-	•	event schemas
-	•	release guard artifacts
+## Code of Conduct
 
-2. Replayability by construction
+By contributing or participating in project spaces, you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.md), which adopts the Contributor Covenant version 2.1.
 
-Any meaningful state change should leave behind enough information to:
-	•	audit what happened
-	•	replay what happened
-	•	reconstruct case outcomes
-	•	compare expected and actual replay results
+## License
 
-3. Safe extensibility
+License is not yet specified in this repository. Contributions are accepted under the assumption that the project will adopt a permissive open-source license (MIT or Apache-2.0) before any public release. See `CONTRIBUTING.md` and `SECURITY.md` for participation and reporting guidelines.
 
-New strategies, adapters, or orchestration paths should be introducible without breaking the core semantics.
+## Contact
 
-4. Release safety
-
-Configuration changes, contract drift, rollback readiness, and runbook completeness should all be checked before release.
-
-⸻
-
-Repository scope
-
-Tianqi is architecture-complete, but some integrations are intentionally adapter-based or in-memory by design.
-
-This repository is well-suited for:
-	•	architecture review
-	•	collaborative development
-	•	local development and test environments
-	•	GitHub publication and open-source presentation
-	•	extension into production adapters
-
-What is still adapter-based
-
-Depending on your deployment target, you may still want to wire in:
-	•	persistent storage implementations
-	•	external configuration center integration
-	•	real monitoring / alerting backends
-	•	release automation integration
-	•	deployment secrets and environment management
-	•	real rollback execution adapters
-
-⸻
-
-Getting started
-
-Requirements
-	•	Node.js 20+
-	•	pnpm 9+
-
-Install
-
-pnpm install
-
-Type check
-
-pnpm typecheck
-
-Lint
-
-pnpm lint
-
-Test
-
-pnpm test
-
-Run all core checks
-
-pnpm lint && pnpm typecheck && pnpm test
-
-
-⸻
-
-Example capability map by phase
-
-Phase	Main outcome
-Phase 1	package skeleton, contracts, shared identifiers, baseline structure
-Phase 2	core case models, state machines, coordination, repair and diagnostic flows
-Phase 3	pluggable strategy interfaces, bundle resolution, config activation and rollback
-Phase 4	orchestrators, saga skeletons, idempotency, audit-event publishing
-Phase 5	event store, replay, reconstruction, replay baseline and acceptance flow
-Phase 6	tracing, metrics, benchmark harness, fault drills, observability acceptance flow
-Phase 7	release preflight, contract freeze baseline, rollback plan, runbook readiness, final close
-
-
-⸻
-
-Testing philosophy
-
-Tianqi was built with regression-friendly engineering in mind.
-
-The test suite validates:
-	•	domain transition legality
-	•	policy bundle resolution correctness
-	•	orchestration and replay semantics
-	•	trace / metrics / benchmark consistency
-	•	fault drill handling
-	•	release preflight and final close logic
-
-The project favors:
-	•	explicit invariants
-	•	structured results over implicit behavior
-	•	baseline snapshots and gate-style checks
-	•	synchronized code and documentation changes
-
-⸻
-
-What Tianqi is not
-
-Tianqi is not currently:
-	•	a UI product
-	•	a hosted SaaS
-	•	a finished deployment platform
-	•	a complete CI/CD release system
-	•	a production dashboard
-
-It is a high-discipline core engine and architecture base for building safer risk-processing systems.
-
-⸻
-
-Contributing
-
-Contributions are welcome, but changes should preserve the project’s architectural discipline.
-
-Please keep these rules in mind:
-	•	do not bypass explicit ports
-	•	do not blur domain, policy, and application responsibilities
-	•	do not introduce incompatible contract drift casually
-	•	add tests and docs for meaningful behavior changes
-	•	keep risk, rollback, and compatibility implications explicit
-
-⸻
-
-License
-
-This project is released under the MIT License.
-
-⸻
-
-Project description
-
-An elegant TypeScript engine for risk-case orchestration, replayable auditing, observability, and production release guardrails.
+For collaboration, see [`CONTRIBUTING.md`](./CONTRIBUTING.md). For security vulnerabilities, follow the private channel in [`SECURITY.md`](./SECURITY.md). For general questions, open a GitHub Discussion (preferred) or Issue.

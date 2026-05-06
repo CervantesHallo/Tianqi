@@ -6,6 +6,80 @@ is what an external reader can pick up). This file follows the spirit of
 [Keep a Changelog](https://keepachangelog.com/) but is keyed by Phase rather
 than semver.
 
+## [Phase 10] — 2026-05-05 — Engineering and Collaboration Foundation
+
+The Phase that turns Tianqi from "code complete + business capabilities" (Phase 1-9) into "production-deployable + collaboratable + observable" engineering infrastructure. 8 implementation Steps + 1 Kickoff = 10 PRs (#1-#10) added zero business code, zero new error codes, zero new packages, and only 6 boundary tests (lifting coverage 84.91% → 85.00%) while delivering the four bricks of engineering infrastructure.
+
+### Engineering Infrastructure (4/4 完成)
+
+- **CI strict gate** (Step 3 + 3.5): GitHub Actions workflow with 4 parallel jobs (lint / typecheck / test / coverage); 84% → 85% coverage threshold upgrade in Step 7; **double-defect-chain fix** (KI-P10-001 typecheck-layer + KI-P10-002 packaging-layer) as honest留痕 of "未在干净环境验证过的真绿色" baseline before Phase 10
+- **Containerization** (Step 4): Multi-stage `Dockerfile` (`node:22-slim` + `USER node` + `HEALTHCHECK`); `docker-compose.yml` single-service development orchestration; runtime image ~508MB
+- **Release automation** (Step 5): `phase-*-closed` tag-triggered `release.yml` via `gh release create` CLI (元规则 P 在"有 GitHub 官方等价物"场景严守); draft GitHub Release with auto-extracted CHANGELOG section; **第三方 action 严格度判断** 4-类型沉淀
+- **Documentation** (Step 6 + Step 7): `README.md` rewritten 274 → 94 lines with engineering infrastructure overview; `docs/runbook.md` 125 lines covering deployment / configuration / health / troubleshooting / rollback; `CONTRIBUTING.md` trimmed 104 → 96 lines (Step 5 honest留痕承接兑现)
+
+### Collaboration Assets (7/7 完成)
+
+- `CONTRIBUTING.md` / `CODE_OF_CONDUCT.md` / `SECURITY.md` (Step 1; project-level)
+- `.github/PULL_REQUEST_TEMPLATE.md` / `.github/ISSUE_TEMPLATE/*` / `.github/CODEOWNERS` (Step 2; GitHub-platform)
+- `README.md` / `CHANGELOG.md` (Step 6 / Phase 9; project-level)
+
+### Workflow Transition
+
+Phase 10 起 feature-branch + PR + merge-commit 工作流（Phase 1-9 直接 main）；累计 10 PRs (#1-#10) 全部 merge commit 合并保留迭代历史。拆两阶段流程实战 6 次（Phase 9 / Step 6 + Step 14 + Phase 10 / Kickoff + Step 3 + Step 3.5 + Step 5）；Phase 启程级 + 普通 Step 级别均被验证。
+
+### Resolved Known Issues
+
+- **KI-P10-001** (typecheck layer): saga-end-to-end fixture 与 Engine Port 类型对齐 (Step 0; vitest type-erasure 绕过的 typecheck 缺陷)
+- **KI-P10-002** (packaging layer): root `build` script + `ci.yml` `pnpm build` step; `CONTRIBUTING` + `closure-checklist` 防御 (Step 3.5; dist-based workspace 在 fresh checkout 下不工作)
+- **Double-defect-chain repair complete** — Tianqi 进入"干净环境真绿色"成熟度
+
+### Open Known Issues (Phase 11+ 承接)
+
+| KI | Topic | Owner Phase |
+|---|---|---|
+| KI-P8-001 | domain coverage 75.16% | Phase 13+ TBD |
+| KI-P8-002 | 真实基础设施测试 (postgres / kafka) | Phase 11 |
+| KI-P8-003 | 时序 flake (high-concurrency) | Phase 11 (with KI-P8-002) |
+| KI-P8-005 | ports coverage 11.96% | structural / N/A |
+| KI-P9-001 | StateTransition Saga 数据副本漂移 | Phase 10+ ongoing monitoring |
+
+### Engineering Discipline Distillation
+
+- 元规则 Q v3 模板（4 项独立命令实测输出）实战 10 次（Kickoff + Step 0/1/2/3/3.5/4/5/6/7）
+- 拆两阶段流程实战 6 次（双层 PHASE_DESIGN/IMPLEMENT 流程在 Phase 启程 + 普通 Step 都被验证）
+- 惯例 M（ADR 增量追写）跨 Phase 第 8 次实战；ADR-0003 总长 ~700 行（远低于 800 拆分阈值）
+- "引用而不复制"纪律延伸到 README + Runbook + ADR-0003
+- "未在干净环境验证过的真绿色" 措辞校正（避免 Phase 1-9 work 不公平污名）
+- 第三方 action 严格度判断 4 类型 + 判断顺序沉淀（Phase 11+ 沿用基础）
+
+### Test & Coverage
+
+- Tests: 1971 → **1977** (+6 boundary tests in Step 7 covering lifecycle-continuity uncovered branches)
+- Coverage: 84.91%/79.5%/91.68%/84.91% → **85.00%/79.63%/91.68%/85.00%**（lines/functions/statements 84 → 85；branches 维持 75；K.2 锁定路径 B 兑现）
+
+### References
+
+- ADR-0003: `docs/decisions/0003-phase-10-engineering-and-collaboration.md` (Status: Accepted Phase 10 CLOSED 2026-05-05)
+- Phase 10 execution records: `docs/phase10/00-phase-10-kickoff.md` through `09-step-7-closure.md`
+- Closure checklist: `docs/closure-checklist.md`
+- Workflows: `.github/workflows/ci.yml` + `.github/workflows/release.yml`
+- Containerization: `Dockerfile` + `docker-compose.yml`
+
+### Compatibility
+
+Zero breaking changes. Phase 1-9 production layers (domain / policy / shared / ports / adapters) remain byte-for-byte unchanged. Engine Port 类型签名零修改 (元规则 B 跨 Phase 10 严守). Test increment is +6 boundary tests on existing application-layer code; no new functions / types / error codes / packages.
+
+### Phase 11+ Forward-Looking
+
+- docker push 决策（Phase 11 起草指令必含; Step 5 K.3 强化承接）
+- 真实基础设施测试（KI-P8-002 / KI-P8-003 修复责任）
+- HEALTHCHECK 升级真实 HTTP endpoint（Step 4 段 Phase 11+ 承接事项）
+- production deps 优化（pnpm deploy / prune --prod; runtime image 大小优化）
+- 未来非数字 tag 评估（譬如 sprint-N-closed; Step 5 K.4 承接）
+- coverage 进一步提升（Step 7 lines/statements 85.00% 安全裕度紧；v8 噪声偶发可能让 CI 红色 → Phase 11+ 加测试或登记 KI）
+
+---
+
 ## [Phase 9] — 2026-05-02 — Saga Orchestration Architecture
 
 The Phase that turns Tianqi from "infrastructure landed" (Phase 8) into "saga

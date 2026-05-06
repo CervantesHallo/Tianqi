@@ -48,23 +48,15 @@ Issue templates (`.github/ISSUE_TEMPLATE/`) are similarly auto-loaded. Security 
 Before opening a PR, run all four commands **independently** and record each output:
 
 ```bash
-# Prerequisites (fresh checkout; per KI-P10-002):
-pnpm install --frozen-lockfile   # install workspace deps
-pnpm build                        # build dist for workspace packages (required for tests)
-# Four mandatory validation commands (Meta-rule Q v3):
+pnpm install --frozen-lockfile   # prerequisite (fresh checkout; per KI-P10-002)
+pnpm build                        # prerequisite (build dist for workspace packages)
 pnpm lint                         # zero warnings, zero errors
 pnpm typecheck                    # zero errors
-pnpm test                         # all tests green (auto-runs `pnpm build` per package.json)
-pnpm test:coverage                # coverage thresholds 84/75/84/84
+pnpm test                         # all tests green (auto-runs `pnpm build`)
+pnpm test:coverage                # coverage thresholds 85/75/85/85
 ```
 
-Do not substitute a single command (e.g. `pnpm test:coverage`) for independent typecheck verification. This rule exists because of KI-P10-001: a Phase 9 closure defect where vitest's lenient type-checking masked 10 typecheck errors that escaped review. Build is a prerequisite (per KI-P10-002), not a substitute for any of the four. See `docs/closure-checklist.md` for the broader rationale.
-
-> **Note** — `pnpm typecheck` and `pnpm build` both run `tsc -b tsconfig.json` (semantically overlapping). They stay separate because CI jobs run in isolation (ADR-0003 Step 3 裁决 1 B); separate scripts make PR check status unambiguous.
-
-### CI Verification
-
-When you open a PR, GitHub Actions will automatically run the four validation commands listed above as parallel jobs (see `.github/workflows/ci.yml`). Your PR cannot be merged until all four jobs pass. Local pre-PR validation remains your responsibility (per Meta-rule Q v3); CI is a safety net, not a substitute.
+The four validation commands (`lint` / `typecheck` / `test` / `test:coverage`) run independently — do not substitute one for another. KI-P10-001 (vitest's lenient type-checking masking 10 typecheck errors) is why `pnpm typecheck` is mandatory even though `pnpm build` runs `tsc -b`. CI runs the same four as parallel jobs (`.github/workflows/ci.yml`); local validation is your responsibility, CI is the safety net. See `docs/closure-checklist.md` for the broader rationale.
 
 ## Commit Convention
 

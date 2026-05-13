@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress (Phase 10 kickoff started 2026-05-02; PHASE_DESIGN v1 → v2 → user APPROVE → PHASE_IMPLEMENT v2 → user REQUEST_CHANGES + 4 项 v3 修订要求 → PHASE_IMPLEMENT v3 完成；ADR-0003 进入 Phase 10 内部 Step 0-7 增量追写阶段)
+**Accepted (Phase 10 CLOSED, 2026-05-05)**. Phase 10 工程化与协作基础完整闭环；4/4 块砖落地（CI ✅ + 容器化 ✅ + 发布自动化 ✅ + 文档 ✅）；双层缺陷链双层修复完成（KI-P10-001 + KI-P10-002）；ADR Status: In Progress → Accepted via Phase 10 / Step 7 收官。沿用 ADR-0001 / ADR-0002 closed 模式。
 
 > **本 ADR 是增量追写**（惯例 M 沿用 Phase 9 模式）。Phase 10 启程指令拆两阶段流程：
 >
@@ -597,11 +597,83 @@ K.1 + K.2 是元规则 P + "克制 > 堆砌"原则的两次延伸应用：
 
 **Step 6 工程意义**：Phase 10 工程化基础设施 4/4 块砖完整闭环。Step 0-5 累计的工程价值（CI + 容器 + 发布自动化）通过 README + Runbook 让贡献者 / 运维者"可读取"。Step 7 收官前最后一战完成；Phase 10 进度 8/9 → 待 Step 7 收官（phase-10-closed tag push 触发 release.yml 第一次真实运行；CHANGELOG Phase 10 段创建；覆盖率门槛 84% → 85% 升级；CONTRIBUTING ≤ 100 行精简；ADR-0003 Status In Progress → Accepted）。
 
-### 待 Phase 10 内部各 Step 增量追写
+### Step 7: Phase 10 收官（CLOSED 工程仪式 + 覆盖率升级 + Status Accepted）
 
-[由 Step 7 收官完成时增量填充关键裁决摘要]
+**性质**：Phase 10 工程旅程的工程仪式 Step。8 个实施 Step（Kickoff + Step 0-6）累计的工程价值在本 Step 通过 5 项收尾工作仪式化：(1) CHANGELOG Phase 10 段创建；(2) 覆盖率门槛 84% → 85% 升级；(3) CONTRIBUTING 精简至 ≤ 100 行；(4) ADR-0003 Status: In Progress → Accepted；(5) phase-10-closed tag push 触发 release.yml 第一次真实运行。**单阶段流程**（收官工作主题成熟；多个工作并行落地）。
 
-### Step 7: [待 Phase 10 收官 Step 增量填充]
+**9 项核心裁决摘要**：
+
+| # | 裁决 | 选择 | 理由 |
+|---|---|---|---|
+| 1 | CHANGELOG Phase 10 段长度 | β 标准 ~70 行 | 沿用 Phase 9 段格式；含 4 块砖 + KI 盘点 + 工程纪律沉淀 + Phase 11+ 承接 |
+| 2 | 覆盖率升级路径 | **B 收官小幅补充**（K.2 锁定路径）| A 风险大；C 违反 Step 3.5 教训；B 加 6 测试让 lines/statements 84.91% → 85.00% |
+| 3 | CONTRIBUTING 精简策略 | α + 部分 β 合并（删 Note + 合并 CI Verification）| 104 → 96 行（≤ 100 硬底兑现；Step 5 honest留痕承接）|
+| 4 | KI 状态盘点格式 | A + B + C 三层 | CHANGELOG 简短 + ADR 中等 + execution record 详细 |
+| 5 | ADR Status 变更格式 | β Status + Step 7 段 | 沿用 ADR-0001/0002 closed 模式 |
+| 6 | phase-10-closed tag 时序 | PR 合并 + main 全绿后用户独立创建 | 避免污染 git tag 历史 + release.yml 引用未就位 main |
+| 7 | 0 新增 | 错误码 / Port / Adapter / 包 / 第三方依赖 | 惯例 K 第 26 次实战；元规则 P 累计 29 步零依赖 |
+| 8 | ADR Step 7 段长度 | ≤ 80 行（实测 ~70 行；惯例 M 第 28 次 + 跨 Phase 第 9 次）| Phase 10 工程旅程总结需要充分篇幅 |
+| 9 | Phase 10 工程旅程总结声明位置 | δ 完整四层（README + CHANGELOG + ADR + execution record）| 不同 audience 视角全部呈现 |
+
+**关键工程纪律**：
+
+- 覆盖率升级路径 B 实施细节：在 `diagnostic-alert-suppression-repair-lifecycle-continuity.test.ts` 加 6 个边界测试（previousLifecycle malformed × 2 / attempts_regressed × 2 / live_conflict × 2）；不修改业务代码（元规则 B 严守 + 接口签名冻结严守）；测试增量 1971 → 1977；coverage 84.91%/79.5%/91.68%/84.91% → **85.00%/79.63%/91.68%/85.00%**（K.2 锁定路径 B 兑现）
+- 覆盖率安全裕度 honest留痕：lines/statements 升至 85.00% 恰好门槛（不是 85.5% 安全裕度）；Phase 11+ 承接事项含"coverage 进一步提升"备用方案（v8 噪声偶发让 CI 红色时启动）
+- CONTRIBUTING 精简：104 → 96 行（删 typecheck/build 语义重叠 Note + 合并 CI Verification 子段进 Mandatory Validation 主段）；保留所有功能性内容；Step 5 honest留痕"100 行硬底在 Step 5 阶段不可达"承接兑现
+
+**Phase 10 工程旅程总结**（8 实施 Step + 1 Kickoff = 9 项工作；4/4 工程基础设施块砖）：
+
+| Step | 主题 | 工程价值 |
+|---|---|---|
+| Kickoff | 启程战 | 拆两阶段流程第 3 次实战 + Phase 启程级首次；4 轮迭代 v1 → v2 → IMPLEMENT v2 → v3 |
+| Step 0 | 修复 + 防御（typecheck）| 修复 KI-P10-001（saga-end-to-end fixture）；建立 closure-checklist；元规则 Q v3 4 项独立命令首次完整实战 |
+| Step 1 | 协作建设（项目级）| CONTRIBUTING + CODE_OF_CONDUCT (链接版) + SECURITY 三件套；引用而不复制纪律首次确立 |
+| Step 2 | 协作建设（GitHub 平台）| .github/PR 模板 + Issue 模板 + CODEOWNERS；协作资产 7 件套达 7/7 |
+| Step 3 | 工程化（CI）| GitHub Actions 4 jobs 并行；vitest thresholds 80 → 84；拆两阶段流程第 4 次（普通 Step 级别首次） |
+| Step 3.5 | 修复 + 防御（packaging）| 修复 KI-P10-002（root build script + ci.yml build 步 + CONTRIBUTING + closure-checklist 防御）；双层缺陷链双层修复完成 |
+| Step 4 | 工程化（容器化）| Dockerfile 多阶段 + USER node + HEALTHCHECK + docker-compose；runtime image 508MB；docker build/run 实测 |
+| Step 5 | 工程化（发布自动化）| release.yml 触发 phase-*-closed → gh CLI 创建 draft Release；第三方 action 严格度判断 4 类型沉淀；拆两阶段第 6 次 |
+| Step 6 | 文档 | README 重写 274 → 94 + Runbook 创建 125；Quick Start fresh checkout 6/6 PASS |
+| **Step 7** | **收官 + 工程仪式** | **本 Step：CHANGELOG + 覆盖率 85% + CONTRIBUTING ≤ 100 + ADR Accepted + phase-10-closed tag** |
+
+**KI 状态盘点**（详见 KNOWN-ISSUES.md "Resolved Known Issues (Phase 10 Closed)" 段 + "Open" 段）：
+
+- ✅ **KI-P10-001 RESOLVED**（Step 0；typecheck layer）
+- ✅ **KI-P10-002 RESOLVED**（Step 3.5；packaging layer）
+- 📋 **5 项 open KI carried over to Phase 11+**：KI-P8-001（domain 75.16% / Phase 13+ TBD）+ KI-P8-002（真实基础设施 / Phase 11）+ KI-P8-003（时序 flake / Phase 11 with KI-P8-002）+ KI-P8-005（ports 11.96% / structural N/A）+ KI-P9-001（StateTransition 数据副本漂移 / ongoing）
+
+**元规则 / 惯例触发统计**（Phase 10 全程；Kickoff + Step 0-7）：
+
+| 规则 / 惯例 | Phase 10 触发次数 |
+|---|---|
+| B（接口签名冻结）| 严守 9 次（每 Step；零业务代码修改）|
+| P（不主动引入第三方依赖）| 严守累计 29 步零新依赖（含 gh CLI 是 GitHub 官方等价物不计；softprops 拒绝引入）|
+| K（错误码命名空间扩展）| 严守 26 次（每 Step；0 新错误码）|
+| M（ADR 增量追写）| **第 28 次 + 跨 Phase 第 9 次实战**（Step 7 段；ADR-0003 总长 ~700 行）|
+| Q（强制开局动作 v3 模板）| **10 次实战**（含动作 5 4 项独立命令实测 + Step 7 final 实测）|
+| §4.8 编译期硬约束 | 严守 9 次（每 Step；不触碰 packages/domain）|
+| 拆两阶段流程 | **6 次实战**（Phase 9 / Step 6 + Step 14 + Phase 10 / Kickoff + Step 3 + Step 3.5 + Step 5）|
+| Phase 10 工作流过渡 | **10 次实战**（每 Step + Kickoff；feature 分支 + PR + merge commit）|
+
+**Phase 11+ 承接事项**（按 Step 5/6 留痕统一汇总）：
+
+- **docker push 决策**（Phase 11 起草指令必含；Step 5 K.3 强化承接）
+- **真实基础设施测试**（KI-P8-002 + KI-P8-003 修复责任 Phase 11）
+- **HEALTHCHECK 升级真实 HTTP endpoint**（Step 4 段 Phase 11+ 承接）
+- **production deps 优化**（pnpm deploy / prune --prod；runtime image 大小优化）
+- **未来非数字 tag 评估**（sprint-N-closed 等约定；Step 5 K.4 承接）
+- **coverage 进一步提升**（Step 7 lines/statements 85.00% 安全裕度紧；v8 噪声偶发可能让 CI 红色 → Phase 11+ 加测试或登记 KI）
+- **CONTRIBUTING ≤ 100 行硬底维持**（Step 7 96 行已兑现；Phase 11+ 修订时维持）
+
+**Phase 10 CLOSED 工程仪式声明**：
+
+读者打开 README 看到 Phase Status 表 Phase 10 → Closed + phase-10-closed tag；打开 CHANGELOG 看到 Phase 10 工程基础设施 4/4 块砖完整摘要；打开 ADR-0003 看到 Status: **Accepted (Phase 10 CLOSED, 2026-05-05)**；看到 phase-10-closed git tag + GitHub Release published（用户审视后 click Publish）；docs/00-phase1-mapping.md Phase 10 全部 Step 完成段——清晰、可控、可信的工程旅程从"工程基础设施建立"到"工程基础设施验证"完整闭环。
+
+**Step 7 工程意义**：Phase 10 工程旅程的工程仪式时刻。元规则 B 在工作流层面再次兑现——release.yml 接口冻结后 Phase 11+ 在此基础上演进；不修改 release.yml 即可让 phase-11-closed / phase-12-closed / 等持续工作。Tianqi 工程旅程从"代码完整 + 业务能力齐全"升级到"+ 协作生态 + CI 真绿色 + 容器可部署 + 发布自动化 + 可执行文档"七重工程成熟度——为 Phase 11 真实基础设施测试主题提供完整工程基础设施 baseline。
+
+---
+
+**Phase 10 / Step 7 收官完成 — 2026-05-05 ✅ Phase 10 CLOSED ✅**
 
 ## Consequences
 

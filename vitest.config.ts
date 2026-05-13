@@ -42,18 +42,19 @@ export default defineConfig({
         // Re-export-only barrels carry no logic to cover.
         "**/index.ts"
       ],
-      // Phase 10 / Step 3 升级 per ADR-0003 K.2 锁定 84% 起步路径.
-      // lines / functions / statements 升至 84 (current 84.92% / 91.68% /
-      // 84.92% all safely above; functions 91.68% remains safely above 84).
-      // branches keep 75 因 KI-P8-005 结构性现象 (current 79.5%-79.58% 距
-      // 75% 仅 4.5pp; v8 statistical noise 可能让 branches 偶发跌破 84%
-      // 即便实际测试覆盖未变). Step 7 收官升级 85% 时再次审视 branches
-      // 是否可同步升级.
+      // Phase 10 / Step 7 收官升级 per ADR-0003 K.2 锁定路径 B (5-10 测试
+      // 增量 + thresholds 升级). lines / functions / statements 84 → 85
+      // (current 85.00% / 91.68% / 85.00% post-Step-7 boundary tests).
+      // branches keep 75 因 KI-P8-005 结构性现象 — current 79.65% 距 75%
+      // 4.65pp 安全裕度; Phase 11+ 真实基础设施测试引入后再评估 branches
+      // 是否升级 80+. lines/statements 安全裕度紧 (85.00% exactly at
+      // threshold; ~22905/26945 covered) — Phase 11+ 承接进一步覆盖率
+      // 提升若 v8 噪声偶发让 CI 红色.
       thresholds: {
-        lines: 84,
-        functions: 84,
+        lines: 85,
+        functions: 85,
         branches: 75,
-        statements: 84
+        statements: 85
       }
     }
   }

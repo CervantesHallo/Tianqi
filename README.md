@@ -65,7 +65,7 @@ Full design rationale lives in [ADR-0003](./docs/decisions/0003-phase-10-enginee
 | Phase 1–7 | Architecture skeleton (domain / application / policy / ports) | Closed | (no tags) |
 | Phase 8 | Adapter layer foundation (13 Adapter packages + 5 Engine Ports) | Closed (ADR-0001 Accepted) | (no tag) |
 | Phase 9 | Saga orchestration (4 business sagas + cross-saga coordination + §4.8 enforcement) | Closed (ADR-0002 Accepted) | `phase-9-closed` |
-| Phase 10 | Engineering and collaboration foundation (CI / containerization / release / docs) | In Progress (ADR-0003) | (pending `phase-10-closed`) |
+| **Phase 10** | **Engineering and collaboration foundation (CI / containerization / release / docs)** | **Closed (ADR-0003 Accepted)** | **`phase-10-closed`** |
 | Phase 11+ | Real infrastructure binding | Not started | — |
 
 ## Project Mission

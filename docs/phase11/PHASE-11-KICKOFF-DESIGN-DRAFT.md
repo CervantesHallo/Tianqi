@@ -1,8 +1,9 @@
-# Phase 11 Kickoff v2 — PHASE_DESIGN 草案
+# Phase 11 Kickoff v2/v3 — PHASE_DESIGN 草案
 
-> **状态**：第一阶段（PHASE_DESIGN）草案；等待用户 APPROVE。
+> **状态**：第一阶段（PHASE_DESIGN）草案 **v3 修订完成**；等待用户 APPROVE。
 > **拆两阶段流程第 7 次实战 / 元规则 Q v3 模板第 11 次实战 / 首次 Phase 启程级别完整实战 v2**
-> 本草案在 APPROVE 后转入 ADR-0004 + KNOWN-ISSUES + docs/phase11/00 + mapping；草案文档本身在 PHASE_IMPLEMENT 完成时删除（设计沉淀）。
+> **v3 修订要点**：K.3 日期回填必做（+3 commits）+ K.1 24 包纪律延伸 + K.4 你独立关闭 PR #11；ADR-0004 §B.1 草案重写到 ~80 行（4 段）；PHASE_IMPLEMENT commit 规划升至 7 commits。
+> 本草案在 APPROVE 后转入 ADR-0004 + 3 个回填 + KNOWN-ISSUES + docs/phase11/00 + mapping；草案文档本身在 PHASE_IMPLEMENT 完成时删除（设计沉淀）。
 
 ---
 
@@ -241,70 +242,82 @@ vitest 自身**不含**性能测试 baseline 工具。候选：
 
 ---
 
-## F. ADR-0004 Kickoff 段草案（K.7 详细；含 §B.1 v2 重启教训完整留痕）
+## F. ADR-0004 Kickoff 段草案（K.7 详细；§B.1 v3 重写到 ~80 行 / 4 段）
 
 ```markdown
 # ADR-0004: Phase 11 端到端集成验证
 
 ## Status
 
-In Progress (Phase 11 启程 2026-05-15；CLOSED 待 Step 11 收官)
+In Progress (Phase 11 启程 2026-05-16；CLOSED 待 Step 11 收官)
 
-> 本 ADR 是增量追写（惯例 M 沿用 Phase 9/10 模式）。Phase 11 启程指令拆两阶段流程：
-> 第一阶段 PHASE_DESIGN 草案 + 用户 APPROVE → 第二阶段 PHASE_IMPLEMENT 落地。
-> 各 Step 完成时向 §Decision 段下对应小节追加该 Step 关键裁决摘要。
+> 本 ADR 是增量追写（惯例 M 沿用 Phase 9/10 模式；第 29 次实战 / 跨 Phase 第 10 次）。
+> Phase 11 启程指令拆两阶段流程：第一阶段 PHASE_DESIGN 草案 + 用户 APPROVE
+> → 第二阶段 PHASE_IMPLEMENT 落地。各 Step 完成时向 §Decision 段下对应小节
+> 追加该 Step 关键裁决摘要。
 
 ## Context
 
 Phase 11 主题：**端到端集成验证**（《Phase 8-12 补充文档》§1.2 原文）。Phase 1-10 累计建立的"代码 + 业务能力 + 协作生态 + CI 真绿色 + 容器可部署 + 发布自动化 + 可执行文档"七重工程成熟度在 Phase 11 通过**真实基础设施**（不是 mock）+ **端到端 4 路径覆盖** + **性能基线 4 指标** + **混沌演练 4 故障场景**让工程价值得到真实验证。
 
-§8.1 Mock 使用边界硬约束：事件存储 / 消息系统 / 配置系统 / Saga 状态持久化 4 类组件**严禁 mock**。§13.1 第 11 项严禁。
+§8.1 Mock 使用边界硬约束：事件存储 / 消息系统 / 配置系统 / Saga 状态持久化 4 类组件**严禁 mock**。§13.1 第 11 项严禁。依赖：Phase 8 (ADR-0001) + Phase 9 (ADR-0002) + Phase 10 (ADR-0003) 全部 CLOSED。
 
-依赖：Phase 8 (ADR-0001) + Phase 9 (ADR-0002) + Phase 10 (ADR-0003) 全部 CLOSED。
+## Decision (Kickoff)
 
-## Decision
+### K.1-K.7（7 项核心裁决摘要；每项 ≤10 行）
+- **K.1** Step 划分 **β 12 Step**（Kickoff + Step 0-11；见 docs/00-phase1-mapping.md Phase 11 段）
+- **K.2** 测试数下限路径 **α + β 组合**（自然增量 + Step 11 收官评估补充；1977 → 1900+）
+- **K.3** 覆盖率维持 **85%**（不进一步升级；Phase 12 评估）
+- **K.4** 真实基础设施 **α + β 组合**（Testcontainers 本地 + GitHub Actions services CI；Step 1 实地裁决）
+- **K.5** 拆两阶段流程 Phase 11 **实战 4+ 次预期**（Kickoff + Step 1/7/8 强烈倾向；Step 0 TBD；Step 11 不拆）
+- **K.6** Kickoff 阶段 **0 新增**（惯例 K 第 27 次实战；元规则 P 30+ 步零依赖暂维持；Step 1 Testcontainers 评估）
+- **K.7** ADR-0004 起步段 ≤120 行（含 §B.1 ~80 行 4 段）
 
-### K.1 Step 划分：β 12 Step
-[Kickoff + Step 0-11；见 docs/00-phase1-mapping.md Phase 11 段]
+## §B.1 工程纪律延伸与历史校正记录（v3 / 4 段）
 
-### K.2-K.7
-[7 个 K 核心裁决摘要，每个 ≤10 行]
+本段记录 Phase 11 Kickoff 形成过程中触发的 4 类工程纪律延伸 + 历史文档校正动作，构成 Tianqi 工程纪律"第 4 层防御机制"（历史文档事实校正）实战兑现。
 
-## §B.1 Phase 11 Kickoff v2 重启教训完整记录
+### §B.1.A — v2 重启教训（事实锚定纪律建立）
 
-Phase 11 Kickoff 第一次起草指令（v1）在事实锚定段假设"Phase 10 CLOSED 2026-05-05（PR #10 merge + phase-10-closed tag + GitHub Release published）"。用户回执"pr 合并完成，过程中虽然有错误，但是搞定了"实际指 Step 7 PHASE_IMPLEMENT 在 feature 分支搞定，未涉及 PR 合并 / tag 创建 / Release published。
+Phase 11 Kickoff 第一次起草指令（v1）在事实锚定段假设"Phase 10 CLOSED 2026-05-05（PR #10 merge + phase-10-closed tag + GitHub Release published）"。用户回执"pr 合并完成，过程中虽然有错误，但是搞定了"实指 Step 7 PHASE_IMPLEMENT 在 feature 分支搞定，未涉及 PR 合并 / tag 创建 / Release published。AI 在 §13.3 Phase Gate 回溯义务前置核查的第一秒发现事实冲突（`git ls-remote origin refs/heads/main` 实测 `92753168` = Merge PR #9 Step 6，非假设的 PR #10 merge；`phase-10-closed` tag 不存在；Step 7 commits 仍停留在 feature 分支），在创建任何草案 / commit / push 前停下，触发 v2 重启。教训 5 条沉淀（详见 docs/phase11/00-phase-11-kickoff.md）。**事实锚定纪律 Phase 11+ 严守**：所有 SHA / tag / 状态必须基于 git fetch + ls-remote / gh CLI 等实测确认；不接受"乐观假设"。
 
-AI 在 §13.3 Phase Gate 回溯义务前置核查的第一秒发现事实冲突：
-- `git ls-remote origin refs/heads/main` 实测 `92753168`（Merge PR #9，Step 6）而非假设的 PR #10 merge
-- `phase-10-closed` tag 不存在
-- Step 7 8 个 commit 仍停留在 `claude/phase-10-step-7-closure` feature 分支
+### §B.1.B — ADR-0003 / CHANGELOG / KNOWN-ISSUES 日期回填修正（v3 必做）
 
-AI 在创建任何草案文档 / commit / push 前停下，触发 Phase 11 Kickoff 第二次起草。
+ADR-0003 / CHANGELOG.md Phase 10 段 / KNOWN-ISSUES.md L206 三文件统一标 "Phase 10 CLOSED 2026-05-05"，实为 Step 7 PHASE_IMPLEMENT 完成日（撰写时锁定）。Phase 10 CLOSED 真实仪式日期 **2026-05-13**（PR #10 merge `cc74da3` + main CI 4/4 PASS + `phase-10-closed` tag `ab70043` push + release.yml 第一次真实运行 + GitHub Release published），间隔 8 天。Phase 11 Kickoff PHASE_IMPLEMENT 阶段以 **3 个最小修正 commit** 回填三文件日期 2026-05-05 → 2026-05-13。**回填原则**：仅校正"已发生但日期标签错位"的事实陈述；不改动决策内容 / 不破坏 ADR-0003 Accepted 语义。**这是 Tianqi 工程纪律第 4 层防御机制（历史文档层）首次实战兑现**——把事实锚定纪律从 future（设计 / 实施 / 部署 / 事实层）扩展到 past（历史文档事实校正）。
 
-**教训沉淀（事实锚定纪律）**：
-1. "事实锚定"段必须基于真实数据（git fetch + git ls-remote / gh CLI 等实测确认），不接受任何"乐观假设"
-2. Step 4 收尾微调的"接受最简实质回执"原则针对"已发生事件的简短确认"，不是"未发生事件的自动假设"
-3. 模糊回执必须追问细节（如"pr 合并完成"是否包含 tag + release），不应自动扩张语义边界
-4. 双层缺陷链教训（Step 0 typecheck + Step 3.5 packaging）扩展到事实层 — Phase 11 §13.3 核查是事实层防御机制实战兑现
-5. Phase 10 CLOSED 真实仪式日期 **2026-05-13**（不是 v1 编造的 2026-05-05；2026-05-05 是 Step 7 PHASE_IMPLEMENT 完成日；间隔 8 天）
+### §B.1.C — 24 包事实精度纪律延伸（v3 必做）
 
-**ADR-0003 / KNOWN-ISSUES.md / CHANGELOG.md 多文件统一标 "Phase 10 CLOSED 2026-05-05"** 实为撰写时锁定日期（假设关闭仪式同期完成），不修改既有锁定文档；仅在 ADR-0004 此处诚实留痕。
+Phase 11 Kickoff v1/v2 prompt 锚定 "25 包 monorepo workspace"，实测 **24 包**（核心 6 + adapters 18；`packages/infrastructure/` 仅含 README.md 占位，无 package.json，不计入 workspace）。事实锚定纪律延伸至"workspace 包数"事实陈述精度。**Phase 11+ 起草指令统一使用 "24 包" 描述**。infrastructure/ 占位是否正式落地由 Phase 11 Step 9-10 observability 工作实地决策（裁决 K.6 全程预期保留）；Kickoff 阶段不补创。
 
-**Phase 8 git tag 处置**：phase-*-closed tag 约定 Phase 10 / Step 5 落地，Phase 8 CLOSED 2026-04-26 时不存在该约定；选项 α 历史遗留，不触发 §13.3 回溯义务。Phase 11+ 严守该约定。
+### §B.1.D — Phase 8 git tag 缺失 α 处置（接受历史遗留）
 
-**事实锚定纪律作为 Tianqi 工程纪律 Phase 11+ 严守**：所有 SHA / tag / 状态必须基于实测确认；起草指令含"事实锚定"段时必须先经 git fetch + ls-remote 实测核查（用户责任）；AI 收到指令时也必须先实测核查（AI 责任 — Phase 11 Kickoff v2 已兑现）。
+`git tag --list` 实测：`phase-9-closed` (Phase 9 / Step 19) + `phase-10-closed` (Phase 10 / Step 7) 就位；**`phase-8-closed` 缺失**。phase-N-closed tag 约定在 Phase 10 / Step 5 release.yml 落地（2026-05-04+），Phase 8 CLOSED 2026-04-26 时该约定尚未引入。**裁决选项 α**：历史遗留，不补打。理由：(1) 补打无工程价值（Phase 8 不需要再触发 release.yml）；(2) 补打会触发 release.yml → 产生 Phase 8 GitHub Release draft 需用户处理；(3) Phase 8 CLOSED 真实证据齐备（ADR-0001 Accepted + docs/phase8/19 + KNOWN-ISSUES.md L13）。**Phase 11+ 严守 phase-N-closed tag 约定**——这一纪律不溯及历史，仅向未来生效。
+
+## 第 4 层防御机制框架（B.1 综合）
+
+Tianqi 工程纪律的 4 层防御机制 by Phase 11 Kickoff：
+
+| 层 | 防御对象 | 兑现 Step |
+|----|---------|----------|
+| 代码层 | Phase closure typecheck + monorepo packaging 双层缺陷链 | Phase 10 / Step 0 + Step 3.5 |
+| 工作流层 | release.yml 元规则 B 在工作流层兑现 | Phase 10 / Step 5 |
+| 事实层 | §13.3 Phase Gate 回溯义务前置核查 | Phase 11 Kickoff v2 |
+| **历史文档层** | **已 Accepted 文档事实陈述错误的最小修正** | **Phase 11 Kickoff v3（本 ADR）** |
+
+完整的工程纪律不仅防御 future（设计 / 实施 / 部署 / 事实），也修正 past（历史文档事实校正）——这是从"工程纪律"升级到"工程信任"的关键节点。
 
 ## Consequences
 
 ### 积极
-- Phase 11 在 cc74da3 干净 main + 真实基础设施可用 + KI-P8-002 修复责任明示的起步状态下工作
+- Phase 11 在 `cc74da3` 干净 main + 真实基础设施可用 + KI-P8-002 修复责任明示的起步状态下工作
 - §13.3 Phase Gate 回溯义务实战兑现（首次）
-- v1 教训成为 Tianqi 工程纪律的事实锚定段沉淀
+- v1 教训 + v3 历史校正成为 Tianqi 工程纪律的事实锚定段沉淀
+- 第 4 层防御机制建立（历史文档层）
 
 ### 风险
 - Step 0 KI-P8-002 修复 + Step 1 Testcontainers 引入决策可能引发 Phase 11 早期不稳定
 - 真实基础设施测试在 CI 跑增加 build time（待 Step 1 评估）
-- KI-P8-003 时序 flake 在端到端测试中可能加重（待 Phase 11 评估修复）
+- KI-P8-003 时序 flake 在端到端测试中可能加重（Phase 11 评估修复）
 
 ## References
 
@@ -312,10 +325,10 @@ AI 在创建任何草案文档 / commit / push 前停下，触发 Phase 11 Kicko
 - 《Phase 8-12 补充文档》§1.2 / §8 / §9 / §11 / §13
 - docs/phase11/00-phase-11-kickoff.md
 - docs/KNOWN-ISSUES.md（KI-P8-002 / KI-P8-003 Phase 11 责任明示）
-- Phase 11 Kickoff v2 重启教训 § B.1
+- §B.1 v3 修订（4 段 / ~80 行）
 ```
 
-**段长度初估**：≤120 行（含 §B.1 留痕段约 40 行）；远低于 ADR-0003 694 行。
+**段长度初估**：≤180 行（Status + Context + Decision 7 项摘要 + §B.1 4 段 ~80 行 + 第 4 层防御机制框架表 + Consequences + References）；远低于 ADR-0003 694 行。
 
 ---
 
@@ -386,53 +399,36 @@ PHASE_IMPLEMENT 阶段（APPROVE 后）删除；内容沉淀到 ADR-0004 + docs/
 
 ## K. 核心未决判断（请重点审视）
 
-### K.1 25 包 vs 24 包事实精度
+### K.1 24 包事实精度纪律延伸（v3 修订锁定）
 
-**问题**：prompt 锚定 "25 包"，实测 24 包（infrastructure/ 占位）。
+**v3 修订**：ADR-0004 §B.1 含"24 包事实精度纪律延伸"段（5-8 行）。Phase 11+ 起草指令统一使用 **"24 包"** 描述。不补创 infrastructure/ 包；该占位由 Phase 11 Step 9-10 observability 工作实地决策。
 
-**裁决建议**：ADR-0004 §B.1 留痕"24 实测；25 是 prompt 锚定误差或包含 infrastructure/ 占位预期"，不补创 infrastructure 包，Phase 11 Step 9-10 实地决策。
+**留痕方向**：prompt 锚定 "25 包" 是历史口径（可能含 infrastructure/ 占位预期）；实测 24 包；事实锚定纪律延伸到"workspace 包数"事实陈述精度。
 
-**请审视**：是否同意此处置？还是希望在 Phase 11 Kickoff 阶段就补创 infrastructure 包以与 prompt 锚定对齐？
+### K.2 Phase 8 git tag α 不补打（接受，不阻塞）
 
-### K.2 Phase 8 git tag 处置（α / β）
+**v3 锁定**：选项 α 历史遗留处置；ADR-0004 §B.1 含 Phase 8 git tag 处置预措辞（~20 行）。不补打；Phase 11+ 严守 phase-N-closed tag 约定。
 
-**裁决建议**：选项 α 历史遗留，不补打。
+### K.3 ADR-0003 / CHANGELOG / KNOWN-ISSUES 日期回填修正（v3 必做）
 
-**请审视**：是否同意？还是希望补打 phase-8-closed tag（基于 Phase 8 / Step 19 closing commit）以让 Phase 8/9/10 tag 三件套完整？
+**v3 修订**：PHASE_IMPLEMENT 阶段新增 **3 个 commit** 最小修正 3 文件日期 2026-05-05 → 2026-05-13。ADR-0004 §B.1 含回填留痕段（10-15 行）。
 
-补打代价：
-- 简单（gh tag create phase-8-closed <step-19-commit-sha>; gh push origin phase-8-closed）
-- release.yml 会被触发 → 产生 Phase 8 GitHub Release draft（需用户处理）
-- 价值低（Phase 8 不需要再发布；纯档案完整性）
+**回填范围**：
+- `docs/decisions/0003-phase-10-engineering-and-collaboration.md` L7 + ADR Step 7 收尾日期段
+- `CHANGELOG.md` Phase 10 段头部日期
+- `docs/KNOWN-ISSUES.md` L206 "Resolved Known Issues (Phase 10 Closed, 2026-05-05)" 标题 + KI-P10-001/002 段内日期引用
 
-### K.3 ADR-0003 日期细节是否回填修正
+**纪律延伸价值**（用户原话）：把"事实锚定纪律"扩展到历史文档层面 → 第 4 层防御机制建立。
 
-**问题**：ADR-0003 / CHANGELOG.md / KNOWN-ISSUES.md L206 标 "Phase 10 CLOSED 2026-05-05"，真实仪式日期 2026-05-13。
+### K.4 PR #11 dangling 处理 — 用户独立操作（v3 锁定）
 
-**裁决建议**：不修改既有锁定文档；仅在 ADR-0004 §B.1 诚实留痕。
+**v3 锁定**：PHASE_IMPLEMENT 实施前你在 **GitHub Web UI 关闭 PR #11**（30 秒）。Phase 11 第一个 PR 序号 = **#12**（GitHub 自动）。
 
-**请审视**：是否同意？还是希望回填修正 ADR-0003 / CHANGELOG / KNOWN-ISSUES 三文件的日期标签？
+**AI 责任**：PHASE_IMPLEMENT 第二阶段 push 前用 `gh pr list` 或直接 `git ls-remote` 核查 PR #11 已关闭再 push（防御性核查）。
 
-回填代价：
-- 三文件 6-10 行编辑（轻量）
-- 但破坏"已锁定文档"原则（ADR-0003 已 Accepted；CHANGELOG Phase 10 段已锁定）
-- 反而扩大事实锚定纪律的张力（"既然撰写时锁定的日期不准就改" vs "ADR-0004 留痕足够"）
+### K.5 notification-kafka .persistent.test.ts 缺失（接受，不阻塞）
 
-### K.4 Phase 11 PR 序号起步（#11 dangling vs #12 直接起步）
-
-**问题**：prompt 提到"PR #11 dangling open"，Phase 11 第一个 PR 应该 #12（如关闭 PR #11）或 #11（如 PR #11 已自动关闭）。
-
-**裁决建议**：在 PHASE_IMPLEMENT 阶段 push 后用 `gh pr list` 实测；如 PR #11 仍 open，先建议用户关闭，然后 Phase 11 第一个 PR 自然取 #12。
-
-**请审视**：是否需要在 Kickoff 阶段先关闭 PR #11？还是 PHASE_IMPLEMENT 时一并处理？
-
-### K.5 notification-kafka .persistent.test.ts 缺失（Step 0 工作面扩张）
-
-**问题**：Phase 8 既有 5 个 .persistent.test.ts；notification-kafka 缺失。Step 0 工作量增加。
-
-**裁决建议**：在 Phase 11 / Step 0 起草指令时实地评估；可能拆分为 Step 0 (Postgres) + Step 0.5 (Kafka) 两 Step。
-
-**请审视**：是否同意此扩张？还是希望在 Kickoff 阶段就锁定 Step 0 = Postgres + Kafka 一并 / 仅 Postgres / 拆 0 + 0.5？
+**v3 锁定**：Phase 11 / Step 0 起草指令实地评估；可能拆分 Step 0 (Postgres) + Step 0.5 (Kafka)。Kickoff 阶段不裁决。
 
 ---
 
@@ -446,12 +442,30 @@ PHASE_IMPLEMENT 阶段（APPROVE 后）删除；内容沉淀到 ADR-0004 + docs/
 - 是否需要调整 Phase 11 Step 划分（K.1 β 12 Step vs α 8 / γ 16）
 - 是否需要调整真实基础设施战略（K.4 α + β vs 单 α / 单 β / γ）
 
-收到 APPROVE 后立即启动第二阶段 PHASE_IMPLEMENT：
-1. 删除本草案文档
-2. 创建 ADR-0004（Status: In Progress；含 §B.1 v2 重启教训完整留痕）
-3. 更新 KNOWN-ISSUES.md（5 项 KI Phase 11 责任明示 + KI-P8-003 实战兑现留痕）
-4. 创建 docs/phase11/00-phase-11-kickoff.md（Kickoff 执行记录）
-5. 同步 docs/00-phase1-mapping.md（Phase 11 启程段）
-6. 4 项独立命令最终实测（预期零波动）
-7. push feature 分支 `claude/phase-11-kickoff` 到 origin
-8. 输出 PR 创建建议（PR #12）
+收到 APPROVE 后立即启动第二阶段 PHASE_IMPLEMENT（7 commits 规划）：
+
+**前置核查**（push 前）：
+- AI 用 `git ls-remote origin refs/pull/11/head` 或 `gh pr list` 核查 PR #11 已关闭（K.4 防御性核查）
+- 如 PR #11 仍 open → STOP + 提示用户先关闭
+
+**Commit 规划 7 项**（拆细 atomic commits，沿用 Phase 10 模式）：
+
+| # | Commit | 内容 | 文件 |
+|---|--------|------|------|
+| 1 | `docs(adr-0003): correct CLOSED date 2026-05-05 → 2026-05-13` | ADR-0003 日期回填（§B.1.B / K.3） | docs/decisions/0003-phase-10-engineering-and-collaboration.md |
+| 2 | `docs(changelog): correct Phase 10 CLOSED date 2026-05-05 → 2026-05-13` | CHANGELOG Phase 10 段日期回填 | CHANGELOG.md |
+| 3 | `docs(known-issues): correct Phase 10 Closed date 2026-05-05 → 2026-05-13` | KNOWN-ISSUES.md L206 回填 + KI-P10-001/002 段内日期引用 | docs/KNOWN-ISSUES.md |
+| 4 | `docs(decisions): create ADR-0004 for Phase 11 end-to-end integration verification` | ADR-0004 In Progress（含 §B.1 v3 四段 + 第 4 层防御机制框架） | docs/decisions/0004-...md |
+| 5 | `docs(known-issues): update KI status with Phase 11 responsibility + KI-P8-003 实战兑现` | 5 项 open KI 责任明示 + KI-P8-003 Phase 10 / Step 7 main CI 第七次运行留痕 | docs/KNOWN-ISSUES.md |
+| 6 | `docs: add Phase 11 kickoff execution record` | docs/phase11/00-phase-11-kickoff.md 创建（含 v3 修订完整留痕） + PHASE-11-KICKOFF-DESIGN-DRAFT.md 删除 | docs/phase11/00-phase-11-kickoff.md (+) / PHASE-11-KICKOFF-DESIGN-DRAFT.md (-) |
+| 7 | `docs(mapping): mark Phase 11 as In Progress with Step structure` | Phase 11 启程段 + Step 划分锁定（Kickoff + Step 0-11） | docs/00-phase1-mapping.md |
+
+**Push 流程**：
+- `git push -u origin claude/phase-11-kickoff`
+- CI 在 Phase 11 第一个 PR 第一次自身运行实测（自 phase-10-closed tag 后的第一个 PR；零依赖变更预期 4/4 PASS）
+
+**PR #12 创建建议**：
+- 标题：`Phase 11 Kickoff: end-to-end integration verification + 4-layer defense extension (v3)`
+- 描述：按 §24.1 七项；含 7 commits 摘要 + v3 修订 3 项要点（K.1/K.3 必做 + K.4 用户独立）+ §B.1 四段引用 + Phase 11 全程 12 Step 预告
+
+**预期回执流程**：你 APPROVE → AI PHASE_IMPLEMENT 7 commits + push → PR #12 自动创建 → CI 4/4 PASS → 你 merge → main CI 转绿 → Phase 11 Kickoff 完成 → Step 0 起草指令承接。

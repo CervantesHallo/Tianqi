@@ -57,6 +57,12 @@ export type PostgresEventStoreOptions = Readonly<{
   poolSize?: number;
   connectionTimeoutMs?: number;
   healthCheckTimeoutMs?: number;
+  // Phase 11 / Step 0：可选 databasePath label，仅在 healthCheck details 中
+  // 回显。Postgres 不使用文件路径——但 persistent contract testkit 假设
+  // healthCheck.details.databasePath === session.databasePath（与 SQLite /
+  // file-based adapter 同形态契约）；测试 fixture 把 session 的合成 path
+  // 通过此选项传入让契约满足。生产代码不需要传 databasePath。
+  databasePath?: string;
 }>;
 
 const infError = (code: "TQ-INF-003" | "TQ-INF-004", action: string): EventStoreWriteError => ({
@@ -173,6 +179,7 @@ export const createPostgresEventStore = (
   const poolSize = options.poolSize ?? DEFAULT_POOL_SIZE;
   const connectionTimeoutMs = options.connectionTimeoutMs ?? DEFAULT_CONNECTION_TIMEOUT_MS;
   const healthCheckTimeoutMs = options.healthCheckTimeoutMs ?? DEFAULT_HEALTH_CHECK_TIMEOUT_MS;
+  const databasePath = options.databasePath;
   const connectionTarget = redactConnectionTarget(connectionString);
 
   let state: LifecycleState = "created";
@@ -187,25 +194,38 @@ export const createPostgresEventStore = (
     }
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      if (schema !== "public") {
-        await client.query(createSchemaDdl(schema));
+      // Phase 11 / Step 0：Postgres `IF NOT EXISTS` DDL 在并发场景下 *不是*
+      // 真正幂等——CREATE SCHEMA 触发 pg_namespace_nspname_index 23505；
+      // CREATE TABLE 触发 pg_type_typname_nsp_index 23505（因为表的 row type
+      // 注册到 pg_type）；CREATE INDEX 类似。P2 cross-instance 测试（writer
+      // + reader 同 schema 同时 init()）实测触发。用 PG advisory lock 串行
+      // bootstrap 是 PG 推荐做法：advisory lock 与 transaction 解耦、与
+      // schema 强绑定（hashtext 派生 lock key）、显式 release 不泄漏。
+      // 后续 append/list 等运行时操作 *不需要* 此 lock，仅 bootstrap 阶段。
+      await client.query("SELECT pg_advisory_lock(hashtext($1))", [schema]);
+      try {
+        if (schema !== "public") {
+          await client.query(createSchemaDdl(schema));
+        }
+        await client.query("BEGIN");
+        await client.query(createEventsTableDdl(schema));
+        await client.query(createEventsIndexDdl(schema));
+        await client.query(createSchemaVersionTableDdl(schema));
+        await client.query(seedSchemaVersionDml(schema));
+        const versionRow = (await client.query<{ version: string }>(selectSchemaVersionSql(schema)))
+          .rows[0];
+        const actual = versionRow?.version ?? "";
+        if (actual !== SCHEMA_VERSION) {
+          await client.query("ROLLBACK");
+          throw new Error(
+            `TQ-INF-008: Postgres schema_version mismatch in "${schema}": expected ${SCHEMA_VERSION} but found ${actual}`
+          );
+        }
+        await client.query("COMMIT");
+        currentSchemaVersion = actual;
+      } finally {
+        await client.query("SELECT pg_advisory_unlock(hashtext($1))", [schema]);
       }
-      await client.query(createEventsTableDdl(schema));
-      await client.query(createEventsIndexDdl(schema));
-      await client.query(createSchemaVersionTableDdl(schema));
-      await client.query(seedSchemaVersionDml(schema));
-      const versionRow = (await client.query<{ version: string }>(selectSchemaVersionSql(schema)))
-        .rows[0];
-      const actual = versionRow?.version ?? "";
-      if (actual !== SCHEMA_VERSION) {
-        await client.query("ROLLBACK");
-        throw new Error(
-          `TQ-INF-008: Postgres schema_version mismatch in "${schema}": expected ${SCHEMA_VERSION} but found ${actual}`
-        );
-      }
-      await client.query("COMMIT");
-      currentSchemaVersion = actual;
     } catch (cause) {
       try {
         await client.query("ROLLBACK");
@@ -320,7 +340,12 @@ export const createPostgresEventStore = (
       connectionTarget,
       lastSuccessAt: lastSuccessAt ?? "never",
       lastError: lastError ?? "none",
-      healthCheckTimeoutMs
+      healthCheckTimeoutMs,
+      // Phase 11 / Step 0：persistent contract testkit P4 断言
+      // status.details["databasePath"] === session.databasePath。Postgres
+      // 不使用文件路径——仅在 options 显式传入时回显（测试 fixture 使用）；
+      // 生产场景该字段为 undefined。
+      ...(databasePath !== undefined ? { databasePath } : {})
     };
     if (state !== "running" || pool === null) {
       return {

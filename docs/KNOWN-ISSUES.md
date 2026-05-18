@@ -110,6 +110,11 @@
 - **修复责任 Step**：未确定
 - **备注**：本 flake 在 Phase 8 Step 18 之前已存在（基线 Step 17 也偶发），不是 Step 18 集成测试引入。Phase 9 全程通过 fast/slow ≥ 1:10 比例防御（Step 8 单 step 超时 + Step 16 端到端集成测试 it 3.1）。Phase 11 当 application 层使用 fake-timers 接入这些 Adapter 时可一并加固。
 - **Phase 10 / Step 7 main CI 第七次运行实战兑现（2026-05-13）**：`saga-orchestrator.test.ts` overall-timeout vacuous 分支（`test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out`）偶发 flake（expected `'timed_out'`、received `'compensated'`；测试运行 14ms 时序紧边界；defaultSagaTimeoutMs 5ms vs step-slow 50ms 比例触发 race）；Re-run PASS。**Phase 9 / Step 17 "Phase 9 实战 0 显式 flake" 评估在 Phase 10 已被修正**——比 Phase 11 预判早一个相位显化。**Phase 11 评估修复路径**：与 KI-P8-002 同期 Step（Step 0/1 实地评估），优先级由 Phase 9/Step 17 的"Phase 11 预防性修复"升级为"Phase 11 必修复"。详见 `docs/decisions/0004-phase-11-end-to-end-integration-verification.md` §Decision K.6 风险段。
+- **Phase 11 / Step 0.5 PR #14 CI run #2 第二次实战兑现（2026-05-19）**：同测试同断言 `saga-orchestrator.test.ts > test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out`；同失败模式 expected `'compensated'` to be `'timed_out'`（与 Phase 10 / Step 7 main CI 第七次完全相同）；处置 Re-run failed jobs → PASS。**进一步确认 flake 性质**：同一 CI run #2 内 Coverage job 跑同样测试 PASS 而 Test job FAIL — cross-job inconsistency within same CI run 是 timing-sensitive race condition 而非 deterministic bug 的关键证据。**状态升级**：偶发 → **已知重复**（2 次兑现；同模式 + 同 Re-run 处置）。**修复路径升级评估**：
+  - 候选 α：Phase 11 / Step 4-6 端到端测试期间统一修复（既定路径；维持；与 §Decision K.6 风险段一致）
+  - 候选 β：独立 Step 0.6 修复（"修复 + 防御"模式延伸；TBD）
+  - 候选 γ：Phase 11 / Step 11 收官同期修复
+  具体修复路径由 Phase 11 / Step 4 起草指令评估锁定（**§B.1.A 事实锚定纪律严守**——第二次兑现是状态升级信号；Phase 11 / Step 4 起草指令必须含 KI-P8-003 修复路径锁定段）。
 
 ### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）— ✅ 已修复（Step 19）
 

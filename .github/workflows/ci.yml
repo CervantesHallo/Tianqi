@@ -88,6 +88,14 @@ jobs:
           KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
           KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
           KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+          # Phase 11 / Step 0.5：单 broker KRaft 配置——默认值
+          # OFFSETS_TOPIC_REPLICATION_FACTOR=3 在 1 broker 环境下让
+          # __consumer_offsets topic 无法创建 → consumer group 无法 join。
+          # 实测发现于本地 docker;CI services 同问题。
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
           CLUSTER_ID: tianqi-test-kraft-cluster
         options: >-
           --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
@@ -161,6 +169,14 @@ jobs:
           KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
           KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
           KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+          # Phase 11 / Step 0.5：单 broker KRaft 配置——默认值
+          # OFFSETS_TOPIC_REPLICATION_FACTOR=3 在 1 broker 环境下让
+          # __consumer_offsets topic 无法创建 → consumer group 无法 join。
+          # 实测发现于本地 docker;CI services 同问题。
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
           CLUSTER_ID: tianqi-test-kraft-cluster
         options: >-
           --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"

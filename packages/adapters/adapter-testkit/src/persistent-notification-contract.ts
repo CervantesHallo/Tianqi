@@ -206,13 +206,12 @@ export const definePersistentNotificationContractTests = <
     // 类别 P2：跨实例可见性（5 it）
     // ============================================================
     describe("category P2: cross-instance visibility", () => {
-      it("test_publish_by_writer_visible_to_concurrent_reader_in_different_session_via_kafka_consumer_loop", async () => {
-        // 不同 session → 不同 consumer group → reader 与 writer 解耦；
-        // reader.subscribe 后 writer.publish → reader 通过 Kafka consumer
-        // 收到消息（验证消息真实经过 broker；非 local dispatch path）。
+      it("test_publish_by_writer_visible_to_concurrent_reader_in_different_group_same_topic_via_kafka_consumer_loop", async () => {
+        // 同 session → 同 topic;factory 每次给 reader 不同 consumerGroupId
+        // (per-instance counter)→ reader 在不同 group 通过 Kafka consumer
+        // 收到 writer 的消息(验证真实经过 broker;非 local dispatch path)。
         const writer = await factory(session);
-        const readerSession = nextSession(options);
-        const reader = await factory(readerSession);
+        const reader = await factory(session);
         await Promise.all([writer.init(), reader.init()]);
         try {
           const observed: NotificationMessage[] = [];
@@ -229,12 +228,12 @@ export const definePersistentNotificationContractTests = <
       }, 30_000);
 
       it("test_two_writer_instances_publishing_to_same_topic_messages_visible_to_single_reader", async () => {
-        // 同 topic + 不同 session → reader 收到两个 writer 的所有消息
-        // (at-least-once)。
+        // 同 session 同 topic → 3 个 adapter 实例(writer1/writer2/reader)各有
+        // 独立 consumer group(factory counter)→ reader 收到两个 writer 的
+        // 所有消息(at-least-once)。
         const writer1 = await factory(session);
         const writer2 = await factory(session);
-        const readerSession = nextSession(options);
-        const reader = await factory(readerSession);
+        const reader = await factory(session);
         await Promise.all([writer1.init(), writer2.init(), reader.init()]);
         try {
           const observed: NotificationMessage[] = [];
@@ -296,16 +295,17 @@ export const definePersistentNotificationContractTests = <
         }
       }, 30_000);
 
-      it("test_late_joining_reader_in_new_group_does_not_see_messages_published_before_subscribe", async () => {
-        // P1 的对偶：跨实例（writer + 新 group reader）也遵守 fromBeginning:
-        // false 语义；reader 实例在 publish 之后才 subscribe → 不见消息。
+      it("test_late_joining_reader_in_new_group_same_topic_does_not_see_messages_published_before_subscribe", async () => {
+        // P1 对偶 + 跨实例验证：同 topic 不同 group(factory counter),reader
+        // 实例在 publish 之后才 init+subscribe → 遵守 fromBeginning: false
+        // 语义不见历史消息。验证 adapter 在跨实例真实 Kafka 路径下正确。
         const writer = await factory(session);
         await writer.init();
         try {
           await writer.publish(buildMessage("RiskCaseCreated", "before-reader"));
           await delayMs(KAFKA_DELIVERY_DELAY_MS);
 
-          const reader = await factory(nextSession(options));
+          const reader = await factory(session);
           await reader.init();
           try {
             const observed: NotificationMessage[] = [];
@@ -325,9 +325,9 @@ export const definePersistentNotificationContractTests = <
     // 类别 P3：并发投递语义（2 it）
     // ============================================================
     describe("category P3: concurrent delivery semantics", () => {
-      it("test_promise_all_concurrent_publish_no_message_loss_at_least_once_to_reader_in_different_session", async () => {
+      it("test_promise_all_concurrent_publish_no_message_loss_at_least_once_to_reader_in_different_group_same_topic", async () => {
         const writer = await factory(session);
-        const reader = await factory(nextSession(options));
+        const reader = await factory(session);
         await Promise.all([writer.init(), reader.init()]);
         try {
           const observed: NotificationMessage[] = [];
@@ -351,10 +351,11 @@ export const definePersistentNotificationContractTests = <
 
       it("test_per_case_id_messages_preserve_publish_order_within_observer_via_key_hash_partitioner", async () => {
         // KafkaJS 默认 partitioner 用 key hash 派生 partition；同 caseId →
-        // 同 partition → 顺序保留。如 auto-create-topic 用 1 partition 也
-        // 顺序保留。本测试是 L.2 的实测验证。
+        // 同 partition → 顺序保留。adapter K.9 修复 admin.createTopics 用
+        // numPartitions: 1 也确保单 partition → 顺序保留。本测试是 L.2 的
+        // 实测验证。
         const writer = await factory(session);
-        const reader = await factory(nextSession(options));
+        const reader = await factory(session);
         await Promise.all([writer.init(), reader.init()]);
         try {
           const observed: NotificationMessage[] = [];

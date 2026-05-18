@@ -50,6 +50,25 @@
 
 ### KI-P8-002：external Adapter 包覆盖率受真实基础设施依赖限制
 
+**Status (2026-05-18)**: **Partially RESOLVED** — Postgres 部分 RESOLVED (Phase 11 / Step 0)；Kafka 部分 pending (Phase 11 / Step 0.5)。
+
+**Postgres 部分 RESOLVED 详情**（Phase 11 / Step 0; 2026-05-18）：
+- 3 Postgres adapter × 3 类测试 = **88 PASS / 9 files green** 在 postgres:16-alpine 实测（本机 docker + ci.yml services）
+- `pnpm test` with `TIANQI_TEST_POSTGRES_URL`: 1873 → 1952 PASS（**79 测试激活**；超 prompt 锚定 76 因 .test.ts unit skipIf 多 3）
+- `pnpm test:coverage` with PG: baseline 85/79.64/91.68/85 → **86.75/80.04/95.91/86.75**（K.3 决议维持 85% thresholds 不主动升级）
+- 3 个 adapter bootstrap 加 `pg_advisory_lock(hashtext($schema))` 串行 DDL（修复 PG `IF NOT EXISTS` 并发不真正幂等的 P2 cross-instance race）
+- 3 个 `.contract.test.ts` factory 改为每次独立 schema + afterAll cleanup（修复 testkit `beforeEach` 共享 BASE_SCHEMA 数据污染）
+- event-store-postgres options 加 optional `databasePath` + healthCheck echo（满足 persistent contract testkit P4 断言）
+- ci.yml test + coverage 双 job 加 `services.postgres` (postgres:16-alpine + health-cmd pg_isready + 显式 ready wait + env var TIANQI_TEST_POSTGRES_URL)
+- 详见 `docs/decisions/0004-...md` Decision (Step 0) + `docs/phase11/01-step-0-postgres-real-infrastructure.md`
+
+**Kafka 部分 pending**（Phase 11 / Step 0.5 责任）：
+- `packages/adapters/notification-kafka/` 当前仅有 contract.test.ts (18 skipped)；缺失 `.persistent.test.ts`
+- Step 0.5 工作面：新建 .persistent.test.ts + ci.yml 加 Kafka services + 环境变量约定（譬如 TIANQI_TEST_KAFKA_BROKERS）
+- 完成后 KI-P8-002 完全 RESOLVED
+
+
+
 - **当前**（Phase 9 / Step 17 实测复核）：
   - `packages/adapters/event-store-postgres/src/` lines 33.8% — 21 contract it + 12 persistent it 在缺失 `TIANQI_TEST_POSTGRES_URL` 时全部 skipped
   - `packages/adapters/notification-kafka/src/` lines 47.41% — 18 contract it 在缺失 `TIANQI_TEST_KAFKA_BROKERS` 时全部 skipped

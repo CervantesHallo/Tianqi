@@ -198,9 +198,49 @@ Tianqi 工程纪律的 4 层防御机制 by Phase 11 Kickoff：
 
 ---
 
+## Decision (Step 0 — KI-P8-002 Postgres 部分 RESOLVED + CI services 第一次实战)
+
+完成日：2026-05-18。惯例 M 第 30 次实战 / 跨 Phase 第 10 次。本 Step 不拆两阶段（裁决 K.5 锁定；主题相对成熟）。
+
+### S0.1 CI services 配置 — α test + coverage 双 job
+ci.yml `services.postgres` 添加到 test + coverage 两 job（与 Step 3/3.5 build chain 协调；4 jobs 概念维持）。postgres:16-alpine（裁决 3）+ health-cmd pg_isready + 显式 ready wait 步（裁决 4 α + β 双层防御）。env var `TIANQI_TEST_POSTGRES_URL=postgres://tianqi:tianqi@localhost:5432/tianqi`（裁决 2 单一变量；3 adapter 共用）。
+
+### S0.2 contract test factory schema 隔离修复
+3 个 `.contract.test.ts`（event-store / saga-state-store / dead-letter-store）由共享 `BASE_SCHEMA` 改为每次 factory 调用产生独立 schema（`${SCHEMA_PREFIX}_it${++factoryCounter}`）+ `afterAll` 按 prefix `DROP SCHEMA CASCADE` 清理。**根因**：testkit `beforeEach` 调 factory() 创建新 adapter，但 in-memory adapter 通过 `new Map()` 天然隔离；Postgres adapter 共享 schema → it 间数据污染。这是 Step 0 真实激活揭露的 Phase 8/9 隐藏假设缺陷。
+
+### S0.3 Postgres bootstrap advisory lock 修复（业务代码 — 显式留痕）
+3 个 Postgres adapter 的 bootstrap 函数引入 `pg_advisory_lock(hashtext($schema))` 串行 DDL 执行 + finally 显式 unlock。**根因**：PG `IF NOT EXISTS` DDL 在并发场景 *不是* 真正幂等——CREATE SCHEMA 触发 `pg_namespace_nspname_index` 23505；CREATE TABLE 触发 `pg_type_typname_nsp_index` 23505（表的 row type 注册到 pg_type）。P2 cross-instance 测试（writer + reader 同 schema 同时 init()）实测触发。advisory lock 是 PG 推荐做法。**这是 Step 0 主题范围内的"激活真实基础设施必要修复"，不是业务语义变化**（接口冻结严守；append/save/list 等运行时 API 0 变化）。运行时操作不持有 advisory lock，仅 bootstrap 阶段。
+
+### S0.4 event-store-postgres healthCheck.databasePath 可选 echo
+event-store-postgres options 新增 optional `databasePath?: string`，healthCheck details 在该选项设置时回显。**根因**：persistent contract testkit P4 断言 `status.details["databasePath"] === session.databasePath`（与 SQLite / file-based adapter 同形态契约）。Postgres 不使用文件路径——但测试 fixture 通过此 echo 满足契约；生产代码不需要传 databasePath（向后兼容）。saga-state-store + dead-letter-store testkit 无此断言，不需要同样修改。
+
+### S0.5 KI-P8-002 Postgres 部分 RESOLVED 实测证据
+本地 Postgres docker (postgres:16-alpine) + `TIANQI_TEST_POSTGRES_URL` 设置后：
+- `pnpm test` baseline (no PG): 1873 PASS + 104 skipped = **1977 total**（与 Kickoff baseline 一致）
+- `pnpm test` with PG: 1952 PASS + 25 skipped = 1977 total（**79 测试激活**：1952 - 1873；超 prompt 锚定 76 因含 `.test.ts` unit skipIf tests）
+- `pnpm test:coverage` with PG: **86.75% / 80.04% / 95.91% / 86.75%**（baseline 85/79.64/91.68/85；自然抬升 +1.75pp lines/statements、+0.40pp branches、+4.23pp functions；**K.3 决议维持 85% thresholds 不主动升级**，让 coverage 自然涨）
+- 3 Postgres adapter 9 test files 全 PASS（event-store / saga-state-store / dead-letter-store × .test.ts + .contract.test.ts + .persistent.test.ts）
+
+### S0.6 KI-P8-003 不在 Step 0 处置（裁决 G α）
+saga-orchestrator overall-timeout vacuous flake 与 Step 0 主题（Postgres 真实基础设施）完全不同模块；推迟 Step 4-6 端到端测试评估时同期处置。Step 0 主题专注度严守。
+
+### S0.7 不预占 Step 0.5 / Step 1 / Phase 11+
+- 不创建 notification-kafka `.persistent.test.ts`（Step 0.5 责任）
+- 不修改 docker-compose.yml（Step 1 责任）
+- 不引入 Testcontainers（Step 1 责任）
+- 不扩 ci.yml jobs 数（4 维持；裁决 1 α）
+
 ## Alternatives Considered
 
 [各 Step 拒绝候选由对应 Step 完成时增量追写；启程指令 7 项核心裁决的拒绝候选详见 `docs/phase11/00-phase-11-kickoff.md`，待 PHASE_IMPLEMENT 阶段沉淀进本段]
+
+### Step 0 Alternatives
+- 裁决 1 β（单独 integration-test job）拒：破坏 4 jobs 概念 + 增加 CI 复杂度
+- 裁决 1 γ（仅 main push 触发）拒：PR 验证不完整，违反 Phase 10 / Step 3 强制门禁精神
+- 裁决 3 β/γ (postgres 15/17) 拒：16 业界 stable 主流；17 太新；15 不必要保守
+- S0.3 catch 23505 retry 模式（仅 catch CREATE SCHEMA 23505）拒：CREATE TABLE 也触发同样错误（pg_type_typname_nsp_index）；advisory lock 是干净的 PG 推荐做法
+- S0.3 Testcontainers Node.js 引入 拒：Step 1 责任；本 Step 用 GitHub Actions services（K.4 + 元规则 P 维持）
+- KI-P8-003 在 Step 0 顺手修 拒：违反主题专注度；推迟 Step 4-6（动作 G α）
 
 ---
 

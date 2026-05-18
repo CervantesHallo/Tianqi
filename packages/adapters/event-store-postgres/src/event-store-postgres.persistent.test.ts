@@ -36,12 +36,14 @@ const factory = (session: PersistentTestSession) => {
   if (session.databasePath.includes(BAD_PATH_MARKER)) {
     return createPostgresEventStore({
       connectionString: "postgres://tianqi_unreachable:secret@127.0.0.1:1/nonexistent",
-      connectionTimeoutMs: 500
+      connectionTimeoutMs: 500,
+      databasePath: session.databasePath
     });
   }
   return createPostgresEventStore({
     connectionString: testUrl ?? "",
-    schema: deriveSchemaFromSession(session)
+    schema: deriveSchemaFromSession(session),
+    databasePath: session.databasePath
   });
 };
 

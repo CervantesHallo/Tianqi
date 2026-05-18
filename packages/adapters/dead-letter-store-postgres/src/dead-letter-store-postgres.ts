@@ -217,20 +217,33 @@ export const createPostgresDeadLetterStore = (
     }
     const client = await pool.connect();
     try {
-      await client.query(createSchemaDdl(schema));
-      await client.query(createDeadLetterEntriesTableDdl(schema));
-      await client.query(createDeadLetterSagaIndexDdl(schema));
-      await client.query(createDeadLetterPendingIndexDdl(schema));
-      await client.query(createSchemaVersionTableDdl(schema));
-      await client.query(seedSchemaVersionDml(schema));
-      const result = (await client.query(selectSchemaVersionSql(schema))) as PgQueryResult;
-      const actual = result.rows[0]?.["version"] as string | undefined;
-      if (actual !== undefined && actual !== SCHEMA_VERSION) {
-        throw new Error(
-          `TQ-INF-024: Postgres dead_letter_entries schema_version mismatch in "${schema}": expected ${SCHEMA_VERSION} but found ${actual}`
-        );
+      // Phase 11 / Step 0：Postgres `IF NOT EXISTS` DDL 在并发场景下 *不是*
+      // 真正幂等——CREATE SCHEMA 触发 pg_namespace_nspname_index 23505；
+      // CREATE TABLE 触发 pg_type_typname_nsp_index 23505（因为表的 row type
+      // 注册到 pg_type）；CREATE INDEX 类似。P2 cross-instance 测试（writer
+      // + reader 同 schema 同时 init()）实测触发。用 PG advisory lock 串行
+      // bootstrap 是 PG 推荐做法：advisory lock 与 transaction 解耦、与
+      // schema 强绑定（hashtext 派生 lock key）、显式 release 不泄漏。
+      // 后续 enqueue/list 等运行时操作 *不需要* 此 lock，仅 bootstrap 阶段。
+      await client.query("SELECT pg_advisory_lock(hashtext($1))", [schema]);
+      try {
+        await client.query(createSchemaDdl(schema));
+        await client.query(createDeadLetterEntriesTableDdl(schema));
+        await client.query(createDeadLetterSagaIndexDdl(schema));
+        await client.query(createDeadLetterPendingIndexDdl(schema));
+        await client.query(createSchemaVersionTableDdl(schema));
+        await client.query(seedSchemaVersionDml(schema));
+        const result = (await client.query(selectSchemaVersionSql(schema))) as PgQueryResult;
+        const actual = result.rows[0]?.["version"] as string | undefined;
+        if (actual !== undefined && actual !== SCHEMA_VERSION) {
+          throw new Error(
+            `TQ-INF-024: Postgres dead_letter_entries schema_version mismatch in "${schema}": expected ${SCHEMA_VERSION} but found ${actual}`
+          );
+        }
+        lastObservedSchemaVersion = actual ?? SCHEMA_VERSION;
+      } finally {
+        await client.query("SELECT pg_advisory_unlock(hashtext($1))", [schema]);
       }
-      lastObservedSchemaVersion = actual ?? SCHEMA_VERSION;
     } finally {
       client.release();
     }

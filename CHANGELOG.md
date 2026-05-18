@@ -6,7 +6,9 @@ is what an external reader can pick up). This file follows the spirit of
 [Keep a Changelog](https://keepachangelog.com/) but is keyed by Phase rather
 than semver.
 
-## [Phase 10] — 2026-05-05 — Engineering and Collaboration Foundation
+## [Phase 10] — 2026-05-13 — Engineering and Collaboration Foundation
+
+> **2026-05-18 校正补丁**（Phase 11 Kickoff v3 §B.1.B 第 4 层防御机制）：本段原标 "Phase 10 — 2026-05-05" 为 Step 7 PHASE_IMPLEMENT 完成日（撰写时锁定）。真实 CLOSED 仪式日期 **2026-05-13**（PR #10 merge `cc74da3` + main CI 4/4 PASS + `phase-10-closed` tag `ab70043` push + release.yml 第一次真实运行 + GitHub Release published；间隔 8 天）。详见 ADR-0004 §B.1.B。
 
 The Phase that turns Tianqi from "code complete + business capabilities" (Phase 1-9) into "production-deployable + collaboratable + observable" engineering infrastructure. 8 implementation Steps + 1 Kickoff = 10 PRs (#1-#10) added zero business code, zero new error codes, zero new packages, and only 6 boundary tests (lifting coverage 84.91% → 85.00%) while delivering the four bricks of engineering infrastructure.
 
@@ -59,7 +61,7 @@ Phase 10 起 feature-branch + PR + merge-commit 工作流（Phase 1-9 直接 mai
 
 ### References
 
-- ADR-0003: `docs/decisions/0003-phase-10-engineering-and-collaboration.md` (Status: Accepted Phase 10 CLOSED 2026-05-05)
+- ADR-0003: `docs/decisions/0003-phase-10-engineering-and-collaboration.md` (Status: Accepted Phase 10 CLOSED 2026-05-13)
 - Phase 10 execution records: `docs/phase10/00-phase-10-kickoff.md` through `09-step-7-closure.md`
 - Closure checklist: `docs/closure-checklist.md`
 - Workflows: `.github/workflows/ci.yml` + `.github/workflows/release.yml`

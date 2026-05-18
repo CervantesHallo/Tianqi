@@ -230,6 +230,80 @@ saga-orchestrator overall-timeout vacuous flake 与 Step 0 主题（Postgres 真
 - 不引入 Testcontainers（Step 1 责任）
 - 不扩 ci.yml jobs 数（4 维持；裁决 1 α）
 
+## Decision (Step 0.5 — KI-P8-002 完整 RESOLVED + Kafka 真实基础设施)
+
+完成日：2026-05-18。惯例 M 第 31 次实战 / 跨 Phase 第 12 次。本 Step **拆两阶段**（K.5 锁定；多设计决策点）；v1 草案 + v2 修订（L.5 image 约定）→ APPROVE → PHASE_IMPLEMENT 7 commits 落地（commit 4 合并 K.9 fix + ci.yml KRaft + testkit cross-instance fix 三层修复）。
+
+### S0.5.1 Kafka services 配置 — α apache/kafka:3.7.2 + KRaft 单 broker
+ci.yml test + coverage 双 job 加 `services.kafka`（与 services.postgres 共存；4 jobs 维持；K.7）。**镜像版本约定调整**：v2 修订 `apache/kafka:3.7` 实测发现镜像不提供 major.minor alias（Docker Hub 仅有 3.7.0/3.7.1/3.7.2 等具体 patch），回退到 `apache/kafka:3.7.2`（3.7 系列最新）；与 Step 0 `postgres:16-alpine` major.minor 模式不同的诚实留痕。env var `TIANQI_TEST_KAFKA_BROKERS=localhost:9092`（K.2 沿用既有约定）。health-cmd `kafka-broker-api-versions.sh` + 显式 nc 双层防御（K.5）。**单 broker 关键 env 补全**：`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1` + `KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1` + `KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1` + `KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0`——默认值 3 让 __consumer_offsets topic 无法创建 → consumer group 无法 join；Phase 8 时未真实激活验证导致此缺陷长期隐藏，Step 0.5 实测揭露。
+
+### S0.5.2 persistent-notification-contract.ts testkit 从零创建（Phase 8 设计疏漏补齐）
+Phase 8 设计 EventStore/SagaStateStore/DeadLetterStore/Config 4 个 persistent contract 时**遗漏 Notification**；Step 0.5 真实激活揭露并补齐。新增 `packages/adapters/adapter-testkit/src/persistent-notification-contract.ts`（13 it 4 类：P1 跨进程持久化 3 + P2 跨实例可见性 5 + P3 并发投递 2 + P4 健康检查 3）。与既有 4 个 persistent contract 模式一致（类别命名 + session 形态 + scratchDirectory 模式）。
+
+### S0.5.3 notification-kafka.persistent.test.ts 从零创建（13 测试）
+挂载 `definePersistentNotificationContractTests`；databasePath → topic 后缀派生模式（与 event-store-postgres 既有模式一致）；factory 每次独立 consumerGroupId（per-instance counter）；afterAll admin.deleteTopics 清理。
+
+### S0.5.4 K.9 业务代码工程缺陷修复（合并到 commit 4）
+notification-kafka.ts init() 在 consumer.subscribe 之前显式 `admin.createTopics({ waitForLeaders: true })`（KafkaJS 官方推荐做法）+ finally admin.disconnect 清理。**根因**：KafkaJS `allowAutoTopicCreation: true` 在 KRaft 模式下 topic auto-create 与 partition leader election 有 race window。仅在 `allowAutoTopicCreation: true` 时执行（向后兼容生产环境）。**接口冻结严守**：publish/save/load/list/healthCheck 等运行时 API 0 变化；仅 init 内部 admin.createTopics 调用增加 + 一个可选 databasePath option 已在 Step 0 引入。
+
+### S0.5.5 testkit cross-instance session 修正 + integration test RUN_ID 隔离
+- testkit P2/P3 cross-instance 测试用 SAME session（同 topic）+ factory counter（不同 group）让 Kafka 路径真实投递（v1 草案用 nextSession 给 reader 不同 topic 永远收不到的逻辑错误）
+- integration test factory 加 KAFKA_RUN_ID + kafkaFactoryCounter 让并发 Kafka 测试不共享 topic/group 名（避免 KafkaJS Consumer Crash）+ allowAutoTopicCreation: true 触发 K.9 fix 路径
+
+### S0.5.6 KI-P8-002 完整 RESOLVED 实测证据
+- pnpm test (with-PG + with-Kafka): **1990 total (1988 PASS + 2 skipped)**
+- 测试增量: +36 (13 新建 + 23 既有激活)
+- 3 Kafka test files 全 PASS: notification-kafka.test.ts (6) + .contract.test.ts (18) + .persistent.test.ts (13) = 37 tests
+- §8.1 Mock 使用边界硬约束 4/4 组件完全兑现
+
+### S0.5.7 不预占 Step 1 / Phase 11+
+- 不修改 docker-compose.yml（Step 1 责任）
+- 不引入 Testcontainers（Step 1 责任）
+- 不扩 ci.yml jobs 数（4 维持；K.7）
+
+## §D 测试 vs 业务代码 vs testkit 边界澄清（Step 0.5 实战延伸）
+
+Step 0.5 PHASE_IMPLEMENT + PR #14 CI fix iteration 实测触发 5 类边界情况完整实战：
+
+### §D.1 业务代码工程缺陷修复（K.9 触发）
+- notification-kafka.ts init() 加 admin.createTopics(waitForLeaders) — 修复 KRaft race
+- 与 Step 0 §D 边界澄清一致：领域+应用+策略层业务逻辑严守 vs **adapter 实现可改**
+- 接口冻结严守：运行时 API 0 变化；仅 init 内部新增 admin 调用 + 一个可选 option
+
+### §D.2 testkit 设计遗漏补齐（L.3 实战）
+- 新建 persistent-notification-contract.ts（Phase 8 设计遗漏补齐）
+- testkit P2/P3 cross-instance session 修正（v1 草案逻辑错误）
+- testkit 是测试基础设施，**不在"修业务代码"禁令范围内**
+
+### §D.3 测试 vs adapter 默认语义不一致（L.1 + L.2 实战）
+- L.1 from_beginning: adapter 默认 `fromBeginning: false` → testkit 转为 **negative 验证**（"reader in new group does NOT receive historical messages"）；不强加 adapter 改为 true
+- L.2 per_case_id: 实测 KafkaJS 默认 **key-hash partitioner** 保证同 key 同 partition 同顺序 → 测试保留并验证
+
+### §D.4 v2 修订 image 约定与 Step 0 不一致的诚实留痕
+- v2 修订意图: `apache/kafka:3.7`（与 `postgres:16-alpine` major.minor 一致）
+- PHASE_IMPLEMENT 实测: Docker Hub apache/kafka 镜像无 major.minor alias
+- 实际锁定: `apache/kafka:3.7.2`（具体 patch；3.7 系列最新）
+- ADR §D 留痕；CI 升级需手动 bump patch
+- 与 Step 0 `postgres:16-alpine` 不同约定的工程纪律差异（不同上游 Docker Hub 策略）
+
+### §D.5 CI 环境时序假设 vs 本机环境（PR #14 CI run #1 揭露）
+
+PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck PASS）。本机 with-PG-Kafka canonical 6/6 PASS，CI 环境时序差异显化的隐藏假设：
+
+- **测试假设"adapter.init() 内 admin.createTopics(waitForLeaders) 返回后 metadata 立即可用"**：本机 KRaft 单 broker setup 时序快，metadata 即时可用；CI 环境（GitHub Actions ubuntu-latest runner + apache/kafka:3.7.2 services container）时序慢，consumer.subscribe 可能在 partition leader 完全可见前触发 → adapter.init() 抛 TQ-INF-010 "This server does not host this topic-partition"
+- **测试假设"vitest afterAll hook 10s 默认 timeout 足够 Kafka admin cleanup"**：本机 admin.connect + deleteTopics + disconnect ~1-2s；CI 环境 5-15s 超过 10s 默认 → afterAll hook timed out
+
+**修复策略（仅测试 fixture + lint；不修业务代码）**：
+- `notification-kafka.test.ts` 加 `ensureTopicReady(topic, 30s)` helper：独立 admin client 预创 topic + 轮询 `admin.fetchTopicMetadata` 直到 partition leader 可见；应用到 line 102 + line 128 两个失败测试的 adapter.init() 之前
+- `notification-kafka.contract.test.ts` + `notification-kafka.persistent.test.ts` afterAll hook 加 `, 60_000` timeout（10s → 60s）
+- `persistent-notification-contract.ts` 删除 unused `afterEach` import（本机 lint cache 让死 import 未检测；CI fresh run 揭露）
+
+**这是 §D.1 业务代码工程缺陷的镜像在测试层**：均"真实基础设施激活揭露隐藏工程缺陷"模式；区别在于 §D.1 修业务代码（K.9 race），§D.5 修测试 fixture（CI 环境时序）。不修业务代码（adapter 接口 / 默认行为 0 变化）；不改测试语义（仍验证相同行为）。
+
+**ADR-0003 §E.1 fallback CI Iteration 诚实记录纪律严守**：追加 fix commits 不 force-push；保留 PR #14 CI run #1 失败历史 + run #2 修复 commits 完整可见。
+
+第 4 层防御机制（§B.1 历史文档层）延伸到**第 5 层防御机制**：**实战发现层** — 即使 PHASE_DESIGN 设计完整 + PHASE_IMPLEMENT 本机实测全 PASS，CI feature 分支第一次跑仍可能揭露 Phase 1-N 多层隐藏缺陷（业务代码 K.9 + 基础设施 KRaft env + testkit 设计 + 镜像约定 + **CI 环境时序** 5 类完整触发）。Step 0 + Step 0.5 共建立"真实激活揭露隐藏缺陷"机制；Phase 11+ 期间持续兑现。**本机实测 ≠ CI 实测；CI 实测是第 5 层防御机制核心证据**。
+
 ## Alternatives Considered
 
 [各 Step 拒绝候选由对应 Step 完成时增量追写；启程指令 7 项核心裁决的拒绝候选详见 `docs/phase11/00-phase-11-kickoff.md`，待 PHASE_IMPLEMENT 阶段沉淀进本段]

@@ -15,6 +15,14 @@ import { createKafkaNotification } from "@tianqi/notification-kafka";
 
 const KAFKA_BROKERS = env["TIANQI_TEST_KAFKA_BROKERS"];
 
+// Phase 11 / Step 0.5：unique RUN_ID 让 integration test 与并发跑的
+// notification-kafka.{test,contract,persistent}.test.ts 不共享 topic/group
+// (避免 KafkaJS Consumer Crash 因 group rebalance 冲突)。
+// 加 factoryCounter 让同 describe 内多个 it 也用独立 topic/group
+// (避免前 it shutdown 与下 it init 的 consumer group 状态干扰)。
+const KAFKA_RUN_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+let kafkaFactoryCounter = 0;
+
 const sampleMessage = (): NotificationMessage => ({
   caseId: createRiskCaseId("case-int-1"),
   traceId: createTraceId("trace-int-1"),
@@ -43,13 +51,20 @@ const cases: readonly AdapterCase[] = [
   },
   {
     name: "kafka",
-    factory: () =>
-      createKafkaNotification({
+    factory: () => {
+      kafkaFactoryCounter += 1;
+      const uniqueId = `${KAFKA_RUN_ID}-i${kafkaFactoryCounter}`;
+      return createKafkaNotification({
         brokers: (KAFKA_BROKERS ?? "localhost:9092").split(","),
-        clientId: "step-18-integration",
-        topic: "tianqi-step18-test",
-        consumerGroupId: "step-18-integration"
-      }),
+        clientId: `step-18-integration-${uniqueId}`,
+        topic: `tianqi-step18-test-${uniqueId}`,
+        consumerGroupId: `step-18-integration-${uniqueId}`,
+        // Phase 11 / Step 0.5：让 adapter K.9 fix 的 admin.createTopics
+        // (waitForLeaders) 路径生效;避免 KafkaJS auto-create 与 leader
+        // election race。
+        allowAutoTopicCreation: true
+      });
+    },
     skip: !KAFKA_BROKERS
   }
 ];

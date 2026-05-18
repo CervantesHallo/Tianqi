@@ -160,6 +160,30 @@ export const createKafkaNotification = (options: KafkaNotificationOptions): Kafk
     try {
       await producer.connect();
       await consumer.connect();
+      // Phase 11 / Step 0.5：KafkaJS `allowAutoTopicCreation: true` 在 KRaft
+      // 模式下不是真正幂等——broker auto-create topic 与 partition leader
+      // election 有 race window；consumer.subscribe 可能在 leader 选举完成
+      // 前触发 NotLeaderOrFollower (broker 返回 "This server does not host
+      // this topic-partition")。Step 0.5 真实激活揭露此缺陷。
+      // 修复：consumer.subscribe 之前显式 admin.createTopics + waitForLeaders
+      // (KafkaJS 官方推荐做法; topic 已存在 idempotent)；仅在 allowAutoTopic-
+      // Creation: true 时执行 (向后兼容：生产环境 admin 可能无权限创建 topic
+      // 时调用方应 allowAutoTopicCreation: false + 预先用 admin 工具创建)。
+      if (allowAutoTopicCreation) {
+        const admin = kafka.admin();
+        try {
+          await admin.connect();
+          await admin.createTopics({
+            topics: [{ topic, numPartitions: 1, replicationFactor: 1 }],
+            waitForLeaders: true,
+            timeout: connectionTimeoutMs
+          });
+        } finally {
+          await admin.disconnect().catch(() => {
+            // Best-effort cleanup; admin lifecycle is independent of producer/consumer.
+          });
+        }
+      }
       await consumer.subscribe({ topic, fromBeginning: false });
       // consumer.run() is fire-and-forget; it returns a promise that resolves when the consumer
       // stops. The eachMessage callback fires asynchronously on every polled message. We filter

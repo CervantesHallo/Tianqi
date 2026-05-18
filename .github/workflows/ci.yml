@@ -1,6 +1,8 @@
 # Tianqi CI — Phase 10 / Step 3 (元规则 Q v3 模板 4 项独立命令并行验证)
 #                Phase 11 / Step 0 (test + coverage 加 postgres:16-alpine services
 #                让 KI-P8-002 Postgres 部分真实激活；裁决 1 α + 3 + 4)
+#                Phase 11 / Step 0.5 (test + coverage 加 apache/kafka:3.7.2 services
+#                让 KI-P8-002 Kafka 部分真实激活；裁决 K.1 α + K.7 4 jobs 维持)
 #
 # Triggered on PR (any branch → any branch) and push to main (per ADR-0003
 # Step 3 裁决 5 B). Each of the four mandatory validations runs as an
@@ -48,13 +50,16 @@ jobs:
       - run: pnpm typecheck
 
   test:
-    name: Test (vitest run + postgres real adapter activation)
+    name: Test (vitest run + postgres + kafka real adapter activation)
     runs-on: ubuntu-latest
     # Phase 11 / Step 0：postgres:16-alpine service container 让 3 个 Postgres
     # adapter (event-store / saga-state-store / dead-letter-store) .persistent +
     # .contract test 第一次在 CI 真实激活 (KI-P8-002 Postgres 部分 RESOLVED).
-    # health 配置让 setup-node 等步骤之后 Postgres 已 ready；额外 ready wait
-    # 步骤是双层防御 (裁决 4 α + β 组合).
+    # Phase 11 / Step 0.5：apache/kafka:3.7.2 KRaft service 让 notification-kafka
+    # adapter .test + .contract + .persistent 真实激活 (KI-P8-002 Kafka 部分
+    # RESOLVED). 注：apache/kafka image 不提供 major.minor alias (v2 修订
+    # apache/kafka:3.7 实测发现 tag 不存在；回退到具体 patch 3.7.2 即 3.7 系列
+    # 最新；详见 ADR-0004 §D Step 0.5 留痕).
     services:
       postgres:
         image: postgres:16-alpine
@@ -69,6 +74,35 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      kafka:
+        image: apache/kafka:3.7.2
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_NODE_ID: 1
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+          # Phase 11 / Step 0.5：单 broker KRaft 配置——默认值
+          # OFFSETS_TOPIC_REPLICATION_FACTOR=3 在 1 broker 环境下让
+          # __consumer_offsets topic 无法创建 → consumer group 无法 join。
+          # 实测发现于本地 docker;CI services 同问题。
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+          CLUSTER_ID: tianqi-test-kraft-cluster
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -84,9 +118,19 @@ jobs:
             echo "Waiting for Postgres..."
             sleep 1
           done
-      - name: Run tests with real Postgres adapter activation
+      - name: Wait for Kafka ready (双层防御 — services health-cmd + 显式 broker probe; KRaft metadata 启动较慢)
+        run: |
+          for i in $(seq 1 60); do
+            if nc -z localhost 9092 2>/dev/null; then
+              echo "Kafka port 9092 reachable after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+      - name: Run tests with real Postgres + Kafka adapter activation
         env:
           TIANQI_TEST_POSTGRES_URL: "postgres://tianqi:tianqi@localhost:5432/tianqi"
+          TIANQI_TEST_KAFKA_BROKERS: "localhost:9092"
         run: pnpm test
 
   coverage:
@@ -95,6 +139,8 @@ jobs:
     # Phase 11 / Step 0：services.postgres 与 test job 同模式 (K.3 决议
     # 维持 85% 不主动升级 thresholds；但激活 Postgres adapter 让 coverage
     # 自然抬升至 ~86.75%/80%/95.91%/86.75%).
+    # Phase 11 / Step 0.5：services.kafka 同 test job (Kafka adapter 激活
+    # 让 coverage 进一步抬升).
     services:
       postgres:
         image: postgres:16-alpine
@@ -109,6 +155,35 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      kafka:
+        image: apache/kafka:3.7.2
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_NODE_ID: 1
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+          # Phase 11 / Step 0.5：单 broker KRaft 配置——默认值
+          # OFFSETS_TOPIC_REPLICATION_FACTOR=3 在 1 broker 环境下让
+          # __consumer_offsets topic 无法创建 → consumer group 无法 join。
+          # 实测发现于本地 docker;CI services 同问题。
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+          CLUSTER_ID: tianqi-test-kraft-cluster
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 10
+          --health-start-period 30s
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -124,7 +199,17 @@ jobs:
             echo "Waiting for Postgres..."
             sleep 1
           done
-      - name: Run coverage with real Postgres adapter activation
+      - name: Wait for Kafka ready
+        run: |
+          for i in $(seq 1 60); do
+            if nc -z localhost 9092 2>/dev/null; then
+              echo "Kafka port 9092 reachable after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+      - name: Run coverage with real Postgres + Kafka adapter activation
         env:
           TIANQI_TEST_POSTGRES_URL: "postgres://tianqi:tianqi@localhost:5432/tianqi"
+          TIANQI_TEST_KAFKA_BROKERS: "localhost:9092"
         run: pnpm test:coverage

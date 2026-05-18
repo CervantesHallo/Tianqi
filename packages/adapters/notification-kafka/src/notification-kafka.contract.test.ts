@@ -49,7 +49,10 @@ afterAll(async () => {
       // Best-effort cleanup.
     });
   }
-});
+  // Phase 11 / Step 0.5 §D.4：vitest afterAll 默认 10s timeout 不足以容纳
+  // CI 环境 Kafka admin connect + deleteTopics + disconnect (本机 ~1-2s;
+  // CI 环境可能 5-15s)。提升至 60s 避免 hook timeout 失败。
+}, 60_000);
 
 describe.skipIf(!canReachKafka)("notification-kafka contract suite", () => {
   defineNotificationContractTests("notification-kafka", factory);

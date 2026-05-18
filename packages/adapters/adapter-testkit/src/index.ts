@@ -25,6 +25,13 @@ export type {
   NotificationAdapterUnderTest,
   NotificationContractOptions
 } from "./notification-contract.js";
+export { definePersistentNotificationContractTests } from "./persistent-notification-contract.js";
+export type {
+  PersistentNotificationAdapterFactory,
+  PersistentNotificationAdapterUnderTest,
+  PersistentNotificationContractOptions,
+  PersistentNotificationTestSession
+} from "./persistent-notification-contract.js";
 export type {
   ConfigAuditCause,
   ConfigAuditEntry,

@@ -88,7 +88,10 @@ afterAll(async () => {
       // Best-effort cleanup.
     });
   }
-});
+  // Phase 11 / Step 0.5 §D.4：persistent.test.ts 累积 ~13+ topics; listTopics
+  // + deleteTopics 在 CI 环境可能慢。提升 hook timeout 至 60s 与 contract.test.ts
+  // 同模式。
+}, 60_000);
 
 describe.skipIf(!canReachKafka)("notification-kafka persistent contract", () => {
   definePersistentNotificationContractTests("notification-kafka", factory, {

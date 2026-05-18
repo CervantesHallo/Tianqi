@@ -263,7 +263,7 @@ notification-kafka.ts init() 在 consumer.subscribe 之前显式 `admin.createTo
 
 ## §D 测试 vs 业务代码 vs testkit 边界澄清（Step 0.5 实战延伸）
 
-Step 0.5 PHASE_IMPLEMENT 实测触发 3 类边界情况完整实战：
+Step 0.5 PHASE_IMPLEMENT + PR #14 CI fix iteration 实测触发 5 类边界情况完整实战：
 
 ### §D.1 业务代码工程缺陷修复（K.9 触发）
 - notification-kafka.ts init() 加 admin.createTopics(waitForLeaders) — 修复 KRaft race
@@ -286,7 +286,23 @@ Step 0.5 PHASE_IMPLEMENT 实测触发 3 类边界情况完整实战：
 - ADR §D 留痕；CI 升级需手动 bump patch
 - 与 Step 0 `postgres:16-alpine` 不同约定的工程纪律差异（不同上游 Docker Hub 策略）
 
-第 4 层防御机制（§B.1 历史文档层）延伸到**第 5 层防御机制**：**实战发现层** — 即使 PHASE_DESIGN 设计完整，PHASE_IMPLEMENT 实地实施仍可能揭露 Phase 1-N 多层隐藏缺陷（业务代码 K.9 + 基础设施 KRaft env + testkit 设计 + 镜像约定 4 类同时触发）。Step 0 + Step 0.5 共建立"真实激活揭露隐藏缺陷"机制；Phase 11+ 期间持续兑现。
+### §D.5 CI 环境时序假设 vs 本机环境（PR #14 CI run #1 揭露）
+
+PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck PASS）。本机 with-PG-Kafka canonical 6/6 PASS，CI 环境时序差异显化的隐藏假设：
+
+- **测试假设"adapter.init() 内 admin.createTopics(waitForLeaders) 返回后 metadata 立即可用"**：本机 KRaft 单 broker setup 时序快，metadata 即时可用；CI 环境（GitHub Actions ubuntu-latest runner + apache/kafka:3.7.2 services container）时序慢，consumer.subscribe 可能在 partition leader 完全可见前触发 → adapter.init() 抛 TQ-INF-010 "This server does not host this topic-partition"
+- **测试假设"vitest afterAll hook 10s 默认 timeout 足够 Kafka admin cleanup"**：本机 admin.connect + deleteTopics + disconnect ~1-2s；CI 环境 5-15s 超过 10s 默认 → afterAll hook timed out
+
+**修复策略（仅测试 fixture + lint；不修业务代码）**：
+- `notification-kafka.test.ts` 加 `ensureTopicReady(topic, 30s)` helper：独立 admin client 预创 topic + 轮询 `admin.fetchTopicMetadata` 直到 partition leader 可见；应用到 line 102 + line 128 两个失败测试的 adapter.init() 之前
+- `notification-kafka.contract.test.ts` + `notification-kafka.persistent.test.ts` afterAll hook 加 `, 60_000` timeout（10s → 60s）
+- `persistent-notification-contract.ts` 删除 unused `afterEach` import（本机 lint cache 让死 import 未检测；CI fresh run 揭露）
+
+**这是 §D.1 业务代码工程缺陷的镜像在测试层**：均"真实基础设施激活揭露隐藏工程缺陷"模式；区别在于 §D.1 修业务代码（K.9 race），§D.5 修测试 fixture（CI 环境时序）。不修业务代码（adapter 接口 / 默认行为 0 变化）；不改测试语义（仍验证相同行为）。
+
+**ADR-0003 §E.1 fallback CI Iteration 诚实记录纪律严守**：追加 fix commits 不 force-push；保留 PR #14 CI run #1 失败历史 + run #2 修复 commits 完整可见。
+
+第 4 层防御机制（§B.1 历史文档层）延伸到**第 5 层防御机制**：**实战发现层** — 即使 PHASE_DESIGN 设计完整 + PHASE_IMPLEMENT 本机实测全 PASS，CI feature 分支第一次跑仍可能揭露 Phase 1-N 多层隐藏缺陷（业务代码 K.9 + 基础设施 KRaft env + testkit 设计 + 镜像约定 + **CI 环境时序** 5 类完整触发）。Step 0 + Step 0.5 共建立"真实激活揭露隐藏缺陷"机制；Phase 11+ 期间持续兑现。**本机实测 ≠ CI 实测；CI 实测是第 5 层防御机制核心证据**。
 
 ## Alternatives Considered
 

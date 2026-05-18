@@ -2,7 +2,9 @@
 
 ## Status
 
-**Accepted (Phase 10 CLOSED, 2026-05-05)**. Phase 10 工程化与协作基础完整闭环；4/4 块砖落地（CI ✅ + 容器化 ✅ + 发布自动化 ✅ + 文档 ✅）；双层缺陷链双层修复完成（KI-P10-001 + KI-P10-002）；ADR Status: In Progress → Accepted via Phase 10 / Step 7 收官。沿用 ADR-0001 / ADR-0002 closed 模式。
+**Accepted (Phase 10 CLOSED, 2026-05-13)**. Phase 10 工程化与协作基础完整闭环；4/4 块砖落地（CI ✅ + 容器化 ✅ + 发布自动化 ✅ + 文档 ✅）；双层缺陷链双层修复完成（KI-P10-001 + KI-P10-002）；ADR Status: In Progress → Accepted via Phase 10 / Step 7 收官。沿用 ADR-0001 / ADR-0002 closed 模式。
+
+> **2026-05-18 校正补丁**（Phase 11 Kickoff v3 §B.1.B 第 4 层防御机制）：本 Status 段原标 "Phase 10 CLOSED, 2026-05-05" 为 Step 7 PHASE_IMPLEMENT 完成日（撰写时锁定，假设关闭仪式同期）。真实 CLOSED 仪式日期 **2026-05-13**（PR #10 merge `cc74da3` + main CI 4/4 PASS + `phase-10-closed` tag `ab70043` push + release.yml 第一次真实运行 + GitHub Release published；间隔 8 天）。本回填仅校正"已发生但日期标签错位"的事实陈述；不改动决策内容。详见 ADR-0004 §B.1.B。
 
 > **本 ADR 是增量追写**（惯例 M 沿用 Phase 9 模式）。Phase 10 启程指令拆两阶段流程：
 >
@@ -667,13 +669,13 @@ K.1 + K.2 是元规则 P + "克制 > 堆砌"原则的两次延伸应用：
 
 **Phase 10 CLOSED 工程仪式声明**：
 
-读者打开 README 看到 Phase Status 表 Phase 10 → Closed + phase-10-closed tag；打开 CHANGELOG 看到 Phase 10 工程基础设施 4/4 块砖完整摘要；打开 ADR-0003 看到 Status: **Accepted (Phase 10 CLOSED, 2026-05-05)**；看到 phase-10-closed git tag + GitHub Release published（用户审视后 click Publish）；docs/00-phase1-mapping.md Phase 10 全部 Step 完成段——清晰、可控、可信的工程旅程从"工程基础设施建立"到"工程基础设施验证"完整闭环。
+读者打开 README 看到 Phase Status 表 Phase 10 → Closed + phase-10-closed tag；打开 CHANGELOG 看到 Phase 10 工程基础设施 4/4 块砖完整摘要；打开 ADR-0003 看到 Status: **Accepted (Phase 10 CLOSED, 2026-05-13)**；看到 phase-10-closed git tag + GitHub Release published（用户审视后 click Publish）；docs/00-phase1-mapping.md Phase 10 全部 Step 完成段——清晰、可控、可信的工程旅程从"工程基础设施建立"到"工程基础设施验证"完整闭环。
 
 **Step 7 工程意义**：Phase 10 工程旅程的工程仪式时刻。元规则 B 在工作流层面再次兑现——release.yml 接口冻结后 Phase 11+ 在此基础上演进；不修改 release.yml 即可让 phase-11-closed / phase-12-closed / 等持续工作。Tianqi 工程旅程从"代码完整 + 业务能力齐全"升级到"+ 协作生态 + CI 真绿色 + 容器可部署 + 发布自动化 + 可执行文档"七重工程成熟度——为 Phase 11 真实基础设施测试主题提供完整工程基础设施 baseline。
 
 ---
 
-**Phase 10 / Step 7 收官完成 — 2026-05-05 ✅ Phase 10 CLOSED ✅**
+**Phase 10 / Step 7 PHASE_IMPLEMENT 完成 — 2026-05-05 ✅** | **Phase 10 CLOSED 仪式完成 — 2026-05-13 ✅**
 
 ## Consequences
 

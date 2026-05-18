@@ -48,24 +48,34 @@
 - **修复责任 Step**：未确定（待 Phase 13+ 相关 Phase 起步指令承接）
 - **备注**：domain 层是 Phase 1-7 冻结代码；Phase 8 + Phase 9 全程仅添加 Adapter / Engine Port / Saga 业务，未触碰 domain 测试；Phase 10 主题工程化非业务覆盖率改善（§1.2 直译边界）。诚实评估：Phase 9 没有 deliver KI-P8-001 修复；Phase 10 不在主题边界内；不为"关闭 KI"而牵强声明改善。
 
-### KI-P8-002：external Adapter 包覆盖率受真实基础设施依赖限制
+### KI-P8-002：external Adapter 包覆盖率受真实基础设施依赖限制 — ✅ RESOLVED
 
-**Status (2026-05-18)**: **Partially RESOLVED** — Postgres 部分 RESOLVED (Phase 11 / Step 0)；Kafka 部分 pending (Phase 11 / Step 0.5)。
+**Status**: ✅ **RESOLVED** (Phase 11 / Step 0 + Step 0.5; 2026-05-18)
 
 **Postgres 部分 RESOLVED 详情**（Phase 11 / Step 0; 2026-05-18）：
-- 3 Postgres adapter × 3 类测试 = **88 PASS / 9 files green** 在 postgres:16-alpine 实测（本机 docker + ci.yml services）
-- `pnpm test` with `TIANQI_TEST_POSTGRES_URL`: 1873 → 1952 PASS（**79 测试激活**；超 prompt 锚定 76 因 .test.ts unit skipIf 多 3）
-- `pnpm test:coverage` with PG: baseline 85/79.64/91.68/85 → **86.75/80.04/95.91/86.75**（K.3 决议维持 85% thresholds 不主动升级）
-- 3 个 adapter bootstrap 加 `pg_advisory_lock(hashtext($schema))` 串行 DDL（修复 PG `IF NOT EXISTS` 并发不真正幂等的 P2 cross-instance race）
-- 3 个 `.contract.test.ts` factory 改为每次独立 schema + afterAll cleanup（修复 testkit `beforeEach` 共享 BASE_SCHEMA 数据污染）
-- event-store-postgres options 加 optional `databasePath` + healthCheck echo（满足 persistent contract testkit P4 断言）
-- ci.yml test + coverage 双 job 加 `services.postgres` (postgres:16-alpine + health-cmd pg_isready + 显式 ready wait + env var TIANQI_TEST_POSTGRES_URL)
-- 详见 `docs/decisions/0004-...md` Decision (Step 0) + `docs/phase11/01-step-0-postgres-real-infrastructure.md`
+- 3 Postgres adapter × 3 类测试 = **88 PASS / 9 files green** 在 postgres:16-alpine 实测
+- `pnpm test` with `TIANQI_TEST_POSTGRES_URL`: 1873 → 1952 PASS（**79 测试激活**）
+- 3 个 adapter bootstrap 加 `pg_advisory_lock(hashtext($schema))` 串行 DDL
+- 3 个 `.contract.test.ts` factory 改为每次独立 schema + afterAll cleanup
+- event-store-postgres options 加 optional `databasePath` + healthCheck echo
+- ci.yml test + coverage 双 job 加 `services.postgres` (postgres:16-alpine)
+- 详见 `docs/decisions/0004-...md` Decision (Step 0) + `docs/phase11/01-...md`
 
-**Kafka 部分 pending**（Phase 11 / Step 0.5 责任）：
-- `packages/adapters/notification-kafka/` 当前仅有 contract.test.ts (18 skipped)；缺失 `.persistent.test.ts`
-- Step 0.5 工作面：新建 .persistent.test.ts + ci.yml 加 Kafka services + 环境变量约定（譬如 TIANQI_TEST_KAFKA_BROKERS）
-- 完成后 KI-P8-002 完全 RESOLVED
+**Kafka 部分 RESOLVED 详情**（Phase 11 / Step 0.5; 2026-05-18）：
+- 1 Kafka adapter × 3 类测试 = **37 tests PASS** 在 apache/kafka:3.7.2 KRaft 实测
+- `pnpm test` with `TIANQI_TEST_KAFKA_BROKERS`: 1952 → 1988 PASS（**+36 测试**：13 新建 + 23 既有激活）
+- 新建 `persistent-notification-contract.ts` testkit（Phase 8 设计遗漏补齐；13 it P1-P4）
+- 新建 `notification-kafka.persistent.test.ts` 挂载 persistent contract
+- notification-kafka.ts init() 加 `admin.createTopics({ waitForLeaders: true })`（K.9 业务代码工程缺陷修复）
+- ci.yml test + coverage 双 job 加 `services.kafka` (apache/kafka:3.7.2 KRaft + 单 broker 关键 env)
+- integration test factory 加 RUN_ID + counter 隔离（避免与并发 Kafka 测试 group 冲突）
+- 详见 `docs/decisions/0004-...md` Decision (Step 0.5) + §D + `docs/phase11/02-...md`
+
+**完整 RESOLVED 工程证据**:
+- pnpm test with-PG+with-Kafka: **1990 total (1988 PASS + 2 skipped)**
+- pnpm test:coverage with-PG+with-Kafka: ~87+% (Step 0.5 Kafka 激活进一步抬升;Step 0 86.75% baseline)
+- §8.1 Mock 使用边界硬约束完全兑现 (4 类组件 4/4 真实激活;Postgres event-store/saga-state-store/dead-letter-store + Kafka notification)
+- CI services 配置完整 (postgres + kafka 双 services;Tianqi 工程旅程第一次双 services CI)
 
 
 

@@ -61,6 +61,11 @@
 - **修复责任 Step**：未确定（Phase 11 整体规划）
 - **状态保持 open**（Phase 9 全程未触及；Step 16 端到端集成测试 A 仅 memory adapter 同精神）
 - **备注**：本 Phase 8/9 阶段允许的状态。在 CI 中提供 `TIANQI_TEST_POSTGRES_URL` / `TIANQI_TEST_KAFKA_BROKERS` 环境变量后，这 4 个 Adapter（event-store-postgres / saga-state-store-postgres / dead-letter-store-postgres / notification-kafka）的覆盖率立刻提升至 90%+。
+- **Phase 11 修复责任承接（2026-05-18）**：Phase 11 Kickoff（ADR-0004）明示 KI-P8-002 修复责任在 Phase 11；具体 Step：
+  - **Step 0**：Phase 8 既有 Postgres / Kafka adapter 真实激活 + notification-kafka 新建 `.persistent.test.ts`（Phase 8 仅有 contract test；缺失 persistent test 是 Step 0 工作面扩张点；可能拆 Step 0 + Step 0.5）
+  - **Step 1**：CI services / Testcontainers / docker-compose 升级（基础设施战略；拆两阶段）
+  - **Step 2-6**：端到端 4 路径（顺利 / 补偿 / 死信 / 恢复）在真实基础设施上验证；Liquidation + ADL 全流程
+  - 详见 `docs/decisions/0004-phase-11-end-to-end-integration-verification.md` §Decision K.1 / K.4
 
 ### KI-P8-003：契约测试套件 + 集成测试在高并发下偶发 flake
 
@@ -75,6 +80,7 @@
 - **修复责任 Phase**：Phase 11（与 KI-P8-002 同期，因为真实 Kafka 接入会同步重写时序断言）
 - **修复责任 Step**：未确定
 - **备注**：本 flake 在 Phase 8 Step 18 之前已存在（基线 Step 17 也偶发），不是 Step 18 集成测试引入。Phase 9 全程通过 fast/slow ≥ 1:10 比例防御（Step 8 单 step 超时 + Step 16 端到端集成测试 it 3.1）。Phase 11 当 application 层使用 fake-timers 接入这些 Adapter 时可一并加固。
+- **Phase 10 / Step 7 main CI 第七次运行实战兑现（2026-05-13）**：`saga-orchestrator.test.ts` overall-timeout vacuous 分支（`test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out`）偶发 flake（expected `'timed_out'`、received `'compensated'`；测试运行 14ms 时序紧边界；defaultSagaTimeoutMs 5ms vs step-slow 50ms 比例触发 race）；Re-run PASS。**Phase 9 / Step 17 "Phase 9 实战 0 显式 flake" 评估在 Phase 10 已被修正**——比 Phase 11 预判早一个相位显化。**Phase 11 评估修复路径**：与 KI-P8-002 同期 Step（Step 0/1 实地评估），优先级由 Phase 9/Step 17 的"Phase 11 预防性修复"升级为"Phase 11 必修复"。详见 `docs/decisions/0004-phase-11-end-to-end-integration-verification.md` §Decision K.6 风险段。
 
 ### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）— ✅ 已修复（Step 19）
 
@@ -124,6 +130,11 @@
 - **修复责任 Phase**：Phase 10+（持续监控）；具体修复路径由 Phase 10 引入第 5 个业务 Saga 或修改 domain transitionRules 时触发评估
 - **修复责任 Step**：未确定
 - **备注**：这不是 Phase 9 的 bug——是裁决 4 A 的明示成本（详见 ADR-0002 Step 13 段）。本 KI 仅为持续监控目的登记；ADR-0002 已留痕"未来 domain 变化由 ADR 修订流程同步"。Phase 9 实测：domain transitionRules 与 Saga 副本完全一致（基于 grep 实测）。
+- **Phase 11 端到端 4 路径触发评估（2026-05-18）**：Phase 11 Kickoff（ADR-0004）明示 StateTransition Saga 数据副本漂移监控在 Phase 11 端到端补偿 / 死信 / 恢复路径可能被压测触发：
+  - Step 4 端到端补偿路径可能触发非法状态转换路径（compensated 后回 created 等）
+  - Step 5 端到端死信路径可能触发 manual_intervention 状态机外路径
+  - Step 6 端到端恢复路径从持久化状态恢复时校验 transitionRules 数据副本
+  - Phase 11 / Step 4-6 实地评估处置；不在 Kickoff 阶段裁决具体方案
 
 ---
 

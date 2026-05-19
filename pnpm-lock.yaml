@@ -398,6 +398,9 @@ importers:
       '@tianqi/dead-letter-store-memory':
         specifier: workspace:*
         version: link:../adapters/dead-letter-store-memory
+      '@tianqi/dead-letter-store-postgres':
+        specifier: workspace:*
+        version: link:../adapters/dead-letter-store-postgres
       '@tianqi/event-store-memory':
         specifier: workspace:*
         version: link:../adapters/event-store-memory
@@ -434,6 +437,18 @@ importers:
       '@tianqi/saga-state-store-memory':
         specifier: workspace:*
         version: link:../adapters/saga-state-store-memory
+      '@tianqi/saga-state-store-postgres':
+        specifier: workspace:*
+        version: link:../adapters/saga-state-store-postgres
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
 
   packages/contracts:
     dependencies:

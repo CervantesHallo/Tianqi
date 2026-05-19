@@ -1,21 +1,25 @@
 # Tianqi docker-compose — Phase 10 / Step 4 (per ADR-0003 Step 4 裁决 6 α)
+#                         Phase 11 / Step 1 (per ADR-0004 Step 1 K.2 β upgrade)
 #
-# Single-service orchestration scoped to the Tianqi container itself.
-# Reasoning: Tianqi's runtime infrastructure dependencies (postgres for
-# event-store-postgres / saga-state-store-postgres / dead-letter-store-
-# postgres / kafka for notification-kafka) are KI-P8-002 territory — real
-# infrastructure binding is Phase 11 responsibility, not Step 4 scope.
-# Adding postgres/kafka services here would either (a) duplicate KI-P8-002
-# scope or (b) ship a half-baked dev environment. Keep this file minimal
-# and let Phase 11 extend with real-infra services.
+# β 升级 (Phase 11 / Step 1)：从 Step 4 单 tianqi 服务扩展到 tianqi +
+# postgres + kafka 三服务编排。让本地 dev cycle 与 ci.yml services 配置
+# 1:1 对应；为端到端测试 fixture 框架 (createE2eHarness) 提供本地真实
+# 基础设施。
 #
-# Value provided: a one-liner wrapper for "build + run inside the project
-# container" that contributors can use without learning docker run flags.
-# Examples:
-#   docker compose build           # build the runtime image
-#   docker compose up -d           # start container in background
+# 与 K.1 α 不引入 Testcontainers 决策配合 — 本地 dev 路径:
+#   docker compose up -d postgres kafka  # 启动测试基础设施
+#   export TIANQI_TEST_POSTGRES_URL="postgres://tianqi:tianqi@localhost:5432/tianqi"
+#   export TIANQI_TEST_KAFKA_BROKERS="localhost:9092"
+#   pnpm test                              # 在 host 上跑测试
+#   docker compose down                    # 清理
+#
+# 或全栈 (含 tianqi 容器内运行):
+#   docker compose up -d
 #   docker compose run --rm tianqi pnpm test
-#   docker compose run --rm tianqi pnpm build
+#
+# postgres + kafka 配置与 ci.yml services 1:1 对应 (Step 0 + 0.5 实战
+# 验证)；KRaft 单 broker 关键 env 全部保留 (KAFKA_OFFSETS_TOPIC_
+# REPLICATION_FACTOR=1 等)。
 
 services:
   tianqi:
@@ -24,6 +28,62 @@ services:
       target: runtime
     image: tianqi:dev
     container_name: tianqi-dev
-    # Use the Dockerfile's HEALTHCHECK as-is (per Step 4 裁决 5 B).
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      # 容器内连接 tianqi/kafka 用 service name (compose 内部 DNS);
+      # host 内连接用 localhost (端口 publish)。
+      TIANQI_TEST_POSTGRES_URL: "postgres://tianqi:tianqi@postgres:5432/tianqi"
+      TIANQI_TEST_KAFKA_BROKERS: "kafka:9092"
+    # Dockerfile HEALTHCHECK is preserved as-is (per Step 4 裁决 5 B).
     # Default CMD keeps the container alive; override for one-off tasks via
     # `docker compose run --rm tianqi <cmd>`.
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: tianqi-postgres
+    environment:
+      POSTGRES_USER: tianqi
+      POSTGRES_PASSWORD: tianqi
+      POSTGRES_DB: tianqi
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tianqi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    # apache/kafka image 不提供 major.minor alias (ADR-0004 §D.4 留痕);
+    # 与 ci.yml services 1:1 同步具体 patch 3.7.2.
+    image: apache/kafka:3.7.2
+    container_name: tianqi-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # 单 broker KRaft 关键 env (Step 0.5 §D.5 实战;default 3 让
+      # __consumer_offsets 无法创建 → consumer group 无法 join).
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      CLUSTER_ID: tianqi-test-kraft-cluster
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s

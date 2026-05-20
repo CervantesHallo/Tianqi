@@ -42,6 +42,8 @@ import type { PostgresDeadLetterStore } from "@tianqi/dead-letter-store-postgres
 import { createKafkaNotification } from "@tianqi/notification-kafka";
 import type { KafkaNotification } from "@tianqi/notification-kafka";
 
+import { warmupKafkaTopics } from "@tianqi/adapter-testkit";
+
 import { createMarginEngineHttp } from "@tianqi/margin-engine-http";
 import { createPositionEngineHttp } from "@tianqi/position-engine-http";
 import { createMatchEngineHttp } from "@tianqi/match-engine-http";
@@ -221,6 +223,14 @@ export const createE2eHarness = async (
     sagaStateStore.init(),
     deadLetterStore.init()
   ]);
+  // Step 2 fix iteration #2 (ADR-0004 §D.7 修复通用化):
+  // 在 notification adapter init() 之前显式 warmup Kafka topic — 等
+  // metadata 完全传播到 broker，避免 consumer.subscribe 触发 TQ-INF-010
+  // "This server does not host this topic-partition" race。
+  // 沉淀: Step 0.5 §D.5 ensureTopicReady 在 notification-kafka 自身测试
+  // 修复;Step 2 createE2eHarness 路径再次兑现 → 抽 testkit helper
+  // warmupKafkaTopics 通用化。
+  await warmupKafkaTopics(options.kafkaBrokers, [kafkaTopic]);
   // Kafka init 与 Postgres 并发可能与 admin.createTopics 内部 race；
   // 序列化 Kafka init 在 Postgres 之后（与 Step 0.5 实战一致）。
   await notification.init();

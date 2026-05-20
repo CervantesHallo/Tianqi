@@ -42,13 +42,27 @@ import type { PostgresDeadLetterStore } from "@tianqi/dead-letter-store-postgres
 import { createKafkaNotification } from "@tianqi/notification-kafka";
 import type { KafkaNotification } from "@tianqi/notification-kafka";
 
+import { createMarginEngineHttp } from "@tianqi/margin-engine-http";
+import { createPositionEngineHttp } from "@tianqi/position-engine-http";
+import { createMatchEngineHttp } from "@tianqi/match-engine-http";
+import { createMarkPriceEngineHttp } from "@tianqi/mark-price-engine-http";
+import { createFundEngineHttp } from "@tianqi/fund-engine-http";
+
 import { ok } from "@tianqi/shared";
 import type { Result } from "@tianqi/shared";
 import type {
+  AdapterFoundation,
   AuditEventRecord,
   AuditEventSinkError,
-  AuditEventSinkPort
+  AuditEventSinkPort,
+  FundEnginePort,
+  MarginEnginePort,
+  MarkPriceEnginePort,
+  MatchEnginePort,
+  PositionEnginePort
 } from "@tianqi/ports";
+
+import type { FakeEnginesServer } from "./fake-engines.js";
 
 const { Client: PgClient } = pg;
 
@@ -69,10 +83,16 @@ export type E2eHarnessOptions = Readonly<{
   postgresUrl: string;
   kafkaBrokers: readonly string[];
   /**
-   * Reserved for Step 2-6：fake external engine HTTP server config.
-   * Phase 11 / Step 1 接口预留，不实施（K.6 0 新 Adapter 严守）。
+   * Phase 11 / Step 2 实施：传入 createFakeEnginesServer() 创建的实例,
+   * harness 会创建 5 个 Engine HTTP adapter (margin/position/match/
+   * mark-price/fund) 全部 baseUrl 指向此 server。
+   *
+   * Step 1 接口预留 → Step 2 实地实施 (Step 1 §G 报告承接)。
+   *
+   * 留空 = 不创建 Engine HTTP adapter (Step 0/0.5/Step 1 self-check
+   * 模式向后兼容)。
    */
-  fakeEngineHttp?: { port: number };
+  fakeEngineHttp?: FakeEnginesServer;
   /**
    * Reserved for Step 4-6 + Step 7：clock control mode.
    * "real" = 默认（真实时间；与 Step 0 + 0.5 一致）
@@ -102,6 +122,20 @@ export type E2eHarness = Readonly<{
   sagaStateStore: PostgresSagaStateStore;
   deadLetterStore: PostgresDeadLetterStore;
   notification: KafkaNotification;
+  /**
+   * 5 Engine HTTP adapter (margin/position/match/mark-price/fund).
+   * 仅当 options.fakeEngineHttp 传入时创建;否则为 undefined.
+   *
+   * Step 2 实施 (Liquidation 顺利路径) 起首次提供;Step 3-6 + Step 7 继续
+   * 使用. 真实 HTTP wire path + Node.js http server 配合 (§8.1 假引擎可接受).
+   */
+  engines?: Readonly<{
+    margin: MarginEnginePort & AdapterFoundation;
+    position: PositionEnginePort & AdapterFoundation;
+    match: MatchEnginePort & AdapterFoundation;
+    markPrice: MarkPriceEnginePort & AdapterFoundation;
+    fund: FundEnginePort & AdapterFoundation;
+  }>;
   /**
    * In-memory 审计 sink：与 saga-end-to-end.integration.test.ts 模式一致
    * （Phase 9 / Step 16 createInMemoryAuditSink）。Step 2-6 测试可读
@@ -191,13 +225,52 @@ export const createE2eHarness = async (
   // 序列化 Kafka init 在 Postgres 之后（与 Step 0.5 实战一致）。
   await notification.init();
 
+  // Step 2 fakeEngineHttp 实施：创建 5 Engine HTTP adapter,全部 baseUrl
+  // 指向 fake server (单 server 多路径分发)。每个 adapter 独立 init。
+  let engines: E2eHarness["engines"];
+  if (options.fakeEngineHttp !== undefined) {
+    const baseUrl = options.fakeEngineHttp.url;
+    const margin = createMarginEngineHttp({ baseUrl });
+    const position = createPositionEngineHttp({ baseUrl });
+    const match = createMatchEngineHttp({ baseUrl });
+    const markPrice = createMarkPriceEngineHttp({ baseUrl });
+    const fund = createFundEngineHttp({ baseUrl });
+    await Promise.all([
+      margin.init(),
+      position.init(),
+      match.init(),
+      markPrice.init(),
+      fund.init()
+    ]);
+    engines = { margin, position, match, markPrice, fund };
+  }
+
   const auditSink = createInMemoryAuditSink();
 
   const cleanup = async (): Promise<void> => {
-    // shutdown 顺序：notification 先（subscribers 解绑）→ stores 后。
+    // shutdown 顺序：notification 先（subscribers 解绑）→ engines 后 → stores 后。
     await notification.shutdown().catch(() => {
       // Best-effort cleanup.
     });
+    if (engines !== undefined) {
+      await Promise.all([
+        engines.margin.shutdown().catch(() => {
+          // Best-effort cleanup.
+        }),
+        engines.position.shutdown().catch(() => {
+          // Best-effort cleanup.
+        }),
+        engines.match.shutdown().catch(() => {
+          // Best-effort cleanup.
+        }),
+        engines.markPrice.shutdown().catch(() => {
+          // Best-effort cleanup.
+        }),
+        engines.fund.shutdown().catch(() => {
+          // Best-effort cleanup.
+        })
+      ]);
+    }
     await Promise.all([
       eventStore.shutdown().catch(() => {
         // Best-effort cleanup.
@@ -249,6 +322,7 @@ export const createE2eHarness = async (
     sagaStateStore,
     deadLetterStore,
     notification,
+    ...(engines !== undefined ? { engines } : {}),
     auditSink,
     cleanup
   };

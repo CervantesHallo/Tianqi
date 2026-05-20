@@ -119,3 +119,5 @@ export type {
   PersistentDeadLetterStoreContractOptions,
   PersistentDeadLetterStoreTestSession
 } from "./persistent-dead-letter-store-contract.js";
+export { warmupKafkaTopics } from "./kafka-topic-warmup.js";
+export type { KafkaTopicWarmupOptions } from "./kafka-topic-warmup.js";

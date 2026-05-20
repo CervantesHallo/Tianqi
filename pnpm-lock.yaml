@@ -50,6 +50,9 @@ importers:
       '@tianqi/shared':
         specifier: workspace:*
         version: link:../../shared
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
 
   packages/adapters/config-file:
     dependencies:

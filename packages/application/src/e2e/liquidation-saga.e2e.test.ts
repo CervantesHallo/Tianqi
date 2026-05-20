@@ -36,6 +36,7 @@ import {
   createMatchAccountId,
   createPositionAccountId
 } from "@tianqi/ports";
+import type { PersistedSagaState } from "@tianqi/ports";
 
 import { createLiquidationSaga, type LiquidationInput } from "../saga/liquidation-saga.js";
 
@@ -248,7 +249,9 @@ describe.skipIf(!canRunE2e)("Liquidation Saga e2e — Phase 11 / Step 2 happy pa
       expect(incompleteResult.ok).toBe(true);
       if (incompleteResult.ok && result.ok) {
         const targetSagaId = result.value.sagaId;
-        const stillIncomplete = incompleteResult.value.some((s) => s.sagaId === targetSagaId);
+        const stillIncomplete = incompleteResult.value.some(
+          (s: PersistedSagaState) => s.sagaId === targetSagaId
+        );
         expect(stillIncomplete).toBe(false);
       }
     },

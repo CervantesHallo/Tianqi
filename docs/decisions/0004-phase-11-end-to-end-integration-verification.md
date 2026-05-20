@@ -334,6 +334,45 @@ PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck 
 
 **与 §D.5 关系**：§D.5（CI 环境时序）是运行时层；§D.6（build cache）是编译时层。两类边界澄清都属"本机 != CI"模式；都通过追加 fix commits 修复（不 force-push；ADR-0003 §E.1 严守）；都让"真绿色"概念更精确。
 
+### §D.7 修复通用化原则（PR #16 CI run #2 揭露；首次正式沉淀）
+
+**元层级边界澄清** — §D.1-D.6 关注"修什么"；§D.7 关注"**怎么修**"（修复策略的工程纪律）。
+
+PR #16 CI run #2 失败实证：
+- 测试：`liquidation-saga.e2e.test.ts > test_happy_path_audit_events_emitted_*`
+- 错误：`TQ-INF-010: This server does not host this topic-partition`（同 Step 0.5 §D.5 根因）
+- 路径：`createE2eHarness → test-harness.ts:226 → notification-kafka.ts:229 init()`
+
+**Step 0.5 §D.5 修复回顾**：
+- 修复范围：`notification-kafka.test.ts:37` 内联 `ensureTopicReady` 函数 + 2 个失败测试加 helper 调用 + contract/persistent test afterAll 60s timeout
+- 修复对象：notification-kafka 自身测试（2 tests + 1 hook）
+- 修复盲点：**该修复未通用化** — 任何其他使用同一 notification-kafka adapter 的测试场景都需要相同保护，但 ensureTopicReady 是 local function 而非 testkit helper
+
+**Step 2 PR #16 CI run #2 兑现**：
+- Step 2 创建 `createE2eHarness` 引用同一 notification-kafka adapter（fakeEngineHttp 路径）
+- 未应用 ensureTopicReady 同等保护 → 同根因 TQ-INF-010 在 e2e 路径再次触发
+
+**修复策略（不修业务代码；testkit 通用化）**：
+- 抽 `warmupKafkaTopics` 到 `packages/adapters/adapter-testkit/src/kafka-topic-warmup.ts`（commit 1）
+- `createE2eHarness` 应用 testkit helper（commit 2）
+- `notification-kafka.test.ts:37 ensureTopicReady` 维持现状（Step 11 收官评估统一迁移；现在迁移会破坏 Step 0.5 既有测试 + 增加 fix iteration 工作面）
+
+**修复通用化原则（工程纪律新沉淀）**：
+
+> 单点修复发现时，AI 在追加 fix commits 之前必须评估"该修复是否会在其他场景再次需要"。
+> 如果会 → **沉淀到通用 helper / testkit** 比单点修复更工程纪律。
+> 如果不会 → 单点修复 + 在 ADR §D 留痕"为何不通用化"。
+
+**与 §D.1-§D.6 区别**：
+- §D.1-§D.6：what to fix（业务代码 / testkit 设计 / 测试默认语义 / 镜像约定 / CI 时序 / build cache）
+- §D.7：**how to fix**（评估通用化必要性）
+
+**Phase 11+ contributor 协作纪律延伸（推迟 Step 11 收官评估实施）**：
+- closure-checklist 追加项："fix iteration 阶段评估修复通用化（同根因可能在其他场景兑现？）"
+- PR template 追加项："fix introducing new shared logic → 沉淀到 testkit / helper 而非内联"
+
+**与 §D.5/D.6 cache layer leakage 不同**：§D.5/D.6 都是"未在干净环境验证"的工程问题；§D.7 是"修复 scope 不够通用"的工程纪律问题（更上层）。
+
 ## Decision (Step 1 — 端到端测试基础框架)
 
 完成日：2026-05-19。惯例 M 第 32 次实战 / 跨 Phase 第 13 次。本 Step **拆两阶段**（第 9 次拆分实战）；多核心决策影响 Phase 11+ 持续。PR #15。

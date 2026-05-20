@@ -115,6 +115,29 @@
   - 候选 β：独立 Step 0.6 修复（"修复 + 防御"模式延伸；TBD）
   - 候选 γ：Phase 11 / Step 11 收官同期修复
   具体修复路径由 Phase 11 / Step 4 起草指令评估锁定（**§B.1.A 事实锚定纪律严守**——第二次兑现是状态升级信号；Phase 11 / Step 4 起草指令必须含 KI-P8-003 修复路径锁定段）。
+- **Phase 11 / Step 2 PR #16 CI run #3 第三次实战兑现（2026-05-20）**：同测试同行同断言 `saga-orchestrator.test.ts:755 > test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out` expected `'compensated'` to be `'timed_out'`（**与第 1/2 次完全相同 — 三连同模式**）；同 cross-job 不一致模式（CI run #3 Test ✅ / Coverage ❌ — 与 PR #14 run #2 同形态）。
+
+**兑现历史汇总**：
+1. Phase 10 / Step 7 main CI 第七次（2026-05-13；初始登记 — Phase 9 / Step 17 "Phase 9 实战 0 显式 flake"评估在 Phase 10 已被修正）
+2. Phase 11 / Step 0.5 PR #14 CI run #2（2026-05-19；cross-job 不一致首次显式记录）
+3. **Phase 11 / Step 2 PR #16 CI run #3（2026-05-20；cross-job 不一致再次复现 — 系统性 timing flake 确认）**
+
+**新证据强化诊断（第 3 次兑现）**：
+- 全部 3 次都是**同一断言文字 + 同测试同行**（`saga-orchestrator.test.ts:755`；expected `'compensated'` to be `'timed_out'`）
+- 第 3 次跨 job 不一致再次复现（Test PASS / Coverage FAIL）— flake 性质（race condition / vitest + coverage 不同 scheduling）**确认无疑**
+- 频率 ≈ 1/3 主分支 + 长支 PR；**系统性 timing flake**（不是罕见偶发）
+
+**状态升级**：偶发 → 已知重复（2 次）→ **系统性 timing flake**（3 次 + cross-job 跨 run 证据）
+
+**修复路径锁定**：**β 候选 — 独立 Step 0.6 修复**（提升优先级；不再推迟到 Step 4-6 或 Step 11）
+
+**β 锁定理由**：
+- 第 3 次系统性兑现 + cross-job 跨 run 证据使"现在动手"工程价值显著超过推迟成本
+- α/γ 候选（推迟 Step 4-6 / Step 11）让 Step 3-10 期间继续重复触发 + 工程债累积
+- Step 0.6 工程范围预告：分析 saga-orchestrator overall timeout vacuous 路径 + 修复 race condition + 更新测试 timing 假设；预期 3-5 commits
+- Step 0.6 触发时机：**Step 2 merge 完成后立即启动；Step 3 ADL e2e 之前必须完成 KI-P8-003 修复**
+
+**当前状态**：OPEN — 系统性 timing flake；修复路径 β 锁定；待 Step 0.6 处置。
 
 ### KI-P8-004：Step 14 build metadata 根本性整理（test/ 迁 src/）— ✅ 已修复（Step 19）
 

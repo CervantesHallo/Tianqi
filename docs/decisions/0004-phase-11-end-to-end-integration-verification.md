@@ -304,6 +304,36 @@ PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck 
 
 第 4 层防御机制（§B.1 历史文档层）延伸到**第 5 层防御机制**：**实战发现层** — 即使 PHASE_DESIGN 设计完整 + PHASE_IMPLEMENT 本机实测全 PASS，CI feature 分支第一次跑仍可能揭露 Phase 1-N 多层隐藏缺陷（业务代码 K.9 + 基础设施 KRaft env + testkit 设计 + 镜像约定 + **CI 环境时序** 5 类完整触发）。Step 0 + Step 0.5 共建立"真实激活揭露隐藏缺陷"机制；Phase 11+ 期间持续兑现。**本机实测 ≠ CI 实测；CI 实测是第 5 层防御机制核心证据**。
 
+### §D.6 Build cache layer (tsc 增量 + pnpm hoisting) vs CI fresh build（PR #16 CI run #1 揭露）
+
+"未在干净环境验证过的真绿色"概念第三次延伸（第三次 cache layer leakage 实战）：
+
+| Step | cache layer | KI 编号 / 性质 |
+|------|-------------|----------------|
+| 3.5  | dist cache (packaging missing) | KI-P10-002 RESOLVED |
+| 0.5  | lint cache (unused import undetected) | §D.5 + PR #14 fix iteration |
+| **2** | **build cache (tsconfig references missing)** | **§D.6 + PR #16 fix iteration（本段）** |
+
+**Local 本机 typecheck PASS 因为**：
+1. tsc 增量编译 `.tsbuildinfo` 缓存已含跨包 type info（Step 1 时 references 已正确；Step 2 新加 cross-package imports 但缓存仍有效）
+2. pnpm hoisting node_modules 误打误撞 resolve 到 postgres 包（即使 application 包 tsconfig.json 未声明 references）
+
+**CI fresh typecheck FAIL 因为**：
+1. CI `pnpm install --frozen-lockfile` + 全新 `pnpm build` (tsc -b)
+2. fresh tsc -b 严格走 tsconfig references chain → 未声明的 cross-package reference 触发 TS2307
+3. type info 缺失导致 callback 参数 inference 失败 → TS7006
+
+**修复路径（不修业务代码；仅工程纪律调整）**：
+- `package.json`: 新 import 必须声明对应 workspace dep（Step 2 时已正确加入；本 fix iteration 不动）
+- `tsconfig.json`: 新 cross-package reference 必须加 `references`（PR #16 fix commit 1 修）
+- 显式类型标注（noImplicitAny 严守；PR #16 fix commit 2 修）
+
+**Phase 11+ contributor 协作纪律延伸（推迟到 Step 11 收官评估实施）**：
+- PR template 追加项: "new cross-package import → verify deps + references in same commit"
+- closure-checklist 追加项: "fresh build verification (clear `.tsbuildinfo`; rerun 4 commands)" as Phase Gate explicit step
+
+**与 §D.5 关系**：§D.5（CI 环境时序）是运行时层；§D.6（build cache）是编译时层。两类边界澄清都属"本机 != CI"模式；都通过追加 fix commits 修复（不 force-push；ADR-0003 §E.1 严守）；都让"真绿色"概念更精确。
+
 ## Decision (Step 1 — 端到端测试基础框架)
 
 完成日：2026-05-19。惯例 M 第 32 次实战 / 跨 Phase 第 13 次。本 Step **拆两阶段**（第 9 次拆分实战）；多核心决策影响 Phase 11+ 持续。PR #15。

@@ -304,6 +304,71 @@ PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck 
 
 第 4 层防御机制（§B.1 历史文档层）延伸到**第 5 层防御机制**：**实战发现层** — 即使 PHASE_DESIGN 设计完整 + PHASE_IMPLEMENT 本机实测全 PASS，CI feature 分支第一次跑仍可能揭露 Phase 1-N 多层隐藏缺陷（业务代码 K.9 + 基础设施 KRaft env + testkit 设计 + 镜像约定 + **CI 环境时序** 5 类完整触发）。Step 0 + Step 0.5 共建立"真实激活揭露隐藏缺陷"机制；Phase 11+ 期间持续兑现。**本机实测 ≠ CI 实测；CI 实测是第 5 层防御机制核心证据**。
 
+## Decision (Step 1 — 端到端测试基础框架)
+
+完成日：2026-05-19。惯例 M 第 32 次实战 / 跨 Phase 第 13 次。本 Step **拆两阶段**（第 9 次拆分实战）；多核心决策影响 Phase 11+ 持续。PR #15。
+
+### S1.1 路径 A 锁定（K.1 不引入 Testcontainers + K.2 docker-compose β）
+权衡矩阵详见 `docs/phase11/03-step-1-end-to-end-test-framework.md` §C.3。三候选 α/β/γ；锁定 **α 不引入 Testcontainers** + **β docker-compose 加 postgres + kafka**。
+
+锁定 α 理由：
+1. 元规则 P 累计 32 步零新依赖严守（Tianqi 工程信任纪律核心）
+2. CI services + docker-compose β 提供功能等价的本地 dev 体验（2 命令 vs 1 命令；差异微小）
+3. "克制 > 堆砌" 严守（Testcontainers 是 nice-to-have）
+4. 引入回退成本高（lockfile + fixture 改写）；严守不引入更安全
+
+**Kickoff K.4 vs Step 1 K.1 一致性留痕**：Phase 11 Kickoff K.4 决议 α+β 组合（"Testcontainers 本地 + GitHub Actions services CI"；"让本地 dev cycle + CI 都流畅"）。Step 1 PHASE_DESIGN 实地评估发现 α 更合适——这正是拆两阶段 + Kickoff 不锁定的工程价值：实地评估让 Kickoff 倾向被精确修正。**Kickoff 决议 = 大方向；Step 实地裁决 = 细节锁定；不冲突**。
+
+### S1.2 docker-compose.yml 升级 β（K.2）
+α 单 tianqi 服务 → β tianqi + postgres + kafka 三服务编排。postgres + kafka 配置与 ci.yml services 1:1 对应（postgres:16-alpine + apache/kafka:3.7.2 KRaft 单 broker 关键 env；与 Step 0/0.5 实战配置同步）。tianqi 服务加 depends_on healthy + env vars。
+
+### S1.3 e2e fixture 框架（K.3 α 共享 helper）
+新建 `packages/application/src/e2e/test-harness.ts` (255 行)。`createE2eHarness({ postgresUrl, kafkaBrokers, fakeEngineHttp?, clockMode? })` 工厂函数返回 4 真实 adapter + in-memory auditSink + cleanup 函数。RUN_ID + harnessCounter 隔离；cleanup 自管（drop postgres schemas + delete kafka topics best-effort）。
+
+`fakeEngineHttp` + `clockMode` 选项 v1 仅声明类型；接口预留供 Step 2-6 + Step 7 实施。
+
+### S1.4 4 自检测试（验证 fixture 框架可用）
+`packages/application/src/e2e/test-harness.e2e.test.ts` 含 4 个 it（all initialized healthy / auditSink empty + append / postgres schema isolation concurrent / cleanup idempotent）。本机实测全 PASS（with-PG-Kafka canonical）；不实现具体 4 端到端路径（Step 2-6 责任）。
+
+### S1.5 ci.yml 维持 4 jobs（K.4）
+e2e 测试在现有 test job 内跑（与 Step 0/0.5 一致）；不引入新 job。harness 依赖既有 ci.yml services.postgres + services.kafka（Step 0/0.5 已就位）。
+
+### S1.6 CONTRIBUTING.md 不升级（K.5 α）
+Step 11 收官统一升级；维持 100 行硬底（Step 7 精简承接精神）。
+
+### S1.7 §B.1.A f9e2831 同步路径 + push≠merge 教训沉淀
+
+**§B.1.A 严守实证**：Step 1 强制开局动作 1 揭露 `f9e2831` (KI-P8-003 第二次兑现留痕 commit) 未进入 main：
+```
+$ git log 5521739^2 --oneline -1  → 8c45c13 (NOT f9e2831)
+$ git merge-base --is-ancestor f9e2831 origin/main  → NOT in
+```
+PR #14 merge 在 `f9e2831` push 之前完成；commit 留在 feature 分支但未进入 main。
+
+**Step 1 PR 第一个 commit re-apply** KI-P8-003 第二次兑现留痕（路径 α 内嵌策略；用户 APPROVE）— diff 1:1 与 f9e2831 相同。
+
+**push 不等于 merge 教训**（Tianqi 工程旅程第二次类似事件）：
+- **1st event**：Phase 11 Kickoff v1 起草时假设 Phase 10 CLOSED but PR #10 actually 未 merge（recorded in §B.1.A）
+- **2nd event**：Step 0.5 KI 留痕 f9e2831 push but 未 merge（本 Step §S1.7）
+
+**教训沉淀**：
+- **push 到 feature 分支 != merge 到 main**：GitHub 工作流中两个独立事件
+- post-push 必须实测 main HEAD（`git ls-remote` / `git log`）确认变更已进入 main
+- "已 push" + "推断 CI 通过" + "推断 merge 成功" 是 §B.1.A 事实锚定纪律违规
+
+**Phase 11+ 协作纪律延伸**：用户回执"已 merge"/"全绿"/类似后，AI 在下一 Step Kickoff 强制开局动作 1 必须实测 main HEAD 才能完成事实锚定。
+
+### S1.8 不预占 Step 2-11 工作
+- 不实现 4 端到端路径（Step 2-6 责任）
+- 不实现性能测试（Step 7 责任）
+- 不实现混沌演练（Step 8 责任）
+- 不修复 KI-P8-003（Step 4 评估锁定）
+- 不引入新错误码 / Port / workspace 包（K.6 0 新增；元规则 P 累计 32 步零依赖维持）
+- 不修改 README / Runbook（Step 11 收官升级）
+- 不创建 phase-11-closed tag（Step 11 收官）
+
+---
+
 ## Alternatives Considered
 
 [各 Step 拒绝候选由对应 Step 完成时增量追写；启程指令 7 项核心裁决的拒绝候选详见 `docs/phase11/00-phase-11-kickoff.md`，待 PHASE_IMPLEMENT 阶段沉淀进本段]
@@ -315,6 +380,19 @@ PR #14 feature CI 第一次运行 3/4 FAIL（Lint + Test + Coverage；Typecheck 
 - S0.3 catch 23505 retry 模式（仅 catch CREATE SCHEMA 23505）拒：CREATE TABLE 也触发同样错误（pg_type_typname_nsp_index）；advisory lock 是干净的 PG 推荐做法
 - S0.3 Testcontainers Node.js 引入 拒：Step 1 责任；本 Step 用 GitHub Actions services（K.4 + 元规则 P 维持）
 - KI-P8-003 在 Step 0 顺手修 拒：违反主题专注度；推迟 Step 4-6（动作 G α）
+
+### Step 1 Alternatives
+- K.1 β（完整引入 @testcontainers/postgresql + @testcontainers/kafka）拒：元规则 P 累计 32 步零依赖第一次破坏；本地 dev 体验边际价值不值得（差 1 个命令）
+- K.1 γ（仅 testcontainers core）拒：同上理由 + 仍破坏 32 步零依赖
+- K.2 α'（维持单 tianqi 服务）拒：错失本地 dev "一键启动测试基础设施"机会；ci.yml services 配置无法在本地 1:1 复用
+- K.2 γ（β + 更多服务如假引擎 HTTP）拒：过度（mock external engine HTTP 是 Step 2-6 责任）
+- K.3 β（独立 packages/e2e-tests/ workspace 包）拒：违反 K.6 0 新增（§B.1.C 24 → 25 包）
+- K.3 γ（命名约定 *.e2e.test.ts 分散在各包）拒：测试分散不利于共享 fixture
+- K.4 β（单独 e2e job）拒：破坏 4 jobs 概念（§B.1.C 24 包 + 4 jobs 一致性）
+- K.4 γ（workflow_dispatch 手动触发）拒：PR 验证不完整
+- K.5 β（CONTRIBUTING.md 同步追加端到端启动指引）拒：突破 100 行硬底；Step 11 收官升级更系统
+- §B.1.A f9e2831 同步路径 β（单独 micro-PR）拒：α 内嵌更克制（"克制 > 堆砌"）+ 与 Step 1 commit 序列自然融合
+- §B.1.A f9e2831 同步路径 γ（放弃 sync）拒：违反 §B.1.A 事实锚定纪律（main 文档必须诚实留痕）
 
 ---
 

@@ -16,6 +16,9 @@
   },
   "devDependencies": {
     "@tianqi/adapter-testkit": "workspace:*",
+    "@types/pg": "8.11.10",
+    "kafkajs": "2.2.4",
+    "pg": "8.13.1",
     "@tianqi/config-file": "workspace:*",
     "@tianqi/config-memory": "workspace:*",
     "@tianqi/event-store-memory": "workspace:*",
@@ -27,9 +30,11 @@
     "@tianqi/mark-price-engine-http": "workspace:*",
     "@tianqi/match-engine-http": "workspace:*",
     "@tianqi/dead-letter-store-memory": "workspace:*",
+    "@tianqi/dead-letter-store-postgres": "workspace:*",
     "@tianqi/notification-kafka": "workspace:*",
     "@tianqi/notification-memory": "workspace:*",
     "@tianqi/position-engine-http": "workspace:*",
-    "@tianqi/saga-state-store-memory": "workspace:*"
+    "@tianqi/saga-state-store-memory": "workspace:*",
+    "@tianqi/saga-state-store-postgres": "workspace:*"
   }
 }

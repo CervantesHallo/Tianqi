@@ -28,7 +28,11 @@
 //     vs happy-path business response）
 //
 // Phase 11+ 演进预留：
-//   - Step 3 (ADL) 可能扩展 endpoint 集合（adjust-position / 等）
+//   - Step 3 (ADL) 扩展 endpoint 集合 — 已实施 (2026-06-03)：新增 2 个
+//     happyResponses key（/query-mark-price-batch + /query-position）
+//     支持 ADL Saga 5 step（fetch-mark-prices / verify-targets / submit-
+//     deleveraging-orders / insurance-fund-deduction / settle-account-funds）
+//     —— 不改 export 签名（元规则 B 严守）；仅 internal const 扩展。
 //   - Step 4-6 补偿 / 死信 / 恢复路径可能需要按 caseId 选择性失败注入
 //     （新增可选 faultInjection config；不破坏 v1 API）
 
@@ -100,6 +104,32 @@ const happyResponses: Record<string, () => Record<string, unknown>> = {
     transferId: "transfer-e2e-fake",
     status: "completed",
     transferredAt: new Date().toISOString()
+  }),
+  // Phase 11 / Step 3 ADL Saga 扩展 (2026-06-03)：
+  // queryMarkPriceBatch 批量标记价响应（与 parseQueryMarkPriceBatchResponse
+  // 约束一致：顶层 queriedAt + prices 数组；每 price 含 symbol + markPrice）。
+  // 顺利路径返回 ADL e2e fixture 用到的 2 个 symbol（BTC-USDT + ETH-USDT）；
+  // adapter parser 仅校验 schema 不校验数组长度（顺利路径不依赖 request body）。
+  "/query-mark-price-batch": () => ({
+    queriedAt: new Date().toISOString(),
+    prices: [
+      { symbol: "BTC-USDT", markPrice: 50_000 },
+      { symbol: "ETH-USDT", markPrice: 3_000 }
+    ]
+  }),
+  // Phase 11 / Step 3 ADL Saga 扩展 (2026-06-03)：
+  // queryPosition 单账户单 symbol 持仓响应（与 parseQueryPositionResponse
+  // 约束一致：accountId + symbol + positionId 必含字段（可 null）+
+  // side（positionId 非 null 时必含 "long"|"short"）+ size + queriedAt）。
+  // ADL verify-targets step 顺利路径需 positionId 非 null（targets[] 候选盈利
+  // 账户应有持仓；side 标记盈利方向）；fake 返回固定 long 0.5 size。
+  "/query-position": () => ({
+    accountId: "acct-pos-adl-e2e",
+    symbol: "BTC-USDT",
+    positionId: "pos-adl-e2e-fake",
+    side: "long",
+    size: 0.5,
+    queriedAt: new Date().toISOString()
   })
 };
 

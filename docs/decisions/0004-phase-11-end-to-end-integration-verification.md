@@ -518,6 +518,60 @@ Liquidation 全流程兑现 = §8.2 顺利路径覆盖第一半；Step 3 ADL 全
 
 ---
 
+### Step 3: ADL e2e Happy Path
+
+**性质**：Phase 11 整数 Step 编号纪律严守（Step 3 业务功能推进；进 Phase 11 12 Step 计数 → 完成后 7/12）
+**前置满足**：Step 2 PR #16 merged + KI-P8-003 独立 hotfix RESOLVED（PR #17 merge commit `d9673dd`；CI 3 次连续 PASS + main CI 4/4 PASS）
+
+#### K.1-K.6 PHASE_DESIGN 裁决
+
+- **K.1 ADL Saga 业务流（实测 adl-saga.ts 666 LOC + docs/phase9/11）**：5 step（fetch-mark-prices / verify-targets / submit-deleveraging-orders / insurance-fund-deduction / settle-account-funds）；ADLSagaPorts = LiquidationSagaPorts（裁决 3 类型别名复用）；涉及 4 Engine（MarkPrice / Position / Match / Fund）**不含 MarginEngine**；多账户 C-fail-fast；ADLInput 10 字段 + DeleveragingTarget 8 字段
+- **K.2 fake-engines 实测**：Step 2 共享 5 endpoint（query-mark-price / list-open-positions / place-order / release-margin / transfer-fund）；ADL 复用 2 个（place-order / transfer-fund）+ 需扩展 2 个（query-mark-price-batch / query-position）；Step 2 实测 5 it 而非 1 it（用户原 prompt 用词与实测不一致 → §B.1.A 事实锚定诚实报告）
+- **K.3 测试覆盖度 = α' 5 it 与 Step 2 严格对称**：1) completes_through_5_steps_with_completed_status / 2) audit_events_emitted_for_each_of_5_steps_plus_saga_lifecycle / 3) saga_state_persists_to_real_postgres_after_completion / 4) 4_engine_endpoints_called_via_real_http_in_expected_order / 5) two_concurrent_adl_sagas_both_complete_independently
+- **K.4 fake-engines 扩展 = 仅扩展 happyResponses map**：新增 2 个 key（`/query-mark-price-batch` + `/query-position`）；不改 export 签名（元规则 B 严守）；不新增 fake 函数；happyResponses 既有 5 key 保留不变
+- **K.5 docs/phase11/03-adl-e2e-happy-path.md 骨架**：§A 当前任务 / §B 影响范围 / §C 设计裁决 / §D 测试设计 / §E ADL 业务流概览 / §F 与 Step 4-6 衔接 / §G 验收
+- **K.6 KI-P9-001 第二次评估 = 选项 1 未触及**：实测 ADL Saga 0 引用 state-transition-saga / risk-case-state-machine；ADL 内部状态机由 saga-orchestrator 管理与 StateTransition Saga 完全独立；KI-P9-001 数据副本漂移风险在 ADL e2e 中**结构性不可触及**；维持 OPEN；Step 4-6（补偿/死信/恢复路径，可能触及 RiskCase 状态机）继续评估
+
+#### 实施与验证
+
+- **测试覆盖度**：5 it 全部 K.3 α' 视角；测试增量 1999 → 2004（+5）
+- **fake-engines.ts 扩展**：2 个新 happyResponses key；不改 export；约 30 行新增
+- **adl-saga.e2e.test.ts 新建**：约 290 行；含 buildDeleveragingTarget + buildAdlInput fixture builder + EXPECTED_STEP_PATHS（4 distinct）+ EXPECTED_STEP_NAMES（5 step name）
+- **本地验证**：lint + typecheck + build + 全量 2004 测试（1873 PASS + 131 skipped；本地无 PG/Kafka services → e2e 全部 skip）全部通过；CI services 会运行
+- **KI-P9-001 留痕**：docs/KNOWN-ISSUES.md Phase 11 / Step 3 ADL e2e 第二次评估记录（选项 1 未触及）
+
+#### 与 Step 2 模式对称性证据
+
+| 维度 | Step 2 Liquidation | Step 3 ADL |
+|------|---------------------|------------|
+| 测试视角数 | 5 | 5（K.3 α' 严格对称） |
+| 测试文件位置 | packages/application/src/e2e/liquidation-saga.e2e.test.ts | packages/application/src/e2e/adl-saga.e2e.test.ts |
+| harness 接口 | createE2eHarness | createE2eHarness（K.4 不改接口） |
+| fakeEngineHttp | fakeServer | fakeServer（同一 helper） |
+| Engine 集合 | 5（含 margin） | 4（不含 margin） |
+| 测试增量 | 1996 → 1999 (+5) | 1999 → 2004 (+5) |
+| EXPECTED_STEP_PATHS | 5 distinct paths | 4 distinct paths |
+| EXPECTED_STEP_NAMES | 5 names | 5 names |
+| §8.2 顺利路径覆盖 | Liquidation | ADL |
+
+#### Phase 11 进度更新
+
+- 6/12 → **7/12**（Kickoff + Step 0 + 0.5 + 1 + 2 + 3）
+- KI-P8-003 hotfix（PR #17）**不计入 Step 计数**（独立 hotfix；§Phase 11 整数 Step 编号纪律永久严守）
+- Step 4 起草指令独立承接（端到端补偿路径；含 KI-P9-001 第三次评估机会）
+
+---
+
+### Step 3 Alternatives
+
+- 裁决 K.3 β'（仅 1 happy it 用户原 prompt 表述）拒：与 Step 2 实测 5-it 模式不严格对称；§15 审计要求 + §8.1 持久化 + §8.2 HTTP wire path 顺序 + 并发 4 视角覆盖缺失
+- 裁决 K.3 γ'（5+ it 含 ADL 特有变体）拒：超 Step 2 覆盖度范围；可能抽取 Step 4-6 工作（多账户 N=3 变体 + 仓位规模差异 + 资金充足度差异）
+- 裁决 K.4 β（新增 fake 函数 export）拒：fake-engines.ts 设计原则是"单 server 多路径分发"；新增 export 增加 surface area；不符合既有命名约定
+- 裁决 K.6 β（选项 2 触及但未复现）拒：实测 ADL Saga 0 引用 state-transition-saga；不应虚报"触及"
+- 裁决 K.6 γ（选项 3 复现 → 独立 hotfix）拒：K.1-K.6 分析未发现复现证据；不可未发现而触发 hotfix（§B.1.A 事实锚定）
+
+---
+
 ## References
 
 - 《Tianqi 项目架构与代码规范总文档》§22.1 ADR 规范、§24.1 PR 七项、§27 最终裁决原则

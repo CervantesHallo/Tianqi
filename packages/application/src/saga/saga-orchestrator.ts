@@ -826,17 +826,31 @@ export const createSagaOrchestrator = (
           outcome: "failed",
           failureReason
         });
-        // Step 8: TQ-SAG-001 单步超时触发后，若整体预算也已耗光，仍按
-        // 整体超时聚合终态（裁决 3 R）。
+        // Step 8 + KI-P8-003 hotfix (2026-06-03)：TQ-SAG-001 单步超时触发后，
+        // 若 effective 预算等于"saga 剩余预算"（即 sagaTimeout 是 clamp 因子
+        // 而非 stepTimeout），等价于整体预算耗光，聚合为整体超时终态（裁决 3 R）。
+        //
+        // 原实现用 computeElapsedMs() 二次读 Date.now() 与 sagaTimeoutMs 比较；
+        // Date.now() 整数 ms 精度与 setTimeout sub-ms 内部精度失配，在 5ms 量级
+        // 下产生 ~33% 概率的 race（CI 中三次系统性兑现；详见
+        // docs/hotfixes/ki-p8-003-resolution.md）。改用 install-time 已捕获的
+        // elapsedBeforeStep + effectiveStepTimeoutMs 作判定，完全消除 race。
+        //
+        // Path A install-time 静态值判定保持：
+        //   - ADR-0002 §裁决 1 γ 局限性诚实表述（setTimeout race 行为未改）
+        //   - Step 7 立约 5 不变量（不触及 runCompensationPhase / 双重幂等 / 死信
+        //     / persist 触发点 / 链式继续）
+        //   - Step 8 立约 P/Q/R 终态语义（R-vac 边界由 race-敏感升级为确定性；
+        //     P/Q + 含补偿 R + 普通失败 vacuous 全部不变）
         if (
           execResult.error.code === "TQ-SAG-001" &&
           Number.isFinite(sagaTimeoutMs) &&
-          computeElapsedMs() >= sagaTimeoutMs
+          elapsedBeforeStep + effectiveStepTimeoutMs >= sagaTimeoutMs
         ) {
           overallTimedOut = true;
           overallTimeoutInfo = {
             lastExecutingStepName: step.name,
-            elapsedMs: computeElapsedMs()
+            elapsedMs: computeElapsedMs()  // 审计 payload 信息观测用，非决策依据
           };
         }
         firstFailureIdx = i;

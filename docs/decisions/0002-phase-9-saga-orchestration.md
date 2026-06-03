@@ -3982,6 +3982,126 @@ PreconditionCheck 含 `validate: (engines) => Promise<Result>` callback
 
 **拒绝在协调模块运行时验证 sagaId 命名约定（强守 vs 防御之间的折中）**。理由：违反元规则 B（任何 Saga 都可构造任意 sagaId 字符串，运行时强制约束破坏接口稳定性）；解析失败的 saga 在协调模块内静默跳过（防御式 null 返回）+ ADR 留痕命名约定为"事实契约"即可。
 
+## Hotfix: KI-P8-003 Saga Vacuous Timeout Race Condition Resolution
+
+**性质**：Independent hotfix（**NOT a Phase 11 Step**；不绑 Step 编号；不进 Phase 11 12 Step 计数）
+**日期**：2026-06-03
+**惯例 M 增量追写**：首次为"独立 hotfix"性质追写 ADR 段；不在 Step 编号序列内
+**详细执行记录**：`docs/hotfixes/ki-p8-003-resolution.md`
+
+### 缘起
+
+`saga-orchestrator.test.ts:755 > test_runSaga_with_overall_saga_timeout_vacuous_emits_saga_timed_out`
+三次系统性 CI 兑现（Phase 10 / Step 7 + Phase 11 / Step 0.5 + Phase 11 / Step 2；频率 ≈ 1/3；
+cross-job 不一致 Test ✅ Coverage ❌）。原 KI-P8-003 entry 在 Phase 9 / Step 8 引入 vacuous timed_out
+逻辑时埋下 race：双次 `computeElapsedMs()` 调用 + `Date.now()` 整数 ms 精度与 setTimeout
+sub-ms 内部精度失配，产生 ~33% 概率漂移。Step 8 已尝试 1:10 fast/slow 比例缓解，本地 93ms 稳定，
+但 CI 仍三次兑现 → 缓解措施已耗尽实证；根因修复必要性确立。
+
+### 根因（K.1）
+
+`packages/application/src/saga/saga-orchestrator.ts:829-841`（vacuous 路径 `overallTimedOut` 判定）：
+
+```ts
+if (
+  execResult.error.code === "TQ-SAG-001" &&
+  Number.isFinite(sagaTimeoutMs) &&
+  computeElapsedMs() >= sagaTimeoutMs        // ← race 点：Date.now() 整数 ms 精度
+) {
+  overallTimedOut = true;
+  ...
+}
+```
+
+`computeElapsedMs()` 实现：`clock().getTime() - sagaStartedAtMs`，依赖 `Date.now()` 整数 ms 精度。
+当 `sagaStartedAtMs` 与 setTimeout install 处于同一 ms tick `T` 且 setTimeout 在第 4ms 整数 tick
+触发，`computeElapsedMs() = 4 < 5 = sagaTimeoutMs` → `overallTimedOut = false` → 终态错误聚合为
+`"compensated"`（违反裁决 3 R-vac + 裁决 4 III）。
+
+### 修复（裁决 Path A）
+
+PHASE_DESIGN 阶段 K.4-K.5 评估 5 候选（A 业务代码 / B fake timer / C 断言放宽 / D tolerance /
+E `performance.now()`），用户裁决 **Path A install-time 静态值判定**：
+
+```ts
+if (
+  execResult.error.code === "TQ-SAG-001" &&
+  Number.isFinite(sagaTimeoutMs) &&
+  elapsedBeforeStep + effectiveStepTimeoutMs >= sagaTimeoutMs   // ← install-time 静态值，无 race
+) {
+  overallTimedOut = true;
+  overallTimeoutInfo = {
+    lastExecutingStepName: step.name,
+    elapsedMs: computeElapsedMs()  // 审计 payload 信息观测用，非决策依据
+  };
+}
+```
+
+由 `computeEffectiveStepTimeoutMs`（行 700-705）的构造：
+`effectiveStepTimeoutMs = min(stepTimeoutMs, sagaTimeoutMs - elapsedBeforeStep)`。
+`elapsedBeforeStep + effectiveStepTimeoutMs >= sagaTimeoutMs` 严格等价于"sagaTimeout 是 clamp
+因子"——install-time 已捕获的两个 const 的纯代数比较，**无 race**。
+
+业务代码改动 ~5 行（行 829-841 区域注释 +13 行解释 race / 修复语义 / 立约保持，条件表达式 1 行
+替换）；测试 0 行改动；测试总数 1999 不变。
+
+### 裁决 1 γ 局限性诚实表述（保持）
+
+ADR-0002 裁决 1 γ 锁定的「setTimeout race 触发后，编排器立即 resolve 为 TQ-SAG-001」**仍成立**。
+Path A 不改变 setTimeout race 机制本身，只改变 race 后的终态聚合判定方式。**§裁决 1 γ 局限性
+描述无需修改**。
+
+### 5 不变量保持（K.6 评估）
+
+| # | 不变量 | Path A 是否触及 |
+|---|--------|-----------------|
+| 1 | 严格逆序补偿（§4.3）| ❌ 不触及 `runCompensationPhase` 主循环 |
+| 2 | 双重幂等保护（§4.2）| ❌ 不触及 `isStepEligibleForCompensation` |
+| 3 | compensation_failed 入死信（§4.5）| ❌ 不触及死信入队路径 |
+| 4 | 每次状态变化都 persist（§4.5）| ❌ persist 触发点 1-6 全部不变 |
+| 5 | 链式继续 + 终态聚合（§4.6）| ❌ 不触及 chain continuation |
+
+**全部 5 不变量保持**——`docs/phase9/08-timeout-mechanism.md` §C 强制开局 6 表的原始论证在
+Path A 后仍成立。
+
+### P/Q/R 终态语义保持（K.7 评估）
+
+| 终态 | Path A 前 | Path A 后 |
+|------|-----------|-----------|
+| `completed` | 不变 | 不变 |
+| **P** = `compensated`（succeeded≥1 + 全部补偿成功）| 由 `aggregateCompensationOutcome` 决定 | 不变 |
+| **Q** = `partially_compensated`（succeeded≥1 + 部分补偿失败）| 由 `aggregateCompensationOutcome` 决定 | 不变 |
+| **R-vac** = `timed_out`（succeeded=0 + 整体超时）| **race-敏感**（偶发误判为 `compensated`）| **确定性**判定 |
+| **R-含补偿**（succeeded≥1 + 整体超时触发但补偿完成 + `saga.timed_out` audit）| 不变 | 不变 |
+| 普通失败 vacuous = `compensated`（0 of 0）| 不变 | 不变 |
+
+**R-vac 边界由 race-敏感升级为确定性**——这是 Path A 的语义改善。P/Q + 含补偿 R + 普通失败
+vacuous 全部不变。**Step 8 立约 P/Q/R 终态语义完全保留**。
+
+### 验证
+
+- 本地：lint + typecheck + build PASS；saga-orchestrator unit test 5 次连跑 16/16 PASS（每次
+  80-92ms）；全量 1999 PASS（1873 PASS + 126 skipped 含本地无 PG/Kafka services 的 integration tests）
+- CI：3 次连续 PASS（用户立约强制门槛；KI-P8-003 频率 ≈ 1/3 → 单次 PASS 不足证据）
+
+### 与 Phase 11 Step 编号纪律的关系
+
+- **Phase 11 整数 Step 编号纪律永久严守**：Kickoff + Step 0-11 = 12 Step；Step 0.5 是历史固化
+  错误编号但不能改；新工作零容忍小数编号
+- 本 hotfix **不绑 Step 编号** → 不计入 Phase 11 12 Step（Phase 11 进度 hotfix 前后均 6/12；
+  Step 3 ADL e2e 是下一个 Step 工作）
+- ADR-0002 Hotfix 段是**惯例 M 增量追写的"独立 hotfix"性质首次实战**——后续若再有独立
+  hotfix 可按本范式追加 Hotfix 段
+
+### 与 Phase 8 ADR-0001 立约的关系
+
+- ADR-0001 元规则 B（签名兼容）：✓ **严守**——SagaStep / SagaInvocation /
+  SagaOrchestratorOptions / `clock()` / AUDIT_EVENT_TYPES 接口零变化
+- ADR-0001 元规则 P（无第三方依赖）：✓ 零新依赖
+- ADR-0001 元规则 K（错误码命名空间）：N/A（TQ-SAG-004 复用，不新增）
+
+---
+
 ## References
 
 - 《Tianqi 项目架构与代码规范总文档》§13.3 Saga / 补偿、§7 状态机、§6.5

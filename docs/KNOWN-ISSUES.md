@@ -194,6 +194,7 @@
   - Step 5 端到端死信路径可能触发 manual_intervention 状态机外路径
   - Step 6 端到端恢复路径从持久化状态恢复时校验 transitionRules 数据副本
   - Phase 11 / Step 4-6 实地评估处置；不在 Kickoff 阶段裁决具体方案
+- **Phase 11 / Step 3 ADL e2e 第二次评估（2026-06-03）**：本 Step PHASE_DESIGN K.6 实测分析 — ADL Saga 与 StateTransition Saga 是两个独立 application 层 saga 模块（adl-saga.ts 0 引用 state-transition-saga 或 risk-case-state-machine；ADL 内部状态机由 saga-orchestrator 管理 overallStatus / stepStatuses 与 StateTransition Saga 完全独立；ADL 调用的 Engine MarkPrice/Position/Match/Fund 均不涉及 risk-case 状态转换）。**评估结论 = 选项 1（未触及/未复现）**：ADL e2e 测试结构性不可触及 KI-P9-001 数据副本漂移风险区域；**状态维持 OPEN**；Step 4-6（补偿/死信/恢复路径，可能触及 RiskCase 状态机）继续评估（第三次评估机会在 Step 4 起草指令承接）。详见 docs/decisions/0004 §Step 3 段 + docs/phase11/05-step-3-adl-e2e-happy-path.md §F。
 
 ---
 

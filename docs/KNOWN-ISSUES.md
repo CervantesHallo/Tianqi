@@ -205,6 +205,16 @@
   - **与 Step 2+3 结论的关键差异**：本 Step 第三次评估**非惰性推断**——用户硬指令明确要求探针证据，本 Step 提供 4 探针；探针证据完整度高于前两次（前两次主要看顺利路径结构推断）
   - **状态维持 OPEN**；第四次评估机会在 Phase 11 / Step 5（ADL 补偿路径 e2e）
   - 详见 docs/decisions/0004 §Step 4 段 + docs/phase11/06-step-4-liquidation-compensation-e2e.md §F。
+- **Phase 11 / Step 5 ADL 补偿 e2e 第四次评估（2026-06-10）**：本 Step PHASE_DESIGN K.6 基于 **Step 5 独立 4 探针实测（非惰性推断）**——用户硬指令明确禁止用前 3 次"未触及"结论惰性推断：
+  - Probe 1: `grep -E "state-transition\|risk-case-state-machine\|stateTransitionRules" packages/application/src/saga/adl-saga.ts` → **0 hits**（本 Step grep 验证；仅 import @tianqi/shared + @tianqi/ports + ./saga-orchestrator.js + ./liquidation-saga.js 类型别名）
+  - Probe 2: `grep -rE "state-transition\|risk-case-state-machine" packages/application/src/e2e/` → **0 hits**（含本 Step adl-compensation.e2e.test.ts）
+  - Probe 3: createE2eHarness 实测不消费 application command handlers（test-harness.ts 0 引用 executeAdl/transitionAdl/createAdlCase）
+  - Probe 4: Step 5 e2e 6 个 it 全部 `saga.runForCase(input)` 直接调用（与 Step 2/3/4 同模式）
+  - K.1 ADL 补偿结构性差异澄清：ADL "多账户 C-fail-fast" 是 **step 内部循环模式**（step 2/3/5 内部 for 循环），与 RiskCase domain 状态机完全独立；saga 层仍是 5 step 严格逆序与 Liquidation 同
+  - **评估结论 = 选项 1（实测未触及，维持 OPEN）**：ADL 补偿路径 e2e 沿用 Step 2-4 既定模式，结构性不可触及 KI-P9-001 数据副本漂移区域
+  - **与 Step 4 评估的独立性**：本 Step 探针 1-3 重新 grep（非引用 Step 4 结果）；探针 4 验证本 Step e2e 实际使用 saga.runForCase；探针证据完整独立
+  - **状态维持 OPEN**；第五次评估机会在 Phase 11 / Step 6（死信路径专项 e2e；可能在死信落盘验证场景触及）
+  - 详见 docs/decisions/0004 §Step 5 段 + docs/phase11/07-step-5-adl-compensation-e2e.md §F。
 
 ---
 

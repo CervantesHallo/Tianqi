@@ -627,6 +627,61 @@ Liquidation 全流程兑现 = §8.2 顺利路径覆盖第一半；Step 3 ADL 全
 
 ---
 
+### Step 5: ADL Compensation Path E2E
+
+**性质**：Phase 11 整数 Step 编号纪律严守（Step 5 业务功能推进；进 Phase 11 12 Step 计数 → 完成后 9/12）
+**前置满足**：Step 4 PR #19 merged（`d2779fa`）+ KI-P8-003 hotfix RESOLVED + 测试基线 2010
+
+#### K.1-K.7 PHASE_DESIGN 裁决
+
+- **K.1 ADL Saga 补偿路径结构性分析（实测 adl-saga.ts 666 LOC）**：
+  - 5 step saga 层严格逆序与 Liquidation 同（step 1+2 noop / step 3 cancelOrder 反向 / step 4 transferFund 反向 / step 5 transferFund 反向）
+  - **结构性差异**：ADL step 内部多账户 C-fail-fast 循环（step 2/3/5）；step 3 compensate = cancelOrder × N（vs Liquidation × 1）；step 5 compensate = transferFund × N（vs Liquidation × 1）
+  - **核心差异点**：ADL step 4 + step 5 共用 `/transfer-fund` endpoint；区分依赖 body.idempotencyKey 子串（`:insurance` / `:settle:` / `:reverse-insurance` / `:reverse-settle:`）
+- **K.2 e2e 模式映射**：adl-compensation.e2e.test.ts 沿用 Step 4 双 harness 模式（harnessP + harnessQ）
+- **K.3 测试覆盖度**：**α'' 6 it（5 视角 + 1 it Q）— 与 Step 4 严格对称**
+- **K.4 P + Q 双终态覆盖**：双覆盖
+- **K.5 fake-engines 扩展策略**：**候选 γ — FakeFailureRule 加 optional `bodyIdempotencyKeyPattern` 字段**（Readonly type 可选字段；向后兼容；Step 4 既有 callers 零影响；元规则 B 严守 — createFakeEnginesServer / FakeEnginesServerOptions / FakeEnginesServer 接口签名零变化）
+- **K.6 KI-P9-001 第四次评估**：**选项 1（实测未触及，维持 OPEN）** — 基于 Step 5 独立 4 探针实测（非惰性推断）：(1) adl-saga.ts 0 引用 state-transition-saga（Step 5 grep 验证）；(2) e2e 目录 0 引用（含本 Step adl-compensation.e2e.test.ts）；(3) createE2eHarness 不消费 command handlers；(4) Step 5 e2e 6 个 it 全部 saga.runForCase 直接调用
+- **K.7 5 不变量端到端兑现表**：详见 docs/phase11/07-step-5 §E（含 ADL 特有 saga 层 + step 内部双层覆盖；不变量 1 严格逆序双层验证：saga 层 step 4 → step 3 + step 内部 cancelOrder × N i=0..N-1）
+
+#### 实施与验证
+
+- **测试覆盖度**：6 it 全部 K.3 α'' + K.4 P+Q 视角；测试增量 2010 → 2016（+6）
+- **fake-engines.ts schema 扩展**：FakeFailureRule 新增 optional `bodyIdempotencyKeyPattern` 字段（Step 4 既有 callers 零影响）；matchFailureRule 增加 body inspection（仅当 rule.bodyIdempotencyKeyPattern 存在）
+- **adl-compensation.e2e.test.ts 新建**：约 470 LOC；含 buildDeleveragingTarget + buildAdlInput fixture + getBodyIdempotencyKey helper + 双 harness (P/Q) + 6 it 实施
+- **本地验证**：lint + typecheck + build + 全量 2016 测试（1873 PASS + 143 skipped；本地 PG/Kafka 无 → e2e 全部 skip）
+- **KI-P9-001 第四次评估留痕**：docs/KNOWN-ISSUES.md Phase 11 / Step 5 ADL 补偿 e2e 第四次评估（选项 1 + 独立探针证据沉淀）
+
+#### Phase 11 e2e 22 it 严格对称证据
+
+| Step | 测试文件 | it 数 | 视角 |
+|------|----------|-------|------|
+| Step 2 | liquidation-saga.e2e.test.ts | 5 | 顺利 P |
+| Step 3 | adl-saga.e2e.test.ts | 5 | 顺利 P (mirror) |
+| Step 4 | liquidation-compensation.e2e.test.ts | 6 | 补偿 P+Q |
+| **Step 5** | **adl-compensation.e2e.test.ts** | **6** | **补偿 P+Q (mirror Step 4)** |
+| 总计 | | **22 it** | **顺利 5+5 + 补偿 6+6 严格对称** |
+
+#### Phase 11 进度更新
+
+- 8/12 → **9/12**（Kickoff + Step 0 + 0.5 + 1 + 2 + 3 + 4 + 5）
+- KI-P8-003 hotfix（PR #17）**不计入 Step 计数**
+- Step 6 起草指令独立承接（死信路径专项 e2e；KI-P9-001 第五次评估）
+
+---
+
+### Step 5 Alternatives
+
+- 裁决 K.5 α (零扩展) 拒：ADL 补偿路径触发受限；仅 step 3 (/place-order) FAIL → succeeded = [step 1, 2] noop → 补偿 vacuous 0 HTTP；不测补偿
+- 裁决 K.5 β (仅数据扩展 caseFailureRules) 拒：ADL step 4 + step 5 同 path 无法区分；step 4 先 fail → 补偿仅 step 3 cancel-orders × N（saga 层不变量 1 vacuous，仅一个 non-noop compensate）
+- 裁决 K.3 β'' (7-8 it 含 ADL 特有维度) 拒：K.5 γ 选择后 saga 层严格逆序可断言，无需额外独家 it；测试增量最小化（K.3 推荐 α''）
+- 裁决 K.3 γ'' (仅 1 P happy) 拒：K.7 不变量 3 + 5 链式严重缺失（仅 Q 路径可观察）
+- 裁决 K.6 扩张 e2e 范围走 application command lifecycle 拒：违反 Section 九范围严守立约
+- 裁决 K.1 K.6 推断 ADL 补偿与 Liquidation 补偿不对称导致 KI-P9-001 触及概率上升 拒：K.6 探针实测明示 ADL Saga 与 StateTransition Saga 完全独立 application 层模块；ADL "多账户 C-fail-fast" 是 step 内部循环模式，与 RiskCase domain 状态机无关
+
+---
+
 ## References
 
 - 《Tianqi 项目架构与代码规范总文档》§22.1 ADR 规范、§24.1 PR 七项、§27 最终裁决原则

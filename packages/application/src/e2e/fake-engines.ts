@@ -33,8 +33,14 @@
 //     支持 ADL Saga 5 step（fetch-mark-prices / verify-targets / submit-
 //     deleveraging-orders / insurance-fund-deduction / settle-account-funds）
 //     —— 不改 export 签名（元规则 B 严守）；仅 internal const 扩展。
-//   - Step 4-6 补偿 / 死信 / 恢复路径可能需要按 caseId 选择性失败注入
-//     （新增可选 faultInjection config；不破坏 v1 API）
+//   - Step 4 (Liquidation 补偿路径) 扩展 — 已实施 (2026-06-03)：
+//     * 新增 2 个 happyResponses key（/lock-margin + /cancel-order）支持
+//       P 终态测试 (补偿链 step 4 → 3 反向调用)
+//     * 新增 export FakeFailureRule + FakeEnginesServerOptions
+//     * createFakeEnginesServer 签名扩展接受可选 options 参数（既有 Step 2 +
+//       Step 3 无参调用零影响；元规则 B 兼容）
+//     * caseId 路由失败注入：按 x-trace-id substring + path 匹配返回 failure
+//       response（Q 终态测试需要）
 
 import { Buffer } from "node:buffer";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -57,6 +63,44 @@ export type FakeEnginesServer = Readonly<{
   readonly receivedRequests: ReadonlyArray<FakeEngineRequest>;
   /** 关闭 server 释放端口 (best-effort;harness cleanup 调用). */
   close: () => Promise<void>;
+}>;
+
+/**
+ * Phase 11 / Step 4 — 失败注入规则（K.5 候选 α: caseId 路由）。
+ *
+ * 用途：让特定测试 case 触发某 step 的 Engine 调用失败，进而触发 Saga
+ * 补偿路径（P 终态）或补偿失败死信（Q 终态）。
+ *
+ * 匹配机制：fake server 收到 request 时按 x-trace-id 头部 substring 匹配
+ * traceIdPattern + path 完全匹配。命中即返回 failure response（默认 500 +
+ * test_injected_failure；可显式自定义）。
+ *
+ * 与 happyResponses 关系：failure rules 优先级高于 happyResponses；
+ * 未命中失败规则时 fallback 到 happyResponses。
+ *
+ * 元规则 B：FakeFailureRule 字段一旦发布即冻结。
+ */
+export type FakeFailureRule = Readonly<{
+  /** x-trace-id 头部 substring；命中即触发失败。 */
+  readonly traceIdPattern: string;
+  /** HTTP path that should fail. */
+  readonly path: string;
+  /** HTTP status code; 默认 500. */
+  readonly statusCode?: number;
+  /** Response body; 默认 { error: "test_injected_failure" }. */
+  readonly responseBody?: Record<string, unknown>;
+}>;
+
+/**
+ * Phase 11 / Step 4 — createFakeEnginesServer 可选 options。
+ *
+ * 既有 Step 2 + Step 3 调用 createFakeEnginesServer() 不变（options 缺省 →
+ * happy-only 路径；元规则 B 兼容）。Step 4 调用
+ * createFakeEnginesServer({ caseFailureRules: [...] }) 启用失败注入。
+ */
+export type FakeEnginesServerOptions = Readonly<{
+  /** 可选失败注入规则列表；缺省仅 happy 路径。 */
+  readonly caseFailureRules?: ReadonlyArray<FakeFailureRule>;
 }>;
 
 /**
@@ -130,6 +174,25 @@ const happyResponses: Record<string, () => Record<string, unknown>> = {
     side: "long",
     size: 0.5,
     queriedAt: new Date().toISOString()
+  }),
+  // Phase 11 / Step 4 Liquidation 补偿路径扩展 (2026-06-03)：
+  // lockMargin compensate Step 4 release-margin 反向调用（与
+  // parseLockMarginResponse 约束一致：lockId + lockedAmount (非负数) +
+  // currency + lockedAt）。P 终态测试需此 endpoint 在 fake server 返回 200。
+  "/lock-margin": () => ({
+    lockId: "lock-compensate-e2e-fake",
+    lockedAmount: 1_000,
+    currency: "USDT",
+    lockedAt: new Date().toISOString()
+  }),
+  // Phase 11 / Step 4 Liquidation 补偿路径扩展 (2026-06-03)：
+  // cancelOrder compensate Step 3 submit-close-orders 反向调用（与
+  // parseCancelOrderResponse 约束一致：orderId + status (OrderStatus 枚举
+  // 必须是 "cancelled"对应补偿语义) + cancelledAt）。P 终态测试需此 endpoint 200。
+  "/cancel-order": () => ({
+    orderId: "order-compensate-e2e-fake",
+    status: "cancelled",
+    cancelledAt: new Date().toISOString()
   })
 };
 
@@ -151,20 +214,47 @@ const writeJson = (res: ServerResponse, statusCode: number, body: unknown): void
 };
 
 /**
- * 创建 fake engines HTTP server (Liquidation 顺利路径 5 endpoint).
+ * 创建 fake engines HTTP server (Liquidation 顺利路径 + 补偿路径 endpoint).
  *
- * 用法 (Step 2 e2e 测试)：
+ * 用法 (Step 2 / Step 3 e2e 测试 - happy only)：
  *   const fakeServer = await createFakeEnginesServer();
- *   // 配置 5 engine adapter 全部用 fakeServer.url 作为 baseUrl
- *   ...
- *   // 测试结束:
- *   await fakeServer.close();
+ *
+ * 用法 (Step 4 e2e 测试 - 补偿路径，含失败注入)：
+ *   const fakeServer = await createFakeEnginesServer({
+ *     caseFailureRules: [
+ *       { traceIdPattern: "compensation-Q-test", path: "/transfer-fund" },
+ *       { traceIdPattern: "compensation-Q-test", path: "/lock-margin" }
+ *     ]
+ *   });
  *
  * port :0 自动分配 + IPv4 127.0.0.1 (避免 IPv6 + DNS 解析延迟).
+ *
+ * 元规则 B：options 参数可选；既有 Step 2 + Step 3 无参调用零影响。
  */
-export const createFakeEnginesServer = async (): Promise<FakeEnginesServer> => {
+export const createFakeEnginesServer = async (
+  options?: FakeEnginesServerOptions
+): Promise<FakeEnginesServer> => {
   const receivedRequests: FakeEngineRequest[] = [];
   const openSockets = new Set<Socket>();
+  const failureRules: ReadonlyArray<FakeFailureRule> =
+    options?.caseFailureRules ?? [];
+
+  /**
+   * 失败规则匹配：traceId substring + path 完全匹配。
+   * 返回首个匹配规则；未命中返回 undefined（fallback 到 happyResponses）。
+   */
+  const matchFailureRule = (
+    path: string,
+    traceId: string | null
+  ): FakeFailureRule | undefined => {
+    if (failureRules.length === 0 || traceId === null) return undefined;
+    for (const rule of failureRules) {
+      if (rule.path === path && traceId.includes(rule.traceIdPattern)) {
+        return rule;
+      }
+    }
+    return undefined;
+  };
 
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const path = req.url ?? "/";
@@ -183,6 +273,17 @@ export const createFakeEnginesServer = async (): Promise<FakeEnginesServer> => {
     }
 
     receivedRequests.push({ method, path, body: bodyJson, traceId });
+
+    // K.5 候选 α：优先匹配失败规则（caseId 路由）→ fallback happyResponses → 404.
+    const failureRule = matchFailureRule(path, traceId);
+    if (failureRule !== undefined) {
+      writeJson(
+        res,
+        failureRule.statusCode ?? 500,
+        failureRule.responseBody ?? { error: "test_injected_failure", path }
+      );
+      return;
+    }
 
     const responseFactory = happyResponses[path];
     if (responseFactory === undefined) {

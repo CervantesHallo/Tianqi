@@ -259,8 +259,21 @@ export const createFakeEnginesServer = async (
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const path = req.url ?? "/";
     const method = req.method ?? "GET";
-    const traceHeader = req.headers["x-trace-id"];
-    const traceId = typeof traceHeader === "string" ? traceHeader : null;
+    // Phase 11 / Step 4 修复：external-engine-http-base 实际发送的 trace header
+    // 是 "x-tianqi-trace-id"（DEFAULT_TRACE_HEADER_NAME；详见 http-base-engine.ts
+    // 行 119），而非 "x-trace-id"。Step 2 + Step 3 e2e 不断言 traceId 字段，所以
+    // 该 latent bug 未被暴露；Step 4 失败规则匹配依赖正确读取 traceId 才在 CI
+    // run #1 暴露此问题（5/6 it 失败因失败注入未触发）。修复：优先读
+    // "x-tianqi-trace-id"，回退兼容 "x-trace-id"（FakeEngineRequest.traceId
+    // 字段语义不变；与既有 e2e 测试断言假设兼容）.
+    const tianqiTraceHeader = req.headers["x-tianqi-trace-id"];
+    const legacyTraceHeader = req.headers["x-trace-id"];
+    const traceId =
+      typeof tianqiTraceHeader === "string"
+        ? tianqiTraceHeader
+        : typeof legacyTraceHeader === "string"
+          ? legacyTraceHeader
+          : null;
 
     let bodyJson: unknown = null;
     try {

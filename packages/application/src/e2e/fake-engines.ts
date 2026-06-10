@@ -41,6 +41,15 @@
 //       Step 3 无参调用零影响；元规则 B 兼容）
 //     * caseId 路由失败注入：按 x-trace-id substring + path 匹配返回 failure
 //       response（Q 终态测试需要）
+//   - Step 5 (ADL 补偿路径) 扩展 — 已实施 (2026-06-10)：
+//     * ADL step 4 + step 5 同用 /transfer-fund endpoint（区分依赖 body.idempotencyKey
+//       子串 :insurance / :settle: / :reverse-insurance / :reverse-settle: 等）
+//     * FakeFailureRule 新增 optional bodyIdempotencyKeyPattern 字段（Readonly type
+//       可选字段；向后兼容 — Step 4 既有 callers 不需要修改；元规则 B 兼容）
+//     * matchFailureRule 增加 body inspection（仅当 rule.bodyIdempotencyKeyPattern
+//       存在时检查 body.idempotencyKey 是否含 pattern 子串）
+//     * 不改 createFakeEnginesServer / FakeEnginesServerOptions / FakeEnginesServer
+//       接口签名（仅 FakeFailureRule schema 字段新增 optional 字段）
 
 import { Buffer } from "node:buffer";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -89,6 +98,16 @@ export type FakeFailureRule = Readonly<{
   readonly statusCode?: number;
   /** Response body; 默认 { error: "test_injected_failure" }. */
   readonly responseBody?: Record<string, unknown>;
+  /**
+   * Phase 11 / Step 5 (2026-06-10) 扩展（K.5 候选 γ；元规则 B 兼容 — Readonly type
+   * 加 optional 字段）：当 request body 含 idempotencyKey 字段且匹配 substring 时触发失败；
+   * 未指定 = 不约束 body（与 Step 4 既有 callers 兼容）。
+   *
+   * 用途：ADL Saga step 4 (insurance-fund-deduction) + step 5 (settle-account-funds)
+   * 都用 /transfer-fund endpoint；区分依赖 body.idempotencyKey 子串
+   * (`:insurance` / `:settle:` / `:reverse-insurance` / `:reverse-settle:`)。
+   */
+  readonly bodyIdempotencyKeyPattern?: string;
 }>;
 
 /**
@@ -240,18 +259,28 @@ export const createFakeEnginesServer = async (
     options?.caseFailureRules ?? [];
 
   /**
-   * 失败规则匹配：traceId substring + path 完全匹配。
+   * 失败规则匹配：traceId substring + path 完全匹配 + 可选 body.idempotencyKey
+   * substring（Phase 11 / Step 5 扩展 — ADL step 4 vs step 5 区分场景）。
    * 返回首个匹配规则；未命中返回 undefined（fallback 到 happyResponses）。
    */
   const matchFailureRule = (
     path: string,
-    traceId: string | null
+    traceId: string | null,
+    body: unknown
   ): FakeFailureRule | undefined => {
     if (failureRules.length === 0 || traceId === null) return undefined;
     for (const rule of failureRules) {
-      if (rule.path === path && traceId.includes(rule.traceIdPattern)) {
-        return rule;
+      if (rule.path !== path) continue;
+      if (!traceId.includes(rule.traceIdPattern)) continue;
+      // Phase 11 / Step 5 K.5 候选 γ：可选 body.idempotencyKey 匹配
+      if (rule.bodyIdempotencyKeyPattern !== undefined) {
+        if (body === null || typeof body !== "object" || Array.isArray(body)) continue;
+        const bodyObj = body as Record<string, unknown>;
+        const idempotencyKey = bodyObj["idempotencyKey"];
+        if (typeof idempotencyKey !== "string") continue;
+        if (!idempotencyKey.includes(rule.bodyIdempotencyKeyPattern)) continue;
       }
+      return rule;
     }
     return undefined;
   };
@@ -287,8 +316,9 @@ export const createFakeEnginesServer = async (
 
     receivedRequests.push({ method, path, body: bodyJson, traceId });
 
-    // K.5 候选 α：优先匹配失败规则（caseId 路由）→ fallback happyResponses → 404.
-    const failureRule = matchFailureRule(path, traceId);
+    // K.5 候选 α (Step 4) / γ (Step 5)：优先匹配失败规则（caseId 路由 + 可选 body
+    // matching）→ fallback happyResponses → 404.
+    const failureRule = matchFailureRule(path, traceId, bodyJson);
     if (failureRule !== undefined) {
       writeJson(
         res,

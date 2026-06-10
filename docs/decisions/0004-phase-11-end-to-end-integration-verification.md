@@ -572,6 +572,61 @@ Liquidation 全流程兑现 = §8.2 顺利路径覆盖第一半；Step 3 ADL 全
 
 ---
 
+### Step 4: Liquidation Compensation Path E2E
+
+**性质**：Phase 11 整数 Step 编号纪律严守（Step 4 业务功能推进；进 Phase 11 12 Step 计数 → 完成后 8/12）
+**前置满足**：Step 3 PR #18 merged（`a28bd67`）+ KI-P8-003 hotfix RESOLVED + 测试基线 2004
+
+#### K.1-K.7 PHASE_DESIGN 裁决
+
+- **K.1 Liquidation Saga 补偿路径分析（实测 liquidation-saga.ts 557 LOC + ADR-0002 Step 7 段）**：5 step 中 step 1-2 是 read-only noop compensate；step 3 (submit-close-orders) 反向 cancelOrder；step 4 (release-margin) 反向 lockMargin；step 5 (settle-fund-transfer) 反向 transferFund（from/to 对调）。补偿路径触发场景：step 5 execute fail → 完整补偿链 [lock-margin (step 4 compensate)] → [cancel-order (step 3 compensate)] 严格逆序；Q 终态触发：step 5 execute fail + step 4 lock-margin compensate fail → 死信入队 step 4
+- **K.2 fake-engines 扩展策略**：**候选 α** caseId 路由 + optional options 参数（与 happyResponses 模式对称；元规则 B 兼容）
+- **K.3 测试覆盖度**：**α' 6 it（5 视角 + 1 it Q）** — 前 5 it 1:1 mirror Step 2/3 5 视角；第 6 it 专 Q 终态（不变量 3 + 5 主测唯一窗口）
+- **K.4 P + Q 双终态覆盖**：**双覆盖** — K.7 5 不变量端到端兑现完整性的工程必要性（不变量 3 仅 Q 路径可观察）
+- **K.5 fake API 具体设计**：FakeFailureRule + FakeEnginesServerOptions + createFakeEnginesServer(options?) 签名扩展接受可选 options；既有 Step 2 + Step 3 无参调用零影响（元规则 B 严守）
+- **K.6 KI-P9-001 第三次评估**：**选项 1（实测未触及，维持 OPEN）** — 基于 4 探针实测（非惰性推断）：(1) liquidation-saga.ts 0 引用 state-transition-saga；(2) e2e 目录全部 0 引用 state-transition-saga；(3) createE2eHarness 不消费 application command handlers；(4) Step 4 沿用 saga.runForCase 直接调用模式（与 Step 2/3 同模式）→ 结构性不可触及 KI-P9-001 数据副本漂移区域
+- **K.7 5 不变量端到端兑现表**：见 docs/phase11/06-step-4 §E 完整表（每个不变量都有至少 1 个 it 主测兑现；不变量 3 + 5 链式在 Q 路径独家主测）
+
+#### 实施与验证
+
+- **测试覆盖度**：6 it 全部 K.3 α' + K.4 P+Q 视角；测试增量 2004 → 2010（+6）
+- **fake-engines.ts 扩展**：新增 export `FakeFailureRule` + `FakeEnginesServerOptions`；新增 happyResponses key `/lock-margin` + `/cancel-order`（P 补偿测试需要）；createFakeEnginesServer 签名扩展接受可选 options；既有 Step 2 + Step 3 无参调用零影响
+- **liquidation-compensation.e2e.test.ts 新建**：约 430 LOC；含 buildLiquidationInput fixture + FORWARD_STEP_PATHS + COMPENSATION_STEP_PATHS + STEP_NAMES + 6 it 实施
+- **本地验证**：lint + typecheck + build + 全量 2010 测试（1873 PASS + 137 skipped；本地无 PG/Kafka services → e2e 全部 skip）全部通过；CI services 会运行
+- **KI-P9-001 第三次评估留痕**：docs/KNOWN-ISSUES.md Phase 11 / Step 4 Liquidation 补偿 e2e 第三次评估记录（选项 1 + 4 探针证据沉淀）
+
+#### 与 Step 2 + Step 3 模式对称性 + 演进证据
+
+| 维度 | Step 2 Liquidation 顺利 | Step 3 ADL 顺利 | **Step 4 Liquidation 补偿** |
+|------|--------------------------|------------------|------------------------------|
+| 测试视角数 | 5 (P 顺利) | 5 (P 顺利) | **6 (5 视角 + 1 it Q)** |
+| 业务路径 | 顺利路径 | 顺利路径 | **补偿路径首战** |
+| HTTP order 视角 | 正向 5 step | 正向 5 step | **反向补偿 2 step** |
+| 终态覆盖 | completed | completed | **compensated (P) + partially_compensated (Q)** |
+| 测试增量 | +5 (1996→1999) | +5 (1999→2004) | **+6 (2004→2010)** |
+| 5 不变量端到端兑现 | 不涉及 | 不涉及 | **完整 5 个全部兑现（K.7 表）** |
+| KI-P9-001 评估 | 第一次（未触及）| 第二次（未触及）| **第三次（4 探针实测未触及）** |
+
+#### Phase 11 进度更新
+
+- 7/12 → **8/12**（Kickoff + Step 0 + 0.5 + 1 + 2 + 3 + 4）
+- KI-P8-003 hotfix（PR #17）**不计入 Step 计数**
+- Step 5 起草指令独立承接（ADL 补偿路径 e2e；KI-P9-001 第四次评估）
+
+---
+
+### Step 4 Alternatives
+
+- 裁决 K.3 β' (8 it 按补偿场景拆分) 拒：破坏 Step 2/3 严格对称；额外 it (idempotent / 独立 dead_letter / 独立 audit) 与 α' 6 it 已覆盖视角部分重叠
+- 裁决 K.3 γ' (仅 1 it P) 拒：K.7 5 不变量端到端兑现表严重缺失（不变量 3 死信入队 + 不变量 5 链式继续 在 Q 路径独家观察）
+- 裁决 K.4 仅 P 拒：不变量 3 (compensation_failed 入死信) 端到端无证据；放弃 Q 等于放弃工程价值核心
+- 裁决 K.4 仅 Q 拒：放弃 P 顺利补偿路径覆盖；不符合 Step 2/3 严格对称演进
+- 裁决 K.5 β (setFailureRules setter) 拒：修改 FakeEnginesServer 类型签名（虽是 readonly 扩展）；API 表面增加；K.5 候选 α (optional options 参数) 更克制
+- 裁决 K.5 γ (引入 mock library nock/msw) 拒：违反元规则 P 零新依赖（Phase 11 已 34 步零新依赖）；fake-engines.ts 自身已能满足 caseId 路由需求
+- 裁决 K.6 扩张 e2e 范围走 application command lifecycle 拒：违反 Section 九范围严守立约（"仅 Liquidation 补偿路径 e2e；不顺手做"）；本 Step 工程价值（K.7 5 不变量端到端）已完整不需要扩张
+
+---
+
 ## References
 
 - 《Tianqi 项目架构与代码规范总文档》§22.1 ADR 规范、§24.1 PR 七项、§27 最终裁决原则

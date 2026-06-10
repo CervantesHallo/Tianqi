@@ -195,6 +195,16 @@
   - Step 6 端到端恢复路径从持久化状态恢复时校验 transitionRules 数据副本
   - Phase 11 / Step 4-6 实地评估处置；不在 Kickoff 阶段裁决具体方案
 - **Phase 11 / Step 3 ADL e2e 第二次评估（2026-06-03）**：本 Step PHASE_DESIGN K.6 实测分析 — ADL Saga 与 StateTransition Saga 是两个独立 application 层 saga 模块（adl-saga.ts 0 引用 state-transition-saga 或 risk-case-state-machine；ADL 内部状态机由 saga-orchestrator 管理 overallStatus / stepStatuses 与 StateTransition Saga 完全独立；ADL 调用的 Engine MarkPrice/Position/Match/Fund 均不涉及 risk-case 状态转换）。**评估结论 = 选项 1（未触及/未复现）**：ADL e2e 测试结构性不可触及 KI-P9-001 数据副本漂移风险区域；**状态维持 OPEN**；Step 4-6（补偿/死信/恢复路径，可能触及 RiskCase 状态机）继续评估（第三次评估机会在 Step 4 起草指令承接）。详见 docs/decisions/0004 §Step 3 段 + docs/phase11/05-step-3-adl-e2e-happy-path.md §F。
+- **Phase 11 / Step 4 Liquidation 补偿 e2e 第三次评估（2026-06-03；最高触及概率窗口实测）**：本 Step PHASE_DESIGN K.6 基于 **4 探针实测（非惰性推断）**——用户硬指令明确禁止用 Step 2+3"未触及"结论惰性推断：
+  - Probe 1: `grep -E "state-transition\|risk-case-state-machine\|stateTransitionRules" packages/application/src/saga/liquidation-saga.ts` → **0 hits**（仅 import @tianqi/shared + @tianqi/ports + ./saga-orchestrator.js）
+  - Probe 2: `grep -rE "state-transition\|risk-case-state-machine" packages/application/src/e2e/` → **0 hits**（test-harness / fake-engines / liquidation-saga.e2e / adl-saga.e2e / liquidation-compensation.e2e 全部 0 引用）
+  - Probe 3: createE2eHarness 实测不消费 application command handlers（仅创建 postgres + kafka + 5 engine adapter + audit sink）
+  - Probe 4: Step 4 e2e 模式实测 — liquidation-compensation.e2e.test.ts 6 个 it 全部 `saga.runForCase(input)` 直接调用，与 Step 2/3 同模式
+  - 用户警告"补偿路径深度涉及 StateTransition" 实测澄清：RiskCase domain 状态机由 application command handlers（execute-liquidation-case-orchestration-command 等）管理；**与 Saga overallStatus 状态机独立**。Liquidation Saga 内部状态机由 saga-orchestrator 管理 `overallStatus / stepStatuses` — 不修改 RiskCase 状态
+  - **评估结论 = 选项 1（实测未触及，维持 OPEN）**：Step 4 沿用 Step 2+3 e2e 模式（saga.runForCase 直接调用），结构性不可触及 KI-P9-001 数据副本漂移区域；要触及需要扩张 e2e 范围走 application command lifecycle，违反用户立约 Section 九范围严守
+  - **与 Step 2+3 结论的关键差异**：本 Step 第三次评估**非惰性推断**——用户硬指令明确要求探针证据，本 Step 提供 4 探针；探针证据完整度高于前两次（前两次主要看顺利路径结构推断）
+  - **状态维持 OPEN**；第四次评估机会在 Phase 11 / Step 5（ADL 补偿路径 e2e）
+  - 详见 docs/decisions/0004 §Step 4 段 + docs/phase11/06-step-4-liquidation-compensation-e2e.md §F。
 
 ---
 
